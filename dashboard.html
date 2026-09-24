@@ -109,6 +109,20 @@ async function syncOnlineAppointments(options={}){
     }
     if(deduped.length!==(data.agenda||[]).length){data.agenda=deduped;changed=true}
 
+    // Remove órfãos locais que ocupam o mesmo horário de um agendamento online ativo.
+    // Isso cobre registros antigos criados no navegador antes da sincronização,
+    // mesmo quando eles não possuem source/onlineId.
+    const occupiedOnlineSlots=new Set((data.agenda||[])
+      .filter(ev=>ev.onlineId && String(ev.status||'').trim().toLowerCase()!=='cancelado')
+      .map(ev=>`${String(ev.date||'')}|${String(ev.time||'')}`));
+    const beforeOrphans=(data.agenda||[]).length;
+    data.agenda=(data.agenda||[]).filter(ev=>{
+      if(ev.onlineId)return true;
+      const slot=`${String(ev.date||'')}|${String(ev.time||'')}`;
+      return !occupiedOnlineSlots.has(slot);
+    });
+    if(data.agenda.length!==beforeOrphans)changed=true;
+
     if(changed)localStorage.setItem(KEY,JSON.stringify(data));
     renderAll();
     setAppointmentConnectionStatus('Conectado. Última sincronização: '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),'ok');
