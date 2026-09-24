@@ -18,19 +18,98 @@ if(!session){location.href='login.html';throw new Error('Sessão não encontrada
 const KEY='kaliny_v6_data';const RECENT_KEY='kaliny_recent_clients';const base={clients:[],agenda:[],finance:[],calcHistory:[],documents:[],processes:[],notes:[],previdenciario:[]};let storedData=null;try{storedData=JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){storedData=null}let data={...base,...(storedData&&typeof storedData==='object'?storedData:{})};Object.keys(base).forEach(k=>{if(!Array.isArray(data[k]))data[k]=[]});function ensureRecordIds(){let changed=false;const ensure=(arr,prefix)=>{const used=new Set();arr.forEach((item,i)=>{let id=String(item?.id||'').trim();if(!id||used.has(id)){id=prefix+Date.now()+'_'+i+'_'+Math.random().toString(36).slice(2,7);item.id=id;changed=true}used.add(id)})};ensure(data.agenda,'evt_');ensure(data.finance,'fin_');ensure(data.processes,'proc_');ensure(data.documents,'doc_');ensure(data.notes,'note_');ensure(data.calcHistory,'calc_');return changed}const idsChanged=ensureRecordIds();if(idsChanged){try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){console.error('Não foi possível normalizar IDs:',e)}}let syncTimer=null;function save(){try{Object.keys(base).forEach(k=>{if(!Array.isArray(data[k]))data[k]=[]});localStorage.setItem(KEY,JSON.stringify(data));}catch(err){console.error('Falha ao salvar:',err);toast('Não foi possível salvar os dados neste navegador. Verifique se o armazenamento local está disponível.');return false}try{renderAll();}catch(err){console.error('Falha ao atualizar a tela:',err)}if(serverMode){clearTimeout(syncTimer);syncTimer=setTimeout(syncToServer,250)}return true}
 async function api(path,options={}){const headers={...(options.headers||{}),'Content-Type':'application/json','Authorization':'Bearer '+session.token};const r=await fetch(API_BASE+path,{...options,headers});if(r.status===401){sessionStorage.removeItem(AUTH_KEY);location.href='login.html';throw new Error('Não autenticado')}if(!r.ok)throw new Error('API '+r.status);return r.json()}
 
-async function syncOnlineAppointments(){
-  if(!APPOINTMENTS_API_URL || APPOINTMENTS_API_URL.includes('COLE_AQUI')) return;
-  try{const url=APPOINTMENTS_API_URL+'?action=adminList&key='+encodeURIComponent(APPOINTMENTS_ADMIN_KEY);const r=await fetch(url);const j=await r.json();if(!j.ok||!Array.isArray(j.appointments))return;let changed=false;const existing=new Set((data.agenda||[]).map(x=>String(x.onlineId||x.id||'')));j.appointments.forEach(a=>{if(!a.id||existing.has(String(a.id)))return;data.agenda.push({id:'evt_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),onlineId:String(a.id),date:String(a.date||''),time:String(a.time||''),title:'Consulta — '+String(a.type||'Consulta jurídica'),client:a.name,phone:a.phone,email:a.email,area:a.type,mode:a.mode,status:a.status||'Pendente',source:'site',notes:a.notes||''});changed=true;});if(changed){localStorage.setItem(KEY,JSON.stringify(data));renderAll();toast('Novos agendamentos online importados');}}
-  catch(e){console.warn('Agenda online indisponível',e)}
-}
+function onlineConfig(){const url=String(localStorage.getItem('kaliny_appointments_api_url')||APPOINTMENTS_API_URL||'').trim();const key=String(localStorage.getItem('kaliny_appointments_admin_key')||'').trim();return {url,key}}
+function setAppointmentConnectionStatus(text,kind=''){const el=document.getElementById('appointmentConnectionStatus');if(el){el.textContent=text;el.className='mini-help'+(kind?' '+kind:'')}}
+async function syncOnlineAppointments(options={}){
+  const {url,key}=onlineConfig();
+  if(!url||url.includes('COLE_AQUI')){setAppointmentConnectionStatus('Configure a URL e a chave administrativa em Configurações.');return false}
+  if(!key){setAppointmentConnectionStatus('Informe a chave administrativa em Configurações.','warn');return false}
+  try{
+    const r=await fetch(url+'?action=adminList&key='+encodeURIComponent(key),{cache:'no-store'});
+    const j=await r.json();
+    if(!j.ok){setAppointmentConnectionStatus(j.error==='unauthorized'?'Chave administrativa inválida.':'Não foi possível consultar a agenda online.','warn');return false}
+    if(!Array.isArray(j.appointments)){setAppointmentConnectionStatus('Resposta inválida da agenda online.','warn');return false}
 
+    const norm=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();
+    const digits=s=>String(s??'').replace(/\D/g,'');
+    const samePerson=(a,b)=>{
+      const na=norm(a?.client||a?.name), nb=norm(b?.client||b?.name);
+      const pa=digits(a?.phone), pb=digits(b?.phone);
+      return (na&&nb&&na===nb) || (pa&&pb&&pa===pb);
+    };
+    const keyFor=a=>`${String(a?.date||'')}|${String(a?.time||'')}`;
+    let changed=false;
+    const byOnline=new Map();
+    (data.agenda||[]).forEach(x=>{if(x.onlineId)byOnline.set(String(x.onlineId),x)});
+
+    for(const a of j.appointments){
+      if(!a.id)continue;
+      const onlineId=String(a.id);
+      const next={
+        date:String(a.date||''), time:String(a.time||''), client:String(a.name||''),
+        phone:String(a.phone||''), email:String(a.email||''), area:String(a.type||''),
+        mode:String(a.mode||''), status:(String(a.status||'Pendente').trim()||'Pendente'),
+        notes:String(a.notes||'')
+      };
+      let existing=byOnline.get(onlineId);
+
+      // Migra registros antigos criados antes do onlineId existir, em vez de duplicá-los.
+      if(!existing){
+        existing=(data.agenda||[]).find(x=>
+          !x.onlineId &&
+          String(x.date||'')===next.date &&
+          String(x.time||'')===next.time &&
+          String(x.status||'Pendente').trim().toLowerCase()!=='cancelado' &&
+          (String(x.source||'').toLowerCase()==='site' || samePerson(x,next))
+        );
+        if(existing){existing.onlineId=onlineId;changed=true;byOnline.set(onlineId,existing)}
+      }
+
+      if(existing){
+        Object.keys(next).forEach(k=>{if(String(existing[k]??'')!==next[k]){existing[k]=next[k];changed=true}});
+        existing.title='Consulta — '+String(a.type||'Consulta jurídica');
+        existing.source='site';
+      }else{
+        existing={id:'evt_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),onlineId,date:next.date,time:next.time,title:'Consulta — '+String(a.type||'Consulta jurídica'),client:next.client,phone:next.phone,email:next.email,area:next.area,mode:next.mode,status:next.status,source:'site',notes:next.notes};
+        data.agenda.push(existing);byOnline.set(onlineId,existing);changed=true;
+      }
+    }
+
+    // Remove duplicatas locais do mesmo agendamento online/mesma pessoa e horário.
+    const seenOnline=new Set();
+    const seenSiteSlot=new Map();
+    const deduped=[];
+    for(const ev of data.agenda||[]){
+      if(ev.onlineId){
+        const oid=String(ev.onlineId);
+        if(seenOnline.has(oid)){changed=true;continue}
+        seenOnline.add(oid);
+      }
+      if(String(ev.source||'').toLowerCase()==='site' && ev.date && ev.time && !ev.onlineId){
+        const sk=`${ev.date}|${ev.time}`;
+        if(seenSiteSlot.has(sk)){changed=true;continue}
+        seenSiteSlot.set(sk,true);
+      }
+      deduped.push(ev);
+    }
+    if(deduped.length!==(data.agenda||[]).length){data.agenda=deduped;changed=true}
+
+    if(changed)localStorage.setItem(KEY,JSON.stringify(data));
+    renderAll();
+    setAppointmentConnectionStatus('Conectado. Última sincronização: '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),'ok');
+    if(!options.silent)toast(changed?'Agenda online sincronizada':'Agenda online já está atualizada');
+    return true;
+  }catch(e){console.warn('Agenda online indisponível',e);setAppointmentConnectionStatus('Não foi possível conectar à agenda online.','warn');return false}
+}
+async function updateOnlineAppointmentStatus(ev,status){const {url,key}=onlineConfig();if(!ev){toast('Agendamento não encontrado');return false}if(!ev?.onlineId){ev.status=status;save();renderAgenda();if(ev.date)showAgendaDay(ev.date);toast('Agendamento '+status.toLowerCase());return true}if(!url||!key){toast('Configure a conexão online em Configurações');return false}try{const body=new URLSearchParams({action:'adminUpdate',key,id:String(ev.onlineId),status});const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body});const j=await r.json();if(!j.ok){toast(j.error==='unauthorized'?'Chave administrativa inválida':j.error==='not_found'?'Agendamento não encontrado no servidor':'Não foi possível atualizar o agendamento');return false}ev.status=status;save();toast('Agendamento '+status.toLowerCase());await syncOnlineAppointments({silent:true});closeModal();renderAgenda();showAgendaDay(ev.date);return true}catch(e){console.warn(e);toast('Falha ao atualizar o agendamento online');return false}}
 async function syncToServer(){try{await api('/api/data',{method:'PUT',body:JSON.stringify(data)});localStorage.setItem('kaliny_last_sync',new Date().toISOString());const badge=document.getElementById('syncStatus');if(badge){badge.textContent='Sincronizado';badge.className='sync-badge ok'}}catch(e){const badge=document.getElementById('syncStatus');if(badge){badge.textContent='Servidor indisponível';badge.className='sync-badge warn'}}}
 async function hydrateFromServer(){if(!serverMode)return;try{const remote=await api('/api/data');const local=JSON.parse(localStorage.getItem(KEY)||'null');const remoteHas=remote && Object.values(remote).some(v=>Array.isArray(v)&&v.length);if(remoteHas||!local||!local.clients?.length){data={...base,...remote};localStorage.setItem(KEY,JSON.stringify(data));}else{data={...base,...local};await syncToServer();}const badge=document.getElementById('syncStatus');if(badge){badge.textContent='Servidor conectado';badge.className='sync-badge ok'}}catch(e){serverMode=false;const badge=document.getElementById('syncStatus');if(badge){badge.textContent='Modo local';badge.className='sync-badge warn'}}}function money(v){return Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}function parseBRMoney(v){const raw=String(v??'').trim();if(!raw)return 0;let s=raw.replace(/R\$\s?/g,'').replace(/\s/g,'');if(s.includes(',')){s=s.replace(/\./g,'').replace(',','.')}else{s=s.replace(/[^0-9.-]/g,'')}const n=Number(s);return Number.isFinite(n)?n:0}function parseMoneyBR(v){return parseBRMoney(v)}function formatBRMoneyInputValue(v){const n=parseBRMoney(v);return n?money(n):''}function wireMoneyField(el){if(!el||el.dataset.moneyWired==='1')return;el.dataset.moneyWired='1';el.type='text';el.inputMode='decimal';if(el.value)el.value=formatBRMoneyInputValue(el.value);el.addEventListener('focus',()=>{const n=parseBRMoney(el.value);el.value=n?String(n).replace('.',','):'';el.select()});el.addEventListener('blur',()=>{el.value=formatBRMoneyInputValue(el.value)});}function esc(s){return String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}function toast(t){const x=document.getElementById('toast');x.textContent=t;x.classList.add('show');setTimeout(()=>x.classList.remove('show'),1800)}
 function showPage(p){document.querySelectorAll('.dash-page').forEach(x=>x.classList.remove('active'));document.getElementById('page-'+p).classList.add('active');document.querySelectorAll('.dash-nav button[data-page]').forEach(x=>x.classList.toggle('active',x.dataset.page===p));renderAll()}document.querySelectorAll('.dash-nav button[data-page]').forEach(b=>{if(!can(b.dataset.page)){b.style.display='none';}else b.onclick=()=>showPage(b.dataset.page)});document.querySelectorAll('[data-page-jump]').forEach(b=>b.onclick=()=>showPage(b.dataset.pageJump));
-function renderSettings(){const name=document.getElementById('currentUserName'),meta=document.getElementById('currentUserMeta'),list=document.getElementById('usersList');if(!name)return;name.textContent=session.name;meta.textContent=session.email+' · '+session.role+' · modo local';const users=JSON.parse(localStorage.getItem(USERS_KEY)||'[]');list.innerHTML=users.map(u=>`<div class="user-row"><div><b>${esc(u.name)}</b><small>${esc(u.email)} · ${esc(u.role)}</small></div><span class="tag">${u.active===false?'Inativo':'Ativo'}</span></div>`).join('')}
+function renderSettings(){const name=document.getElementById('currentUserName'),meta=document.getElementById('currentUserMeta'),list=document.getElementById('usersList');if(!name)return;name.textContent=session.name;meta.textContent=session.email+' · '+session.role+' · modo local';const users=JSON.parse(localStorage.getItem(USERS_KEY)||'[]');list.innerHTML=users.map(u=>`<div class="user-row"><div><b>${esc(u.name)}</b><small>${esc(u.email)} · ${esc(u.role)}</small></div><span class="tag">${u.active===false?'Inativo':'Ativo'}</span></div>`).join('');const cfg=onlineConfig(),urlEl=document.getElementById('appointmentsApiUrl'),keyEl=document.getElementById('appointmentsAdminKey');if(urlEl)urlEl.value=cfg.url;if(keyEl)keyEl.value=cfg.key;setAppointmentConnectionStatus(cfg.key?'Chave configurada. Clique em “Testar conexão”.':'Configure a chave administrativa para sincronizar.')}
 function logout(){audit('logout');sessionStorage.removeItem(AUTH_KEY);location.href='login.html'}
 setInterval(()=>{if(!touchSession())return},60000);['click','keydown'].forEach(ev=>document.addEventListener(ev,()=>{touchSession()}, {passive:true}));
-setTimeout(syncOnlineAppointments,800); onlineAppointmentsTimer=setInterval(syncOnlineAppointments,60000);
+setTimeout(()=>syncOnlineAppointments({silent:true}),800); onlineAppointmentsTimer=setInterval(()=>syncOnlineAppointments({silent:true}),60000);
+document.getElementById('saveAppointmentSettings')?.addEventListener('click',()=>{const url=String(document.getElementById('appointmentsApiUrl')?.value||'').trim(),key=String(document.getElementById('appointmentsAdminKey')?.value||'').trim();localStorage.setItem('kaliny_appointments_api_url',url);localStorage.setItem('kaliny_appointments_admin_key',key);setAppointmentConnectionStatus('Configuração salva. Testando conexão...');syncOnlineAppointments({silent:true});toast('Conexão da agenda salva')});document.getElementById('testAppointmentConnection')?.addEventListener('click',()=>syncOnlineAppointments());document.getElementById('syncOnlineAgenda')?.addEventListener('click',()=>syncOnlineAppointments());
 document.getElementById('exportBackup').onclick=exportBackup;document.getElementById('importBackup').onchange=e=>importBackup(e.target.files[0]);document.getElementById('logoutBtn').onclick=logout;document.getElementById('lockNow').onclick=()=>{sessionStorage.removeItem(AUTH_KEY);location.href='login.html'};
 document.getElementById('newUser').onclick=()=>{openModal('Novo usuário',`<form id="userForm"><div class="form-grid"><div class="field"><label>Nome</label><input name="name" required></div><div class="field"><label>E-mail</label><input name="email" type="email" required></div><div class="field"><label>Perfil</label><select name="role"><option>Advogada</option><option>Assistente</option><option>Administradora</option></select></div><div class="field"><label>Senha inicial</label><input name="password" type="password" minlength="6" required></div></div><div class="notice"><b>Conta:</b> com o backend conectado, o usuário é criado no servidor. No modo local, fica apenas neste navegador.</div><div class="form-actions"><button class="d-btn" type="submit">Criar usuário</button></div></form>`);document.getElementById('userForm').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);try{if(serverMode){await api('/api/users',{method:'POST',body:JSON.stringify({name:f.get('name'),email:f.get('email'),role:f.get('role'),password:f.get('password')})});toast('Usuário criado no servidor');}else{const users=JSON.parse(localStorage.getItem(USERS_KEY)||'[]');if(users.some(u=>u.email.toLowerCase()===String(f.get('email')).toLowerCase())){toast('E-mail já cadastrado');return}const passwordHash=await hashPassword(String(f.get('password')));users.push({id:'usr_'+Date.now(),name:f.get('name'),email:f.get('email'),passwordHash,role:f.get('role'),active:true});localStorage.setItem(USERS_KEY,JSON.stringify(users));audit('user_created',String(f.get('email')));toast('Usuário criado localmente')}closeModal();renderSettings();}catch(err){toast(err.message.includes('409')?'E-mail já cadastrado':'Não foi possível criar o usuário')}}};
 function exportBackup(){const payload={version:'v18',exportedAt:new Date().toISOString(),data};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='kaliny-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);audit('backup_export');toast('Backup exportado')}
@@ -47,7 +126,27 @@ function pad2(n){return String(n).padStart(2,'0')}
 function dateKey(y,m,d){return `${y}-${pad2(m+1)}-${pad2(d)}`}
 function formatDateBR(key){const [y,m,d]=String(key).split('-').map(Number);return `${pad2(d)}/${pad2(m)}/${y}`}
 function renderAgenda(){const el=document.getElementById('agendaCalendar'),ov=document.getElementById('overviewAgenda'),pd=document.getElementById('processDeadlinesAgenda');const agenda=data.agenda||[],processes=data.processes||[],todayKey=new Date().toISOString().slice(0,10),y=agendaViewDate.getFullYear(),m=agendaViewDate.getMonth(),monthNames=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'],week=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'],first=new Date(y,m,1),last=new Date(y,m+1,0),startDay=first.getDay(),days=last.getDate(),prevDays=new Date(y,m,0).getDate();const cells=[];for(let i=0;i<42;i++){const dayNum=i-startDay+1;let cy=y,cm=m,cd=dayNum,current=true;if(dayNum<1){cm=m-1;if(cm<0){cm=11;cy--}cd=prevDays+dayNum;current=false}else if(dayNum>days){cm=m+1;if(cm>11){cm=0;cy++}cd=dayNum-days;current=false}const key=dateKey(cy,cm,cd),evs=agenda.filter(e=>e.date===key),deadlines=processes.filter(p=>p.deadline===key&&p.status!=='Encerrado'),isToday=key===todayKey,chips=[];evs.slice().sort((a,b)=>(a.time||'').localeCompare(b.time||'')).slice(0,3).forEach(e=>{const c=e.clientId?clientById(e.clientId):null;chips.push(`<button type="button" class="calendar-chip event-chip" onclick="showAgendaDay('${key}')"><span>${esc(e.time||'')}</span> ${esc(e.title||'Compromisso')}${c?` · ${esc(c.name)}`:''}</button>`)});deadlines.slice(0,2).forEach(p=>{const c=clientById(p.clientId);chips.push(`<button type="button" class="calendar-chip deadline-chip" onclick="showAgendaDay('${key}')">⚖ ${esc(p.number||'Prazo')}${c?` · ${esc(c.name)}`:''}</button>`)});const more=evs.length+deadlines.length-chips.length;cells.push(`<div class="calendar-day${current?'':' outside'}${isToday?' today':''}"><div class="calendar-day-head"><button type="button" class="calendar-day-number" onclick="showAgendaDay('${key}')">${cd}</button>${evs.length+deadlines.length?`<span class="calendar-count">${evs.length+deadlines.length}</span>`:''}</div><div class="calendar-chips">${chips.join('')}${more>0?`<button type="button" class="calendar-more" onclick="showAgendaDay('${key}')">+${more} mais</button>`:''}</div></div>`)}if(el)el.innerHTML=`<div class="calendar-grid calendar-weekdays">${week.map(w=>`<div>${w}</div>`).join('')}</div><div class="calendar-grid calendar-days">${cells.join('')}</div>`;const label=document.getElementById('agendaMonthLabel');if(label)label.textContent=`${monthNames[m]} ${y}`;if(ov){const upcoming=agenda.slice().sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time)).filter(e=>e.date>=todayKey).slice(0,5);ov.innerHTML=upcoming.length?'<table class="d-table"><thead><tr><th>Data</th><th>Hora</th><th>Compromisso</th><th>Cliente</th></tr></thead><tbody>'+upcoming.map(e=>{const c=e.clientId?clientById(e.clientId):null;return `<tr><td>${esc(formatDateBR(e.date))}</td><td>${esc(e.time)}</td><td>${esc(e.title)}</td><td>${esc(c?c.name:(e.client||'Sem cliente'))}</td></tr>`}).join('')+'</tbody></table>':'<div class="empty">Agenda livre por enquanto.</div>'}const deadlines=processes.filter(p=>p.deadline&&p.status!=='Encerrado').sort((a,b)=>a.deadline.localeCompare(b.deadline));if(pd)pd.innerHTML=deadlines.length?'<table class="d-table"><thead><tr><th>Prazo</th><th>Processo</th><th>Cliente</th><th>Status</th></tr></thead><tbody>'+deadlines.map(p=>{const c=clientById(p.clientId),cls=p.deadline<todayKey?' style="color:#a33;font-weight:700"':'';return `<tr><td${cls}>${formatDateBR(p.deadline)}${p.deadline===todayKey?' · HOJE':''}</td><td><b>${esc(p.number)}</b></td><td>${c?esc(c.name):'Sem vínculo'}</td><td><span class="tag">${esc(p.status)}</span></td></tr>`}).join('')+'</tbody></table>':'<div class="empty">Nenhum prazo processual cadastrado.</div>'}
-function showAgendaDay(key){ensureRecordIds();const events=(data.agenda||[]).filter(e=>e.date===key).sort((a,b)=>(a.time||'').localeCompare(b.time||'')),deadlines=(data.processes||[]).filter(p=>p.deadline===key&&p.status!=='Encerrado'),items=[];events.forEach(e=>{const c=e.clientId?clientById(e.clientId):null;items.push(`<div class="history-item"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><div><strong>${esc(e.title)}</strong> <span class="tag">${esc(e.time||'')}</span><p class="muted">${esc(c?c.name:(e.client||'Sem cliente'))}${e.area?' · '+esc(e.area):''}</p></div><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="d-btn light" type="button" onclick="openEventForm('${e.clientId||''}','${e.id}')">Editar</button><button class="d-btn light" type="button" onclick="deleteAgendaEvent('${e.id}')">Excluir</button></div></div></div>`)});deadlines.forEach(p=>{const c=clientById(p.clientId);items.push(`<div class="history-item"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><div><strong>⚖ ${esc(p.number||'Prazo processual')}</strong> <span class="tag">Prazo</span><p class="muted">${esc(c?c.name:'Sem cliente')} · ${esc(p.status||'')}</p><p>${esc(p.subject||'Sem assunto informado')}</p></div><button class="d-btn light" type="button" onclick="openProcessForm('${p.clientId||''}','${p.id}')">Editar processo</button></div></div>`)});openModal(`Agenda — ${formatDateBR(key)}`,items.length?items.join(''):'<div class="empty">Nenhum compromisso ou prazo nesta data.</div>')}
+function showAgendaDay(key){
+  ensureRecordIds();
+  const events=(data.agenda||[]).filter(e=>e.date===key).sort((a,b)=>(a.time||'').localeCompare(b.time||''));
+  const deadlines=(data.processes||[]).filter(p=>p.deadline===key&&p.status!=='Encerrado');
+  const items=[];
+  events.forEach(e=>{
+    const c=e.clientId?clientById(e.clientId):null;
+    const rawStatus=String(e.status||'Pendente').trim();
+    const status=rawStatus.toLowerCase()==='confirmado'?'Confirmado':rawStatus.toLowerCase()==='cancelado'?'Cancelado':'Pendente';
+    const statusTag=status==='Confirmado'?'style="background:#e6f1e8;color:#356b45"':status==='Cancelado'?'style="background:#f5e1df;color:#8b3f36"':'';
+    const online=e.onlineId?`<span class="tag" ${statusTag}>${esc(status)}</span>`:'';
+    let onlineActions='';
+    if(e.onlineId){
+      if(status==='Pendente') onlineActions += `<button class="d-btn light" type="button" onclick="updateOnlineAppointmentStatus((data.agenda||[]).find(x=>x.onlineId==='${esc(e.onlineId)}'),'Confirmado')">Confirmar</button>`;
+      if(status!=='Cancelado') onlineActions += `<button class="d-btn light" type="button" onclick="updateOnlineAppointmentStatus((data.agenda||[]).find(x=>x.onlineId==='${esc(e.onlineId)}'),'Cancelado')">Cancelar</button>`;
+    }
+    items.push(`<div class="history-item"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><div><strong>${esc(e.title)}</strong> <span class="tag">${esc(e.time||'')}</span> ${online}<p class="muted">${esc(c?c.name:(e.client||'Sem cliente'))}${e.area?' · '+esc(e.area):''}${e.mode?' · '+esc(e.mode):''}</p>${e.email?`<small class="muted">${esc(e.email)} · ${esc(e.phone||'')}</small>`:''}</div><div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">${onlineActions}<button class="d-btn light" type="button" onclick="openEventForm('${e.clientId||''}','${e.id}')">Editar</button><button class="d-btn light" type="button" onclick="deleteAgendaEvent('${e.id}')">Excluir</button></div></div></div>`);
+  });
+  deadlines.forEach(p=>{const c=clientById(p.clientId);items.push(`<div class="history-item"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><div><strong>⚖ ${esc(p.number||'Prazo processual')}</strong> <span class="tag">Prazo</span><p class="muted">${esc(c?c.name:'Sem cliente')} · ${esc(p.status||'')}</p><p>${esc(p.subject||'Sem assunto informado')}</p></div><button class="d-btn light" type="button" onclick="openProcessForm('${p.clientId||''}','${p.id}')">Editar processo</button></div></div>`)});
+  openModal(`Agenda — ${formatDateBR(key)}`,items.length?items.join(''):'<div class="empty">Nenhum compromisso ou prazo nesta data.</div>');
+}
 function renderFinance(){const el=document.getElementById('financeTable');if(!el)return;ensureRecordIds();if(!data.finance.length){el.innerHTML='<div class="empty">Nenhum lançamento cadastrado.</div>';return}el.innerHTML='<table class="d-table"><thead><tr><th>Data</th><th>Descrição</th><th>Cliente</th><th>Tipo</th><th>Valor</th><th>Status</th><th>Ações</th></tr></thead><tbody>'+data.finance.map(f=>{const c=f.clientId?clientById(f.clientId):null;return `<tr><td>${esc(f.date)}</td><td>${esc(f.desc)}</td><td>${esc(c?c.name:'Sem vínculo')}</td><td>${esc(f.type)}</td><td>${money(f.value)}</td><td>${esc(f.status||'pago')}</td><td><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="d-btn light" type="button" data-fin-edit="${esc(f.id)}">Editar</button><button class="d-btn light" type="button" data-fin-delete="${esc(f.id)}">Excluir</button></div></td></tr>`}).join('')+'</tbody></table>'}
 function openModal(title,html){document.getElementById('modalTitle').textContent=title;document.getElementById('modalBody').innerHTML=html;document.getElementById('modal').classList.add('show')}function closeModal(){document.getElementById('modal').classList.remove('show')}
 function clientById(id){return data.clients.find(c=>c.id===id)}

@@ -35,7 +35,87 @@ async function api(path,options={}){const headers={...(options.headers||{}),'Con
 
 function onlineConfig(){const url=String(localStorage.getItem('kaliny_appointments_api_url')||APPOINTMENTS_API_URL||'').trim();const key=String(localStorage.getItem('kaliny_appointments_admin_key')||'').trim();return {url,key}}
 function setAppointmentConnectionStatus(text,kind=''){const el=document.getElementById('appointmentConnectionStatus');if(el){el.textContent=text;el.className='mini-help'+(kind?' '+kind:'')}}
-async function syncOnlineAppointments(options={}){const {url,key}=onlineConfig();if(!url||url.includes('COLE_AQUI')){setAppointmentConnectionStatus('Configure a URL e a chave administrativa em Configurações.');return false}if(!key){setAppointmentConnectionStatus('Informe a chave administrativa em Configurações.','warn');return false}try{const r=await fetch(url+'?action=adminList&key='+encodeURIComponent(key),{cache:'no-store'});const j=await r.json();if(!j.ok){setAppointmentConnectionStatus(j.error==='unauthorized'?'Chave administrativa inválida.':'Não foi possível consultar a agenda online.','warn');return false}if(!Array.isArray(j.appointments)){setAppointmentConnectionStatus('Resposta inválida da agenda online.','warn');return false}let changed=false;const byOnline=new Map((data.agenda||[]).filter(x=>x.onlineId).map(x=>[String(x.onlineId),x]));j.appointments.forEach(a=>{if(!a.id)return;const onlineId=String(a.id),existing=byOnline.get(onlineId);if(existing){const next={date:String(a.date||''),time:String(a.time||''),client:String(a.name||''),phone:String(a.phone||''),email:String(a.email||''),area:String(a.type||''),mode:String(a.mode||''),status:String(a.status||'Pendente'),notes:String(a.notes||'')};Object.keys(next).forEach(k=>{if(String(existing[k]??'')!==next[k]){existing[k]=next[k];changed=true}})}else{data.agenda.push({id:'evt_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),onlineId:onlineId,date:String(a.date||''),time:String(a.time||''),title:'Consulta — '+String(a.type||'Consulta jurídica'),client:String(a.name||''),phone:String(a.phone||''),email:String(a.email||''),area:String(a.type||''),mode:String(a.mode||''),status:String(a.status||'Pendente'),source:'site',notes:String(a.notes||'')});changed=true}});if(changed)localStorage.setItem(KEY,JSON.stringify(data));renderAll();setAppointmentConnectionStatus('Conectado. Última sincronização: '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),'ok');if(!options.silent)toast(changed?'Agenda online sincronizada':'Agenda online já está atualizada');return true}catch(e){console.warn('Agenda online indisponível',e);setAppointmentConnectionStatus('Não foi possível conectar à agenda online.','warn');return false}}
+async function syncOnlineAppointments(options={}){
+  const {url,key}=onlineConfig();
+  if(!url||url.includes('COLE_AQUI')){setAppointmentConnectionStatus('Configure a URL e a chave administrativa em Configurações.');return false}
+  if(!key){setAppointmentConnectionStatus('Informe a chave administrativa em Configurações.','warn');return false}
+  try{
+    const r=await fetch(url+'?action=adminList&key='+encodeURIComponent(key),{cache:'no-store'});
+    const j=await r.json();
+    if(!j.ok){setAppointmentConnectionStatus(j.error==='unauthorized'?'Chave administrativa inválida.':'Não foi possível consultar a agenda online.','warn');return false}
+    if(!Array.isArray(j.appointments)){setAppointmentConnectionStatus('Resposta inválida da agenda online.','warn');return false}
+
+    const norm=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();
+    const digits=s=>String(s??'').replace(/\D/g,'');
+    const samePerson=(a,b)=>{
+      const na=norm(a?.client||a?.name), nb=norm(b?.client||b?.name);
+      const pa=digits(a?.phone), pb=digits(b?.phone);
+      return (na&&nb&&na===nb) || (pa&&pb&&pa===pb);
+    };
+    const keyFor=a=>`${String(a?.date||'')}|${String(a?.time||'')}`;
+    let changed=false;
+    const byOnline=new Map();
+    (data.agenda||[]).forEach(x=>{if(x.onlineId)byOnline.set(String(x.onlineId),x)});
+
+    for(const a of j.appointments){
+      if(!a.id)continue;
+      const onlineId=String(a.id);
+      const next={
+        date:String(a.date||''), time:String(a.time||''), client:String(a.name||''),
+        phone:String(a.phone||''), email:String(a.email||''), area:String(a.type||''),
+        mode:String(a.mode||''), status:(String(a.status||'Pendente').trim()||'Pendente'),
+        notes:String(a.notes||'')
+      };
+      let existing=byOnline.get(onlineId);
+
+      // Migra registros antigos criados antes do onlineId existir, em vez de duplicá-los.
+      if(!existing){
+        existing=(data.agenda||[]).find(x=>
+          !x.onlineId &&
+          String(x.date||'')===next.date &&
+          String(x.time||'')===next.time &&
+          String(x.status||'Pendente').trim().toLowerCase()!=='cancelado' &&
+          (String(x.source||'').toLowerCase()==='site' || samePerson(x,next))
+        );
+        if(existing){existing.onlineId=onlineId;changed=true;byOnline.set(onlineId,existing)}
+      }
+
+      if(existing){
+        Object.keys(next).forEach(k=>{if(String(existing[k]??'')!==next[k]){existing[k]=next[k];changed=true}});
+        existing.title='Consulta — '+String(a.type||'Consulta jurídica');
+        existing.source='site';
+      }else{
+        existing={id:'evt_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),onlineId,date:next.date,time:next.time,title:'Consulta — '+String(a.type||'Consulta jurídica'),client:next.client,phone:next.phone,email:next.email,area:next.area,mode:next.mode,status:next.status,source:'site',notes:next.notes};
+        data.agenda.push(existing);byOnline.set(onlineId,existing);changed=true;
+      }
+    }
+
+    // Remove duplicatas locais do mesmo agendamento online/mesma pessoa e horário.
+    const seenOnline=new Set();
+    const seenSiteSlot=new Map();
+    const deduped=[];
+    for(const ev of data.agenda||[]){
+      if(ev.onlineId){
+        const oid=String(ev.onlineId);
+        if(seenOnline.has(oid)){changed=true;continue}
+        seenOnline.add(oid);
+      }
+      if(String(ev.source||'').toLowerCase()==='site' && ev.date && ev.time && !ev.onlineId){
+        const sk=`${ev.date}|${ev.time}`;
+        if(seenSiteSlot.has(sk)){changed=true;continue}
+        seenSiteSlot.set(sk,true);
+      }
+      deduped.push(ev);
+    }
+    if(deduped.length!==(data.agenda||[]).length){data.agenda=deduped;changed=true}
+
+    if(changed)localStorage.setItem(KEY,JSON.stringify(data));
+    renderAll();
+    setAppointmentConnectionStatus('Conectado. Última sincronização: '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),'ok');
+    if(!options.silent)toast(changed?'Agenda online sincronizada':'Agenda online já está atualizada');
+    return true;
+  }catch(e){console.warn('Agenda online indisponível',e);setAppointmentConnectionStatus('Não foi possível conectar à agenda online.','warn');return false}
+}
 async function updateOnlineAppointmentStatus(ev,status){const {url,key}=onlineConfig();if(!ev?.onlineId){ev.status=status;save();return true}if(!url||!key){toast('Configure a conexão online em Configurações');return false}try{const body=new URLSearchParams({action:'adminUpdate',key,id:String(ev.onlineId),status});const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body});const j=await r.json();if(!j.ok){toast(j.error==='unauthorized'?'Chave administrativa inválida':'Não foi possível atualizar o agendamento');return false}ev.status=status;save();toast('Agendamento '+status.toLowerCase());return true}catch(e){console.warn(e);toast('Falha ao atualizar o agendamento online');return false}}
 async function syncToServer(){try{await api('/api/data',{method:'PUT',body:JSON.stringify(data)});localStorage.setItem('kaliny_last_sync',new Date().toISOString());const badge=document.getElementById('syncStatus');if(badge){badge.textContent='Sincronizado';badge.className='sync-badge ok'}}catch(e){const badge=document.getElementById('syncStatus');if(badge){badge.textContent='Servidor indisponível';badge.className='sync-badge warn'}}}
 async function hydrateFromServer(){if(!serverMode)return;try{const remote=await api('/api/data');const local=JSON.parse(localStorage.getItem(KEY)||'null');const remoteHas=remote && Object.values(remote).some(v=>Array.isArray(v)&&v.length);if(remoteHas||!local||!local.clients?.length){data={...base,...remote};localStorage.setItem(KEY,JSON.stringify(data));}else{data={...base,...local};await syncToServer();}const badge=document.getElementById('syncStatus');if(badge){badge.textContent='Servidor conectado';badge.className='sync-badge ok'}}catch(e){serverMode=false;const badge=document.getElementById('syncStatus');if(badge){badge.textContent='Modo local';badge.className='sync-badge warn'}}}function money(v){return Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}function parseBRMoney(v){const raw=String(v??'').trim();if(!raw)return 0;let s=raw.replace(/R\$\s?/g,'').replace(/\s/g,'');if(s.includes(',')){s=s.replace(/\./g,'').replace(',','.')}else{s=s.replace(/[^0-9.-]/g,'')}const n=Number(s);return Number.isFinite(n)?n:0}function parseMoneyBR(v){return parseBRMoney(v)}function formatBRMoneyInputValue(v){const n=parseBRMoney(v);return n?money(n):''}function wireMoneyField(el){if(!el||el.dataset.moneyWired==='1')return;el.dataset.moneyWired='1';el.type='text';el.inputMode='decimal';if(el.value)el.value=formatBRMoneyInputValue(el.value);el.addEventListener('focus',()=>{const n=parseBRMoney(el.value);el.value=n?String(n).replace('.',','):'';el.select()});el.addEventListener('blur',()=>{el.value=formatBRMoneyInputValue(el.value)});}function esc(s){return String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}function toast(t){const x=document.getElementById('toast');x.textContent=t;x.classList.add('show');setTimeout(()=>x.classList.remove('show'),1800)}
