@@ -114,7 +114,11 @@ body{overflow-x:hidden}
 .video-modal-copy{padding:20px 5px 4px}
 .video-modal-copy h2{font:500 34px 'Cormorant Garamond';margin:7px 0 0}
 footer h4{font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--brown-soft);margin:0 0 18px}
-footer .footer-grid>div:not(.footer-brand){padding-top:5px}
+footer .footer-grid>div:not(.footer-brand){padding-top:5px;min-width:0}
+footer .footer-grid a{display:block;width:max-content;max-width:100%;margin:0 0 7px;line-height:1.55;white-space:normal}
+footer .footer-grid p{margin:8px 0 0;line-height:1.65}
+footer .footer-grid h4{margin-bottom:16px}
+footer .footer-grid{align-items:start}
 footer .footer-grid a{transition:transform .2s ease,color .2s ease}
 footer .footer-grid a:hover{transform:translateX(2px)}
 footer .footer-brand p{font-size:10px;line-height:1.7;color:#74675e}
