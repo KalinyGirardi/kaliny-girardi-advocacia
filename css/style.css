@@ -126,3 +126,7 @@ footer .footer-bottom span:last-child{letter-spacing:.03em}
 .contact-list a{color:inherit}
 @media(max-width:1050px){.content-grid.video-grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:620px){.content-grid.video-grid{grid-template-columns:1fr}.video-thumb{height:215px}.video-modal{padding:10px}.video-modal-copy{padding:15px 5px 2px}}
+
+/* V104 — Instagram Reels */
+.video-modal-copy .text-link{display:inline-block;margin-top:10px;font-size:10px;letter-spacing:.03em}
+.video-modal-copy .text-link:hover{text-decoration:underline}
