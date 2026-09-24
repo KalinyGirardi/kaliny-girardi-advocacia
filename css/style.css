@@ -150,3 +150,8 @@ footer .footer-bottom span:last-child{letter-spacing:.03em}
 .area-modal-actions .btn{cursor:pointer}
 .area-note{font-size:10px!important;line-height:1.5!important;margin-top:22px!important;color:#9a8b81!important}
 @media(max-width:760px){.area-overlay{padding:12px}.area-modal-grid{grid-template-columns:1fr}.area-modal-image{min-height:260px;height:38vh}.area-modal-copy{padding:35px 25px 30px}.area-modal-copy h2{font-size:46px}.area-modal-actions{display:grid;grid-template-columns:1fr}.area-modal-actions .btn{width:100%}}
+
+/* V107 — Conteúdos com identidade editorial própria */
+.content-intro{max-width:620px;margin:-18px 0 28px;color:var(--muted);font-size:13px;line-height:1.8}
+.video-label{white-space:nowrap}
+@media(max-width:620px){.content-intro{margin:-8px 0 22px;font-size:12px}.video-label{font-size:8px}}
