@@ -45,90 +45,56 @@ async function syncOnlineAppointments(options={}){
     if(!j.ok){setAppointmentConnectionStatus(j.error==='unauthorized'?'Chave administrativa inválida.':'Não foi possível consultar a agenda online.','warn');return false}
     if(!Array.isArray(j.appointments)){setAppointmentConnectionStatus('Resposta inválida da agenda online.','warn');return false}
 
-    const norm=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();
-    const digits=s=>String(s??'').replace(/\D/g,'');
-    const samePerson=(a,b)=>{
-      const na=norm(a?.client||a?.name), nb=norm(b?.client||b?.name);
-      const pa=digits(a?.phone), pb=digits(b?.phone);
-      return (na&&nb&&na===nb) || (pa&&pb&&pa===pb);
-    };
-    const keyFor=a=>`${String(a?.date||'')}|${String(a?.time||'')}`;
-    let changed=false;
-    const byOnline=new Map();
-    (data.agenda||[]).forEach(x=>{if(x.onlineId)byOnline.set(String(x.onlineId),x)});
-
-    for(const a of j.appointments){
-      if(!a.id)continue;
-      const onlineId=String(a.id);
-      const next={
-        date:String(a.date||''), time:String(a.time||''), client:String(a.name||''),
-        phone:String(a.phone||''), email:String(a.email||''), area:String(a.type||''),
-        mode:String(a.mode||''), status:(String(a.status||'Pendente').trim()||'Pendente'),
-        notes:String(a.notes||'')
-      };
-      let existing=byOnline.get(onlineId);
-
-      // Migra registros antigos criados antes do onlineId existir, em vez de duplicá-los.
-      if(!existing){
-        existing=(data.agenda||[]).find(x=>
-          !x.onlineId &&
-          String(x.date||'')===next.date &&
-          String(x.time||'')===next.time &&
-          String(x.status||'Pendente').trim().toLowerCase()!=='cancelado' &&
-          (String(x.source||'').toLowerCase()==='site' || samePerson(x,next))
-        );
-        if(existing){existing.onlineId=onlineId;changed=true;byOnline.set(onlineId,existing)}
-      }
-
-      if(existing){
-        Object.keys(next).forEach(k=>{if(String(existing[k]??'')!==next[k]){existing[k]=next[k];changed=true}});
-        existing.title='Consulta — '+String(a.type||'Consulta jurídica');
-        existing.source='site';
-      }else{
-        existing={id:'evt_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),onlineId,date:next.date,time:next.time,title:'Consulta — '+String(a.type||'Consulta jurídica'),client:next.client,phone:next.phone,email:next.email,area:next.area,mode:next.mode,status:next.status,source:'site',notes:next.notes};
-        data.agenda.push(existing);byOnline.set(onlineId,existing);changed=true;
-      }
-    }
-
-    // Remove duplicatas locais do mesmo agendamento online/mesma pessoa e horário.
-    const seenOnline=new Set();
-    const seenSiteSlot=new Map();
-    const deduped=[];
-    for(const ev of data.agenda||[]){
-      if(ev.onlineId){
-        const oid=String(ev.onlineId);
-        if(seenOnline.has(oid)){changed=true;continue}
-        seenOnline.add(oid);
-      }
-      if(String(ev.source||'').toLowerCase()==='site' && ev.date && ev.time && !ev.onlineId){
-        const sk=`${ev.date}|${ev.time}`;
-        if(seenSiteSlot.has(sk)){changed=true;continue}
-        seenSiteSlot.set(sk,true);
-      }
-      deduped.push(ev);
-    }
-    if(deduped.length!==(data.agenda||[]).length){data.agenda=deduped;changed=true}
-
-    // Remove órfãos locais que ocupam o mesmo horário de um agendamento online ativo.
-    // Isso cobre registros antigos criados no navegador antes da sincronização,
-    // mesmo quando eles não possuem source/onlineId.
-    const occupiedOnlineSlots=new Set((data.agenda||[])
-      .filter(ev=>ev.onlineId && String(ev.status||'').trim().toLowerCase()!=='cancelado')
-      .map(ev=>`${String(ev.date||'')}|${String(ev.time||'')}`));
-    const beforeOrphans=(data.agenda||[]).length;
-    data.agenda=(data.agenda||[]).filter(ev=>{
-      if(ev.onlineId)return true;
-      const slot=`${String(ev.date||'')}|${String(ev.time||'')}`;
-      return !occupiedOnlineSlots.has(slot);
+    // A agenda online passa a ser a fonte única dos compromissos recebidos pelo site.
+    // Removemos do localStorage todos os registros marcados como online/site e
+    // reconstruímos exatamente a partir do retorno do Apps Script. Compromissos
+    // criados manualmente no painel continuam preservados.
+    const localManual=(data.agenda||[]).filter(ev=>{
+      const source=String(ev?.source||'').trim().toLowerCase();
+      return !ev?.onlineId && source!=='site';
     });
-    if(data.agenda.length!==beforeOrphans)changed=true;
+
+    const seen=new Set();
+    const onlineLocal=[];
+    for(const a of j.appointments){
+      if(!a?.id)continue;
+      const onlineId=String(a.id);
+      if(seen.has(onlineId))continue;
+      seen.add(onlineId);
+      const status=(String(a.status||'Pendente').trim()||'Pendente');
+      onlineLocal.push({
+        id:'evt_online_'+onlineId,
+        onlineId,
+        date:String(a.date||''),
+        time:String(a.time||''),
+        title:'Consulta — '+String(a.type||'Consulta jurídica'),
+        client:String(a.name||''),
+        phone:String(a.phone||''),
+        email:String(a.email||''),
+        area:String(a.type||''),
+        mode:String(a.mode||''),
+        status,
+        source:'site',
+        notes:String(a.notes||'')
+      });
+    }
+
+    const nextAgenda=[...localManual,...onlineLocal];
+    const before=JSON.stringify(data.agenda||[]);
+    const after=JSON.stringify(nextAgenda);
+    data.agenda=nextAgenda;
+    const changed=before!==after;
 
     if(changed)localStorage.setItem(KEY,JSON.stringify(data));
     renderAll();
     setAppointmentConnectionStatus('Conectado. Última sincronização: '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),'ok');
     if(!options.silent)toast(changed?'Agenda online sincronizada':'Agenda online já está atualizada');
     return true;
-  }catch(e){console.warn('Agenda online indisponível',e);setAppointmentConnectionStatus('Não foi possível conectar à agenda online.','warn');return false}
+  }catch(e){
+    console.warn('Agenda online indisponível',e);
+    setAppointmentConnectionStatus('Não foi possível conectar à agenda online.','warn');
+    return false;
+  }
 }
 async function updateOnlineAppointmentStatus(ev,status){const {url,key}=onlineConfig();if(!ev?.onlineId){ev.status=status;save();return true}if(!url||!key){toast('Configure a conexão online em Configurações');return false}try{const body=new URLSearchParams({action:'adminUpdate',key,id:String(ev.onlineId),status});const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body});const j=await r.json();if(!j.ok){toast(j.error==='unauthorized'?'Chave administrativa inválida':'Não foi possível atualizar o agendamento');return false}ev.status=status;save();toast('Agendamento '+status.toLowerCase());return true}catch(e){console.warn(e);toast('Falha ao atualizar o agendamento online');return false}}
 async function syncToServer(){try{await api('/api/data',{method:'PUT',body:JSON.stringify(data)});localStorage.setItem('kaliny_last_sync',new Date().toISOString());const badge=document.getElementById('syncStatus');if(badge){badge.textContent='Sincronizado';badge.className='sync-badge ok'}}catch(e){const badge=document.getElementById('syncStatus');if(badge){badge.textContent='Servidor indisponível';badge.className='sync-badge warn'}}}
