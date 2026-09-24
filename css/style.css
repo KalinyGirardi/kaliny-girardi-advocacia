@@ -130,3 +130,23 @@ footer .footer-bottom span:last-child{letter-spacing:.03em}
 /* V104 — Instagram Reels */
 .video-modal-copy .text-link{display:inline-block;margin-top:10px;font-size:10px;letter-spacing:.03em}
 .video-modal-copy .text-link:hover{text-decoration:underline}
+
+/* V106 — experiência detalhada por área */
+.area{cursor:pointer;position:relative;transition:transform .45s ease,box-shadow .45s ease,background .45s ease}
+.area:hover{transform:translateY(-5px);box-shadow:0 18px 42px rgba(67,43,29,.09)}
+.area .more{border:0;background:none;padding:0;font:inherit;color:var(--brown);cursor:pointer}
+.area .more:hover{text-decoration:underline;text-underline-offset:4px}
+.area-overlay{position:fixed;inset:0;background:rgba(36,25,19,.76);display:none;align-items:center;justify-content:center;padding:24px;z-index:10001}
+.area-overlay.show{display:flex}
+.area-modal{position:relative;width:min(980px,94vw);max-height:90vh;overflow:auto;background:#fbf7f2;color:var(--brown-dark);box-shadow:0 35px 100px rgba(0,0,0,.28)}
+.area-modal-grid{display:grid;grid-template-columns:.9fr 1.1fr;min-height:540px}
+.area-modal-image{background:#e9ddd2;min-height:540px;overflow:hidden}
+.area-modal-image img{width:100%;height:100%;object-fit:cover;display:block;filter:saturate(.82)}
+.area-modal-copy{padding:58px 56px;display:flex;flex-direction:column;justify-content:center}
+.area-modal-copy h2{font:500 58px 'Cormorant Garamond';line-height:.95;margin:8px 0 20px;color:var(--brown-dark)}
+.area-modal-copy p{font-size:14px;line-height:1.85;color:#75665d;max-width:470px;margin:0}
+.area-close{position:absolute;right:16px;top:16px;width:40px;height:40px;border:0;border-radius:50%;background:#efe4d8;color:var(--brown-dark);font-size:24px;z-index:3;cursor:pointer}
+.area-modal-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:28px}
+.area-modal-actions .btn{cursor:pointer}
+.area-note{font-size:10px!important;line-height:1.5!important;margin-top:22px!important;color:#9a8b81!important}
+@media(max-width:760px){.area-overlay{padding:12px}.area-modal-grid{grid-template-columns:1fr}.area-modal-image{min-height:260px;height:38vh}.area-modal-copy{padding:35px 25px 30px}.area-modal-copy h2{font-size:46px}.area-modal-actions{display:grid;grid-template-columns:1fr}.area-modal-actions .btn{width:100%}}
