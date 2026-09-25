@@ -21,26 +21,27 @@ async function api(path,options={}){const headers={...(options.headers||{}),'Con
 
 function onlineConfig(){const url=String(localStorage.getItem('kaliny_appointments_api_url')||APPOINTMENTS_API_URL||'').trim();const token=String(session?.token||'').trim();return {url,token,key:token}}
 function setAppointmentConnectionStatus(text,kind=''){const el=document.getElementById('appointmentConnectionStatus');if(el){el.textContent=text;el.className='mini-help'+(kind?' '+kind:'')}const badge=document.getElementById('syncStatus');const dot=document.getElementById('overviewStatusDot');const overview=document.getElementById('overviewStatusText');if(badge){if(kind==='ok'){badge.textContent='Online';badge.className='sync-badge ok'}else if(kind==='warn'){badge.textContent='Offline';badge.className='sync-badge warn'}else{badge.textContent='Sincronizando…';badge.className='sync-badge'}}if(dot&&overview){if(kind==='ok'){dot.className='overview-dot ok';overview.textContent='Informações atualizadas · agenda online conectada'}else if(kind==='warn'){dot.className='overview-dot';overview.textContent='Não foi possível atualizar agora'}else{dot.className='overview-dot';overview.textContent='Atualizando informações…'}}}
+let syncInFlight=false;
 async function syncOnlineAppointments(options={}){
+  if(syncInFlight)return false;
+  syncInFlight=true;
   setAppointmentConnectionStatus('Sincronizando…');
   const {url,token}=onlineConfig();
-  if(!url||url.includes('COLE_AQUI')){setAppointmentConnectionStatus('URL da agenda não configurada.','warn');return false}
-  if(!token){setAppointmentConnectionStatus('Sessão administrativa inválida.','warn');return false}
+  if(!url||url.includes('COLE_AQUI')){setAppointmentConnectionStatus('URL da agenda não configurada.','warn');syncInFlight=false;return false}
+  if(!token){setAppointmentConnectionStatus('Sessão administrativa inválida.','warn');syncInFlight=false;return false}
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),15000);
   try{
-    const r=await fetch(url+'?action=adminList&token='+encodeURIComponent(token),{cache:'no-store'});
+    const r=await fetch(url+'?action=adminList&token='+encodeURIComponent(token),{cache:'no-store',signal:controller.signal});
+    clearTimeout(timeout);
     const j=await r.json();
-    if(!j.ok){setAppointmentConnectionStatus(j.error==='unauthorized'?'Chave administrativa inválida.':'Não foi possível consultar a agenda online.','warn');return false}
+    if(!j.ok){setAppointmentConnectionStatus(j.error==='unauthorized'?'Sessão administrativa expirada.':'Não foi possível consultar a agenda online.','warn');return false}
     if(!Array.isArray(j.appointments)){setAppointmentConnectionStatus('Resposta inválida da agenda online.','warn');return false}
 
-    // A agenda online passa a ser a fonte única dos compromissos recebidos pelo site.
-    // Removemos do localStorage todos os registros marcados como online/site e
-    // reconstruímos exatamente a partir do retorno do Apps Script. Compromissos
-    // criados manualmente no painel continuam preservados.
     const localManual=(data.agenda||[]).filter(ev=>{
       const source=String(ev?.source||'').trim().toLowerCase();
       return !ev?.onlineId && source!=='site';
     });
-
     const seen=new Set();
     const onlineLocal=[];
     for(const a of j.appointments){
@@ -50,39 +51,32 @@ async function syncOnlineAppointments(options={}){
       seen.add(onlineId);
       const status=(String(a.status||'Pendente').trim()||'Pendente');
       onlineLocal.push({
-        id:'evt_online_'+onlineId,
-        onlineId,
-        date:String(a.date||''),
-        time:String(a.time||''),
-        title:'Consulta — '+String(a.type||'Consulta jurídica'),
-        client:String(a.name||''),
-        phone:String(a.phone||''),
-        email:String(a.email||''),
-        area:String(a.type||''),
-        mode:String(a.mode||''),
-        status,
-        source:'site',
-        notes:String(a.notes||'')
+        id:'evt_online_'+onlineId,onlineId,date:String(a.date||''),time:String(a.time||''),
+        title:'Consulta — '+String(a.type||'Consulta jurídica'),client:String(a.name||''),
+        phone:String(a.phone||''),email:String(a.email||''),area:String(a.type||''),mode:String(a.mode||''),
+        status,source:'site',notes:String(a.notes||'')
       });
     }
-
     const nextAgenda=[...localManual,...onlineLocal];
     const before=JSON.stringify(data.agenda||[]);
     const after=JSON.stringify(nextAgenda);
     data.agenda=nextAgenda;
     const changed=before!==after;
-
     if(changed)localStorage.setItem(KEY,JSON.stringify(data));
     renderAll();
     setAppointmentConnectionStatus('Informações atualizadas · última sincronização: '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),'ok');
     if(!options.silent)toast(changed?'Agenda online sincronizada':'Agenda online já está atualizada');
     return true;
   }catch(e){
+    clearTimeout(timeout);
     console.warn('Agenda online indisponível',e);
-    setAppointmentConnectionStatus('Não foi possível conectar à agenda online.','warn');
+    setAppointmentConnectionStatus(e?.name==='AbortError'?'Tempo limite da agenda online. Tente novamente.':'Não foi possível conectar à agenda online.','warn');
     return false;
+  }finally{
+    syncInFlight=false;
   }
 }
+
 async function updateOnlineAppointmentStatus(ev,status){const {url,token}=onlineConfig();if(!ev){toast('Agendamento não encontrado');return false}if(!ev?.onlineId){ev.status=status;save();renderAgenda();if(ev.date)showAgendaDay(ev.date);toast('Agendamento '+status.toLowerCase());return true}if(!url||!token){toast('Sessão administrativa inválida');return false}try{const body=new URLSearchParams({action:'adminUpdate',token,id:String(ev.onlineId),status});const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body});const j=await r.json();if(!j.ok){toast(j.error==='unauthorized'?'Sessão administrativa expirada':j.error==='not_found'?'Agendamento não encontrado no servidor':'Não foi possível atualizar o agendamento');return false}ev.status=status;save();toast('Agendamento '+status.toLowerCase());await syncOnlineAppointments({silent:true});closeModal();renderAgenda();showAgendaDay(ev.date);return true}catch(e){console.warn(e);toast('Falha ao atualizar o agendamento online');return false}}
 async function syncToServer(){try{await api('/api/data',{method:'PUT',body:JSON.stringify(data)});localStorage.setItem('kaliny_last_sync',new Date().toISOString());const badge=document.getElementById('syncStatus');if(badge){badge.textContent='Sincronizado';badge.className='sync-badge ok'}}catch(e){const badge=document.getElementById('syncStatus');if(badge){badge.textContent='Servidor indisponível';badge.className='sync-badge warn'}}}
 async function hydrateFromServer(){if(!serverMode)return;try{const remote=await api('/api/data');const local=JSON.parse(localStorage.getItem(KEY)||'null');const remoteHas=remote && Object.values(remote).some(v=>Array.isArray(v)&&v.length);if(remoteHas||!local||!local.clients?.length){data={...base,...remote};localStorage.setItem(KEY,JSON.stringify(data));}else{data={...base,...local};await syncToServer();}const badge=document.getElementById('syncStatus');if(badge){badge.textContent='Servidor conectado';badge.className='sync-badge ok'}}catch(e){serverMode=false;const badge=document.getElementById('syncStatus');if(badge){badge.textContent='Modo local';badge.className='sync-badge warn'}}}function money(v){return Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}function parseBRMoney(v){const raw=String(v??'').trim();if(!raw)return 0;let s=raw.replace(/R\$\s?/g,'').replace(/\s/g,'');if(s.includes(',')){s=s.replace(/\./g,'').replace(',','.')}else{s=s.replace(/[^0-9.-]/g,'')}const n=Number(s);return Number.isFinite(n)?n:0}function parseMoneyBR(v){return parseBRMoney(v)}function formatBRMoneyInputValue(v){const n=parseBRMoney(v);return n?money(n):''}function wireMoneyField(el){if(!el||el.dataset.moneyWired==='1')return;el.dataset.moneyWired='1';el.type='text';el.inputMode='decimal';if(el.value)el.value=formatBRMoneyInputValue(el.value);el.addEventListener('focus',()=>{const n=parseBRMoney(el.value);el.value=n?String(n).replace('.',','):'';el.select()});el.addEventListener('blur',()=>{el.value=formatBRMoneyInputValue(el.value)});}function esc(s){return String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}function toast(t){const x=document.getElementById('toast');x.textContent=t;x.classList.add('show');setTimeout(()=>x.classList.remove('show'),1800)}
