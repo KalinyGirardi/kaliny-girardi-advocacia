@@ -20,6 +20,32 @@ const KEY='kaliny_v6_data';const RECENT_KEY='kaliny_recent_clients';const base={
 async function api(path,options={}){const headers={...(options.headers||{}),'Content-Type':'application/json','Authorization':'Bearer '+session.token};const r=await fetch(API_BASE+path,{...options,headers});if(r.status===401){sessionStorage.removeItem(AUTH_KEY);location.href='gestao/';throw new Error('Não autenticado')}if(!r.ok)throw new Error('API '+r.status);return r.json()}
 
 function onlineConfig(){const url=String(localStorage.getItem('kaliny_appointments_api_url')||APPOINTMENTS_API_URL||'').trim();const token=String(session?.token||'').trim();return {url,token,key:token}}
+function normalizeMatchValue(value){return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim()}
+function normalizePhone(value){return String(value||'').replace(/\D/g,'')}
+function linkAppointmentsToClients(){
+  const clients=Array.isArray(data.clients)?data.clients:[];
+  const appointments=Array.isArray(data.agenda)?data.agenda:[];
+  if(!clients.length||!appointments.length)return 0;
+  let linked=0;
+  for(const ev of appointments){
+    if(!ev||ev.clientId&&clients.some(c=>String(c.id)===String(ev.clientId)))continue;
+    const evPhone=normalizePhone(ev.phone);
+    const evEmail=normalizeMatchValue(ev.email);
+    const evName=normalizeMatchValue(ev.client||ev.name);
+    let best=null,bestScore=0;
+    for(const c of clients){
+      let score=0;
+      const cPhone=normalizePhone(c.phone), cEmail=normalizeMatchValue(c.email), cName=normalizeMatchValue(c.name);
+      if(evPhone&&cPhone&&evPhone===cPhone)score=100;
+      else if(evEmail&&cEmail&&evEmail===cEmail)score=90;
+      else if(evName&&cName&&evName===cName)score=80;
+      else if(evName&&cName&&evName.length>=4&&cName.length>=4&&(evName.includes(cName)||cName.includes(evName)))score=60;
+      if(score>bestScore){bestScore=score;best=c;}
+    }
+    if(best&&bestScore>=60){ev.clientId=best.id;linked++;}
+  }
+  return linked;
+}
 async function syncClientsFromServer(options={}){const {url,token}=onlineConfig();if(!url||url.includes('COLE_AQUI')||!token)return false;try{const r=await fetch(url+'?action=clientList&token='+encodeURIComponent(token),{cache:'no-store'});const j=await r.json();if(!j.ok||!Array.isArray(j.clients))return false;const remote=j.clients;const local=data.clients||[];const remoteIds=new Set(remote.map(c=>String(c.id)));const localOnly=local.filter(c=>c?.id&&!remoteIds.has(String(c.id)));if(localOnly.length){for(const c of localOnly){await saveClientRemote(c,true)}}const merged=[...remote,...localOnly];data.clients=merged;linkAppointmentsToClients();localStorage.setItem(KEY,JSON.stringify(data));renderAll();if(!options.silent)toast(remote.length?'Clientes sincronizados':'Base de clientes conectada');return true}catch(e){console.warn('Clientes online indisponíveis',e);return false}}
 async function saveClientRemote(client,silent=false){const {url,token}=onlineConfig();if(!url||url.includes('COLE_AQUI')||!token)return false;try{const body=new URLSearchParams({action:'clientSave',token,data:JSON.stringify(client)});const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body});const j=await r.json();if(!j.ok)return false;if(j.client){Object.assign(client,j.client)}localStorage.setItem(KEY,JSON.stringify(data));if(!silent)toast('Cliente salvo com segurança');return true}catch(e){console.warn('Falha ao salvar cliente online',e);if(!silent)toast('Cliente salvo localmente; sincronização pendente');return false}}
 function setAppointmentConnectionStatus(text,kind=''){const el=document.getElementById('appointmentConnectionStatus');if(el){el.textContent=text;el.className='mini-help'+(kind?' '+kind:'')}const badge=document.getElementById('syncStatus');const dot=document.getElementById('overviewStatusDot');const overview=document.getElementById('overviewStatusText');if(badge){if(kind==='ok'){badge.textContent='Online';badge.className='sync-badge ok'}else if(kind==='warn'){badge.textContent='Offline';badge.className='sync-badge warn'}else{badge.textContent='Sincronizando…';badge.className='sync-badge'}}if(dot&&overview){if(kind==='ok'){dot.className='overview-dot ok';overview.textContent='Informações atualizadas · agenda online conectada'}else if(kind==='warn'){dot.className='overview-dot';overview.textContent='Não foi possível atualizar agora'}else{dot.className='overview-dot';overview.textContent='Atualizando informações…'}}}
