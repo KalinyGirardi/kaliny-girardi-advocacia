@@ -1,5 +1,22 @@
 <!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Gestão — Kaliny Girardi Advocacia</title><link rel="stylesheet" href="../css/style.css"><meta name="robots" content="noindex,nofollow,noarchive">
-</head><body class="login-body"><div class="login-card"><img class="login-logo" src="../assets/logo.jpg" alt="Logo Kaliny Girardi"><span class="eyebrow">Acesso administrativo</span><h1>Bem-vinda, Kaliny.</h1><p>Acesse o painel do escritório.</p><form id="loginForm"><div class="field"><label>E-mail</label><input type="email" name="email" placeholder="seu e-mail" required></div><div class="field"><label>Senha</label><input type="password" name="password" placeholder="••••••••" required></div><button class="btn primary" type="submit">Entrar no painel →</button><div id="loginError" class="login-error"></div></form><a class="login-back" href="../index.html">← Voltar ao site</a></div><script src="../assets/appointment-config.js"></script><script>
+<style>
+.login-body{opacity:0;animation:pageIn .7s ease-out forwards;}
+.login-card{animation:cardIn .9s cubic-bezier(.22,.8,.24,1) .12s both;}
+.login-logo{animation:itemIn .65s ease-out .32s both;}
+.login-card .eyebrow{animation:itemIn .6s ease-out .48s both;}
+.login-card h1{animation:itemIn .65s ease-out .60s both;}
+.login-card>p{animation:itemIn .65s ease-out .72s both;}
+.login-motto{font-family:'Cormorant Garamond',Georgia,serif;font-size:18px;line-height:1.4;font-style:italic;font-weight:400;letter-spacing:0;color:#8A6B57;text-align:center;margin:18px 0 22px;animation:itemIn .7s ease-out .84s both;}
+.login-card form{animation:itemIn .7s ease-out .98s both;}
+.login-back{animation:itemIn .6s ease-out 1.22s both;}
+.login-card input,.login-card button{transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease,background-color .22s ease;}
+.login-card input:focus{transform:translateY(-1px);}
+.login-card button:hover{transform:translateY(-2px);}
+@keyframes pageIn{from{opacity:0}to{opacity:1}}
+@keyframes cardIn{from{opacity:0;transform:translateY(28px) scale(.975)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes itemIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@media (prefers-reduced-motion:reduce){.login-body,.login-card,.login-logo,.login-card .eyebrow,.login-card h1,.login-card>p,.login-motto,.login-card form,.login-back{animation:none!important;opacity:1!important;transform:none!important}}
+</style></head><body class="login-body"><div class="login-card"><img class="login-logo" src="../assets/logo.jpg" alt="Logo Kaliny Girardi"><span class="eyebrow">Acesso administrativo</span><h1>Bem-vinda, Kaliny.</h1><p>Acesse o painel do escritório.</p><div class="login-motto">Clareza para decidir. Coragem para seguir.</div><form id="loginForm"><div class="field"><label>E-mail</label><input type="email" name="email" placeholder="seu e-mail" required></div><div class="field"><label>Senha</label><input type="password" name="password" placeholder="••••••••" required></div><button class="btn primary" type="submit">Entrar no painel →</button><div id="loginError" class="login-error"></div></form><a class="login-back" href="../index.html">← Voltar ao site</a></div><script src="../assets/appointment-config.js"></script><script>
 const AUTH_KEY='kaliny_v19_session';
 const SESSION_MS=30*60*1000;
 (async()=>{const s=JSON.parse(sessionStorage.getItem(AUTH_KEY)||'null');if(s&&s.token&&Date.now()-new Date(s.loginAt).getTime()<SESSION_MS)location.href='../dashboard.html';})();
