@@ -167,11 +167,7 @@ document.getElementById('newProcess').onclick=()=>{const opts=data.clients.map(c
   }
 
   try{
-    const body=new URLSearchParams({
-      action:'clientDelete',
-      token:cfg.token,
-      id:String(id)
-    });
+    const body=new URLSearchParams({action:'clientDelete',token:cfg.token,id:String(id)});
     const r=await fetch(cfg.url,{
       method:'POST',
       headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},
@@ -185,15 +181,17 @@ document.getElementById('newProcess').onclick=()=>{const opts=data.clients.map(c
       return
     }
 
+    // O servidor já confirmou. Falhas de atualização da interface não podem
+    // transformar uma exclusão bem-sucedida em uma mensagem de erro.
     data.clients=(data.clients||[]).filter(x=>String(x.id)!==String(id));
     localStorage.setItem(KEY,JSON.stringify(data));
-    closeModal();
-    renderClients();
-    renderOverview();
+    try{closeModal()}catch(e){console.warn('closeModal:',e)}
+    try{renderClients()}catch(e){console.warn('renderClients:',e)}
+    try{renderOverview()}catch(e){console.warn('renderOverview:',e)}
     toast('Cliente excluído com sucesso ✓');
   }catch(e){
     console.error('Falha ao excluir cliente:',e);
-    toast('Erro ao excluir cliente. Nada foi apagado.');
+    toast('Erro ao excluir cliente. Verifique a planilha antes de tentar novamente.');
   }
 }
 
