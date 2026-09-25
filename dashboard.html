@@ -774,4 +774,61 @@ function renderClientDocuments(id){const el=document.getElementById('clientDocsL
 
 // V47: handlers diretos após a renderização do conteúdo dinâmico.
 window.openContractEditor=window.openContractEditor||openContractEditor;
+
+
+/* V133 — persistência real dos clientes no Apps Script. */
+async function v133SaveClientsBatchRemote(clients){
+  const url=String(localStorage.getItem('kaliny_appointments_api_url')||APPOINTMENTS_API_URL||'').trim();
+  const token=String(session?.token||'').trim();
+  if(!url||!token) throw new Error('Servidor ou sessão não configurados');
+  const payload=JSON.stringify(clients||[]);
+  const q=url+'?action=clientSaveBatch&token='+encodeURIComponent(token)+'&data='+encodeURIComponent(payload);
+  const r=await fetch(q,{cache:'no-store'});
+  const j=await r.json();
+  if(!j.ok) throw new Error(j.error||'O servidor recusou o cadastro');
+  return j;
+}
+async function v133SyncClients(){
+  try{
+    const url=String(localStorage.getItem('kaliny_appointments_api_url')||APPOINTMENTS_API_URL||'').trim();
+    const token=String(session?.token||'').trim();
+    if(!url||!token)return false;
+    const r=await fetch(url+'?action=clientList&token='+encodeURIComponent(token),{cache:'no-store'});
+    const j=await r.json();
+    if(!j.ok)throw new Error(j.error||'Falha ao consultar clientes');
+    const remote=Array.isArray(j.clients)?j.clients:[];
+    const local=Array.isArray(data.clients)?data.clients:[];
+    const ids=new Set(remote.map(c=>String(c.id||'')));
+    const pending=local.filter(c=>c&&c.id&&!ids.has(String(c.id)));
+    if(pending.length){
+      await v133SaveClientsBatchRemote(pending);
+      const rr=await fetch(url+'?action=clientList&token='+encodeURIComponent(token),{cache:'no-store'});
+      const jj=await rr.json();
+      if(!jj.ok)throw new Error(jj.error||'Falha ao reler clientes');
+      data.clients=Array.isArray(jj.clients)?jj.clients:[];
+    }else{
+      data.clients=remote;
+    }
+    localStorage.setItem(KEY,JSON.stringify(data));
+    try{renderClients();renderOverview();}catch(e){}
+    return true;
+  }catch(e){console.error('V133 clientes:',e);toast('Não foi possível sincronizar clientes: '+(e.message||'erro')) ;return false}
+}
+async function saveClientFromForm(){
+  try{
+    const form=document.getElementById('clientForm');
+    if(!form){toast('Formulário não encontrado');return;}
+    const f=new FormData(form);
+    const name=String(f.get('name')||'').trim();
+    if(!name){toast('Informe o nome do cliente');return;}
+    if(!Array.isArray(data.clients))data.clients=[];
+    const client={id:'cli_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),name,phone:String(f.get('phone')||'').trim(),area:String(f.get('area')||'Cível'),cpf:String(f.get('cpf')||'').trim(),cep:String(f.get('cep')||'').trim(),street:String(f.get('street')||'').trim(),number:String(f.get('number')||'').trim(),complement:String(f.get('complement')||'').trim(),neighborhood:String(f.get('neighborhood')||'').trim(),city:String(f.get('city')||'').trim(),state:String(f.get('state')||'PR').trim().toUpperCase(),status:String(f.get('status')||'Ativo'),notes:String(f.get('notes')||'').trim(),date:new Date().toLocaleDateString('pt-BR'),createdAt:new Date().toISOString()};
+    data.clients.push(client);localStorage.setItem(KEY,JSON.stringify(data));renderClients();renderOverview();
+    await v133SaveClientsBatchRemote([client]);
+    await v133SyncClients();
+    closeModal();toast('Cliente salvo no servidor');
+  }catch(err){console.error('V133 save client:',err);toast('Cliente ficou salvo localmente, mas não foi enviado ao servidor: '+(err.message||'erro'));}
+}
+setTimeout(()=>v133SyncClients(),1800);
+
 </script></body></html>
