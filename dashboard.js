@@ -51,7 +51,21 @@ async function saveClientRemote(client,silent=false){const {url,token}=onlineCon
 function getAgendaConnectionState(){try{return JSON.parse(localStorage.getItem('kaliny_agenda_connection_state')||'null')}catch(e){return null}}
 function saveAgendaConnectionState(kind,text){try{localStorage.setItem('kaliny_agenda_connection_state',JSON.stringify({kind,text,at:new Date().toISOString()}))}catch(e){}}
 function restoreAgendaConnectionState(){const state=getAgendaConnectionState();if(!state)return false;const badge=document.getElementById('syncStatus'),dot=document.getElementById('overviewStatusDot'),overview=document.getElementById('overviewStatusText'),detail=document.getElementById('appointmentConnectionStatus');if(state.kind==='ok'){if(badge){badge.textContent='Online';badge.className='sync-badge ok'}if(dot){dot.className='overview-dot ok'}if(overview){overview.textContent=state.text||'Informações atualizadas · agenda online conectada'}if(detail){detail.textContent=state.text||'Agenda online conectada';detail.className='mini-help ok'}}else if(state.kind==='warn'){if(badge){badge.textContent='Offline';badge.className='sync-badge warn'}if(dot){dot.className='overview-dot'}if(overview){overview.textContent=state.text||'Não foi possível atualizar agora'}if(detail){detail.textContent=state.text||'Agenda online indisponível';detail.className='mini-help warn'}}return true}
-function setAppointmentConnectionStatus(text,kind=''){saveAgendaConnectionState(kind||'loading',text);const el=document.getElementById('appointmentConnectionStatus');if(el){el.textContent=text;el.className='mini-help'+(kind?' '+kind:'')}const badge=document.getElementById('syncStatus');const dot=document.getElementById('overviewStatusDot');const overview=document.getElementById('overviewStatusText');if(badge){if(kind==='ok'){badge.textContent='Online';badge.className='sync-badge ok'}else if(kind==='warn'){badge.textContent='Offline';badge.className='sync-badge warn'}else{badge.textContent='Sincronizando…';badge.className='sync-badge'}}if(dot&&overview){if(kind==='ok'){dot.className='overview-dot ok';overview.textContent='Informações atualizadas · agenda online conectada'}else if(kind==='warn'){dot.className='overview-dot';overview.textContent='Não foi possível atualizar agora'}else{dot.className='overview-dot';overview.textContent='Atualizando informações…'}}}
+function setAppointmentConnectionStatus(text,kind=''){
+  saveAgendaConnectionState(kind||'loading',text);
+  const el=document.getElementById('appointmentConnectionStatus');
+  if(el){el.textContent=text;el.className='mini-help'+(kind?' '+kind:'')}
+  const badge=document.getElementById('syncStatus');
+  const dot=document.getElementById('overviewStatusDot');
+  const overview=document.getElementById('overviewStatusText');
+  if(badge){
+    badge.textContent=kind==='ok'?'Online':kind==='warn'?'Offline':'Sincronizando…';
+    badge.className='sync-badge '+(kind==='ok'?'ok':kind==='warn'?'warn':'');
+  }
+  if(dot){dot.className='overview-dot'+(kind==='ok'?' ok':'')}
+  if(overview){overview.textContent=kind==='ok'?'Informações atualizadas · agenda online conectada':kind==='warn'?'Não foi possível atualizar agora':'Atualizando informações…'}
+}
+
 let syncInFlight=false;
 async function syncOnlineAppointments(options={}){
   if(syncInFlight)return false;
@@ -96,6 +110,7 @@ async function syncOnlineAppointments(options={}){
     const changed=before!==after;
     if(changed)localStorage.setItem(KEY,JSON.stringify(data));
     renderAll();
+    // V128: a resposta válida da agenda é a fonte de verdade para o status.
     setAppointmentConnectionStatus('Informações atualizadas · última sincronização: '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),'ok');
     if(!options.silent)toast(changed?'Agenda online sincronizada':'Agenda online já está atualizada');
     return true;
