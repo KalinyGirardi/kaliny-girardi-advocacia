@@ -102,7 +102,71 @@ function renderDocuments(){const el=document.getElementById('documentsTable');if
 function printCalcReport(index){const h=data.calcHistory[index];if(!h)return;const c=clientById(h.clientId);const w=window.open('','_blank');if(!w){toast('Permita pop-ups para gerar o relatório');return}const clientName=c?esc(c.name):'Simulação sem cliente';const clientMeta=c?`${esc(c.area||'')} · ${esc(c.phone||'')}`:'Uso interno';w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(h.label||'Relatório')}</title><style>body{font-family:Arial,sans-serif;color:#3d2b20;max-width:820px;margin:50px auto;padding:0 30px;line-height:1.55}header{border-bottom:2px solid #b28a5b;padding-bottom:18px;margin-bottom:30px}h1{font-family:Georgia,serif;font-weight:500;margin:0 0 5px}h2{font-family:Georgia,serif;font-weight:500;margin-top:28px}.meta{color:#765f4e;font-size:13px}.box{background:#f5eee7;border:1px solid #eaded2;border-radius:10px;padding:18px;white-space:pre-wrap}.foot{margin-top:40px;padding-top:15px;border-top:1px solid #eaded2;font-size:11px;color:#8d7767}@media print{body{margin:20px auto}.no-print{display:none}}.audit-row{padding:10px 0;border-bottom:1px solid #eee3db;font-size:12px}.audit-row:last-child{border-bottom:0}.audit-row small{display:block;color:#8d7767;margin-top:3px}</style></head><body><header><h1>Kaliny Girardi Advocacia</h1><div class="meta">Relatório interno de simulação</div></header><h2>${esc(h.label||h.type)}</h2><p><b>Cliente:</b> ${clientName}<br><span class="meta">${clientMeta}</span><br><b>Data:</b> ${esc(h.date)}</p><div class="box">${esc(h.result)}</div><div class="foot">Documento gerado pelo sistema interno. Os valores e conclusões dependem dos dados informados e devem ser conferidos antes de qualquer utilização profissional.</div><p class="no-print"><button onclick="window.print()">Imprimir / Salvar como PDF</button></p><script>window.onload=()=>setTimeout(()=>window.print(),250)<\/script></body></html>`);w.document.close()}
 function renderClients(){const el=document.getElementById('clientsTable');if(!el)return;const search=(document.getElementById('clientSearch')?.value||'').trim().toLowerCase();const area=document.getElementById('clientAreaFilter')?.value||'';const status=document.getElementById('clientStatusFilter')?.value||'';const all=data.clients||[];const filtered=all.filter(c=>{const hay=[c.name,c.phone,c.cpf].filter(Boolean).join(' ').toLowerCase();return (!search||hay.includes(search))&&(!area||c.area===area)&&(!status||(c.status||'Ativo')===status)});const active=all.filter(c=>(c.status||'Ativo')==='Ativo').length;const inactive=all.length-active;const summary=document.getElementById('clientSummary');if(summary)summary.innerHTML=`<div class="mini-card"><small class="muted">Total</small><strong>${all.length}</strong></div><div class="mini-card"><small class="muted">Ativos</small><strong>${active}</strong></div><div class="mini-card"><small class="muted">Inativos</small><strong>${inactive}</strong></div><div class="mini-card"><small class="muted">Exibindo</small><strong>${filtered.length}</strong></div>`;if(!filtered.length){el.innerHTML='<div class="empty">Nenhum cliente encontrado com os filtros atuais.</div>';return}el.innerHTML='<table class="d-table"><thead><tr><th>Nome</th><th>Telefone</th><th>Área</th><th>Status</th><th>Cadastro</th><th>Ações</th></tr></thead><tbody>'+filtered.map(c=>`<tr><td><b>${esc(c.name)}</b></td><td>${c.phone?`<a href="${phoneHref(c.phone)}">${esc(c.phone)}</a>`:'-'}</td><td><span class="tag">${esc(c.area||'Não informada')}</span></td><td><span class="tag">${esc(c.status||'Ativo')}</span></td><td>${esc(c.date||'-')}</td><td><div class="client-actions"><button class="d-btn light" onclick="viewClient('${c.id}')">Ficha</button><button class="d-btn light" onclick="openEditClient('${c.id}')">Editar</button><button class="d-btn" onclick="openCalcForClient('${c.id}')">+ Calculadora</button></div></td></tr>`).join('')+'</tbody></table>'}
 
-function renderOverviewExtras(){const att=document.getElementById('overviewAttention'),recentEl=document.getElementById('overviewRecentClients');if(!att||!recentEl)return;const pending=(data.finance||[]).filter(x=>x.type==='receita'&&x.status==='pendente').reduce((s,x)=>s+Number(x.value||0),0);const stale=(data.processes||[]).filter(p=>{const raw=p.updated||p.date;if(!raw)return false;const parts=String(raw).split('/');const d=parts.length===3?new Date(Number(parts[2]),Number(parts[1])-1,Number(parts[0])):new Date(raw);return !isNaN(d)&&((Date.now()-d.getTime())>30*86400000)});const todayKey=localDateKey();const todayEvents=(data.agenda||[]).filter(e=>e.date===todayKey||e.date===new Date().toLocaleDateString('pt-BR'));const todayDeadlines=(data.processes||[]).filter(p=>p.deadline===todayKey&&p.status!=='Encerrado');const nextDeadlines=(data.processes||[]).filter(p=>p.deadline&&p.deadline>todayKey&&p.status!=='Encerrado'&&p.deadline<=new Date(Date.now()+7*86400000).toISOString().slice(0,10)).sort((a,b)=>String(a.deadline).localeCompare(String(b.deadline)));const items=[];if(todayEvents.length)items.push(`<div class="history-item"><strong>Agenda de hoje</strong><p>${todayEvents.length} compromisso(s) programado(s).</p><button class="d-btn light" data-page-jump="agenda">Abrir agenda</button></div>`);if(todayDeadlines.length)items.push(`<div class="history-item"><strong>Prazos de hoje</strong><p>${todayDeadlines.length} prazo(s) processual(is) precisam ser acompanhados.</p><button class="d-btn light" data-page-jump="processes">Ver processos</button></div>`);if(nextDeadlines.length){const preview=nextDeadlines.slice(0,3).map(p=>{const c=clientById(p.clientId);const due=new Date(p.deadline+'T12:00:00').toLocaleDateString('pt-BR');return `${esc(p.number||p.subject||'Processo')} · ${due}${c?' · '+esc(c.name):''}`}).join('<br>');items.push(`<div class="history-item"><strong>Prazo próximo</strong><p>${nextDeadlines.length===1?'1 prazo processual nos próximos 7 dias.':`${nextDeadlines.length} prazos processuais nos próximos 7 dias.`}</p><p class="muted" style="line-height:1.6">${preview}</p><button class="d-btn light" data-page-jump="processes">Ver processos</button></div>`)}if(pending>0)items.push(`<div class="history-item"><strong>Financeiro</strong><p>${money(pending)} em receitas pendentes.</p><button class="d-btn light" data-page-jump="finance">Ver financeiro</button></div>`);if(stale.length)items.push(`<div class="history-item"><strong>Processos sem atualização recente</strong><p>${stale.length} processo(s) com registro de atualização há mais de 30 dias.</p><button class="d-btn light" data-page-jump="processes">Ver processos</button></div>`);att.innerHTML=items.length?items.join(''):'<div class="overview-mini-note">Nenhum ponto de atenção identificado com os dados atuais.</div>';const ids=JSON.parse(localStorage.getItem(RECENT_KEY)||'[]');const clients=ids.map(id=>clientById(id)).filter(Boolean);recentEl.innerHTML=clients.length?clients.map(c=>`<div class="history-item" style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div><strong>${esc(c.name)}</strong><div class="muted">${esc(c.area||'Área não informada')} · ${esc(c.phone||'Sem telefone')}</div></div><button class="d-btn light" onclick="viewClient('${c.id}')">Abrir ficha</button></div>`).join(''):'<div class="empty">Os clientes acessados aparecerão aqui.</div>';const dot=document.getElementById('overviewStatusDot'),txt=document.getElementById('overviewStatusText');const online=document.getElementById('appointmentConnectionStatus');if(dot&&txt){const isOk=online?.classList.contains('ok');dot.className='overview-dot'+(isOk?' ok':'');txt.textContent=isOk?'Agenda online conectada':'Agenda local / sincronização em andamento';}}
+function renderOverviewExtras(){
+const att=document.getElementById('overviewAttention'),recentEl=document.getElementById('overviewRecentClients');
+if(!att||!recentEl)return;
+const pending=(data.finance||[]).filter(x=>x.type==='receita'&&x.status==='pendente').reduce((s,x)=>s+Number(x.value||0),0);
+const stale=(data.processes||[]).filter(p=>{
+  const raw=p.updated||p.date;if(!raw)return false;
+  const parts=String(raw).split('/');
+  const d=parts.length===3?new Date(Number(parts[2]),Number(parts[1])-1,Number(parts[0])):new Date(raw);
+  return !isNaN(d)&&((Date.now()-d.getTime())>30*86400000)
+});
+const today=new Date();
+today.setHours(0,0,0,0);
+const dayKey=(d)=>`${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+const parseDeadline=(raw)=>{
+  if(!raw)return null;
+  const s=String(raw).trim();
+  let d=null;
+  if(/^\d{4}-\d{2}-\d{2}/.test(s)){
+    const [y,m,dd]=s.slice(0,10).split('-').map(Number);
+    d=new Date(y,m-1,dd);
+  }else{
+    const br=s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})/);
+    if(br)d=new Date(Number(br[3]),Number(br[2])-1,Number(br[1]));
+    else{
+      const x=new Date(s);
+      if(!isNaN(x))d=new Date(x.getFullYear(),x.getMonth(),x.getDate());
+    }
+  }
+  if(!d||isNaN(d))return null;
+  d.setHours(0,0,0,0);
+  return d;
+};
+const todayKey=dayKey(today);
+const limit=new Date(today);
+limit.setDate(limit.getDate()+7);
+const todayEvents=(data.agenda||[]).filter(e=>e.date===todayKey||e.date===new Date().toLocaleDateString('pt-BR'));
+const todayDeadlines=(data.processes||[]).filter(p=>{
+  const d=parseDeadline(p.deadline);
+  return d&&d.getTime()===today.getTime()&&p.status!=='Encerrado';
+});
+const nextDeadlines=(data.processes||[]).filter(p=>{
+  const d=parseDeadline(p.deadline);
+  return d&&d>today&&d<=limit&&p.status!=='Encerrado';
+}).sort((a,b)=>parseDeadline(a.deadline)-parseDeadline(b.deadline));
+const items=[];
+if(todayEvents.length)items.push(`<div class="history-item"><strong>Agenda de hoje</strong><p>${todayEvents.length} compromisso(s) programado(s).</p><button class="d-btn light" data-page-jump="agenda">Abrir agenda</button></div>`);
+if(todayDeadlines.length)items.push(`<div class="history-item"><strong>Prazos de hoje</strong><p>${todayDeadlines.length} prazo(s) processual(is) precisam ser acompanhados.</p><button class="d-btn light" data-page-jump="processes">Ver processos</button></div>`);
+if(nextDeadlines.length){
+  const preview=nextDeadlines.slice(0,3).map(p=>{
+    const c=clientById(p.clientId);
+    const d=parseDeadline(p.deadline);
+    const due=d?d.toLocaleDateString('pt-BR'):'-';
+    return `${esc(p.number||p.subject||'Processo')} · ${due}${c?' · '+esc(c.name):''}`;
+  }).join('<br>');
+  items.push(`<div class="history-item"><strong>Prazo próximo</strong><p>${nextDeadlines.length===1?'1 prazo processual nos próximos 7 dias.':`${nextDeadlines.length} prazos processuais nos próximos 7 dias.`}</p><p class="muted" style="line-height:1.6">${preview}</p><button class="d-btn light" data-page-jump="processes">Ver processos</button></div>`);
+}
+if(pending>0)items.push(`<div class="history-item"><strong>Financeiro</strong><p>${money(pending)} em receitas pendentes.</p><button class="d-btn light" data-page-jump="finance">Ver financeiro</button></div>`);
+if(stale.length)items.push(`<div class="history-item"><strong>Processos sem atualização recente</strong><p>${stale.length} processo(s) com registro de atualização há mais de 30 dias.</p><button class="d-btn light" data-page-jump="processes">Ver processos</button></div>`);
+att.innerHTML=items.length?items.join(''):'<div class="overview-mini-note">Nenhum ponto de atenção identificado com os dados atuais.</div>';
+const ids=JSON.parse(localStorage.getItem(RECENT_KEY)||'[]');
+const clients=ids.map(id=>clientById(id)).filter(Boolean);
+recentEl.innerHTML=clients.length?clients.map(c=>`<div class="history-item" style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div><strong>${esc(c.name)}</strong><div class="muted">${esc(c.area||'Área não informada')} · ${esc(c.phone||'Sem telefone')}</div></div><button class="d-btn light" onclick="viewClient('${c.id}')">Abrir ficha</button></div>`).join(''):'<div class="empty">Os clientes acessados aparecerão aqui.</div>';
+const dot=document.getElementById('overviewStatusDot'),txt=document.getElementById('overviewStatusText'),online=document.getElementById('appointmentConnectionStatus');
+if(dot&&txt){const isOk=online?.classList.contains('ok');dot.className='overview-dot'+(isOk?' ok':'');txt.textContent=isOk?'Agenda online conectada':'Agenda local / sincronização em andamento';}
+}
 let agendaViewDate=new Date();
 function pad2(n){return String(n).padStart(2,'0')}
 function dateKey(y,m,d){return `${y}-${pad2(m+1)}-${pad2(d)}`}
