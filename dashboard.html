@@ -33,7 +33,90 @@ function navigateTo(section){
 <style>
 .client-info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.client-info-grid .history-item{margin:0}.client-info-grid p{margin:8px 0}.client-info-grid .history-item strong{display:block;margin-bottom:8px}@media(max-width:720px){.client-info-grid{grid-template-columns:1fr}}
 </style>
-</head><body>
+<style>
+/* V145.9 — mobile */
+.mobile-only{display:none}
+.mobile-header{display:none}
+.mobile-overlay{display:none}
+@media(max-width:600px){
+  .mobile-only{display:block}
+  .mobile-header{
+    display:flex;position:sticky;top:0;z-index:19;height:64px;
+    align-items:center;justify-content:space-between;gap:12px;
+    padding:10px 14px;background:#fffdf9;border-bottom:1px solid #e9dfd4;
+  }
+  .mobile-brand{display:flex;align-items:center;gap:9px;min-width:0}
+  .mobile-brand img{width:38px;height:38px;border-radius:50%;object-fit:cover}
+  .mobile-brand strong{display:block;font-family:'Cormorant Garamond',serif;font-size:17px;color:#4b3425;letter-spacing:.08em;white-space:nowrap}
+  .mobile-brand small{display:block;font-size:8px;letter-spacing:.18em;color:#8b7565}
+  .mobile-menu-btn{
+    width:42px;height:42px;border:1px solid #e3d6c8;border-radius:10px;
+    background:#f7f0e8;color:#4b3425;font-size:21px;cursor:pointer;
+  }
+  .mobile-drawer{
+    position:fixed;left:0;top:0;bottom:0;width:min(310px,86vw);z-index:30;
+    background:#3f2a1f;transform:translateX(-105%);transition:transform .22s ease;
+    padding:18px 12px;overflow:auto;box-shadow:12px 0 35px rgba(45,31,22,.22);
+  }
+  .mobile-drawer.open{transform:translateX(0)}
+  .mobile-drawer .dash-nav{display:flex;flex-direction:column}
+  .mobile-drawer .dash-nav button{color:#f8f0e8;text-align:left;border:0;background:transparent}
+  .mobile-drawer .dash-nav button.active{background:#76563e;color:#fff}
+  .mobile-drawer .dash-nav .label{color:#bda897}
+  .mobile-overlay{
+    position:fixed;inset:0;z-index:29;background:rgba(45,31,22,.38);
+  }
+  .mobile-overlay.open{display:block}
+  .dash-main{margin:0!important;width:100%!important;padding:18px 14px 28px!important}
+  .dash-top{margin-bottom:18px!important;align-items:flex-start!important}
+  .dash-top>div:first-child p{font-size:11px}
+  .dash-top h1{font-size:27px!important;line-height:1.05}
+  .dash-user .muted{display:none}
+  .dash-user img{width:36px!important;height:36px!important}
+  .dash-stats{grid-template-columns:1fr 1fr!important;gap:10px!important}
+  .d-card{padding:14px!important;min-height:92px}
+  .d-card strong{font-size:22px!important}
+  .dash-grid2{grid-template-columns:1fr!important;gap:12px!important}
+  .d-panel{padding:15px!important}
+  .d-panel-head{gap:10px;align-items:flex-start}
+  .d-panel-head h2{font-size:20px!important}
+  .quick-grid{grid-template-columns:1fr 1fr!important}
+  .client-filterbar,.client-summary{grid-template-columns:1fr!important}
+  .overview-attention{overflow:visible}
+  .overview-attention .attention-item{padding:12px!important}
+  .table-wrap,.d-table-wrap,.process-table-wrap,.finance-table-wrap{overflow-x:auto!important;-webkit-overflow-scrolling:touch}
+  table{min-width:720px}
+  .modal{padding:8px!important;align-items:flex-end!important}
+  .modal-box{width:100%!important;max-width:none!important;max-height:92vh!important;border-radius:16px 16px 0 0!important;padding:18px!important}
+  .modal-box .form-grid{grid-template-columns:1fr!important}
+  .form-grid{grid-template-columns:1fr!important}
+  .form-actions{flex-wrap:wrap}
+  .form-actions .d-btn{flex:1 1 140px}
+  .process-tabs{overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch}
+  .process-tabs button{flex:0 0 auto}
+  .doc-actions,.client-actions,.process-actions{flex-wrap:wrap}
+  .doc-actions .d-btn,.client-actions .d-btn,.process-actions .d-btn{flex:1 1 auto}
+  .d-btn{min-height:40px}
+  input,select,textarea{font-size:16px!important}
+  .settings-card{padding:15px!important}
+}
+</style></head><body>
+<div class="mobile-header mobile-only">
+  <div class="mobile-brand">
+    <img src="assets/logo.jpg" alt="Logo">
+    <div><strong>KALINY GIRARDI</strong><small>ADVOCACIA</small></div>
+  </div>
+  <button id="mobileMenuBtn" class="mobile-menu-btn" type="button" aria-label="Abrir menu">☰</button>
+</div>
+<div id="mobileOverlay" class="mobile-overlay"></div>
+<aside id="mobileDrawer" class="mobile-drawer mobile-only">
+  <div class="mobile-brand" style="margin:4px 8px 20px">
+    <img src="assets/logo.jpg" alt="Logo">
+    <div><strong style="color:#fff">KALINY GIRARDI</strong><small style="color:#cdbbad">ADVOCACIA</small></div>
+  </div>
+  <nav id="mobileNav" class="dash-nav"></nav>
+</aside>
+
 <div class="dash-app"><aside class="dash-side"><a class="side-brand" href="index.html"><img src="assets/logo.jpg" alt="Logo"><span><strong>KALINY GIRARDI</strong><small>ADVOCACIA</small></span></a><nav class="dash-nav"><div class="label">Visão geral</div><button class="active" data-page="overview">◈ <span>Dashboard</span></button><div class="label">Escritório</div><button data-page="clients">♙ <span>Clientes</span></button><button data-page="agenda">▣ <span>Agenda</span></button><button data-page="finance">◫ <span>Financeiro</span></button><button data-page="processes">⚖ <span>Processos</span></button><div class="label">Ferramentas</div><button data-page="calculators">⌁ <span>Calculadoras</span></button><button data-page="documents">▤ <span>Documentos</span></button><div class="label">Sistema</div><button data-page="settings">⚙ <span>Configurações</span></button><button id="logoutBtn">↩ <span>Sair</span></button></nav></aside>
 <main class="dash-main"><div class="dash-top"><div><p>22 de setembro de 2026</p><h1>Bom dia, Kaliny 👋</h1></div><div class="dash-user"><span id="syncStatus" class="sync-badge">Sincronizando…</span><span class="muted">Área do escritório</span><img src="assets/kaliny-smile.jpg" alt="Kaliny"></div></div>
 <section class="dash-page active" id="page-overview"><div class="overview-welcome"><div><span class="eyebrow">Visão geral do escritório</span><h2 id="overviewWelcomeTitle">Tudo organizado para começar o dia.</h2><p id="overviewWelcomeText">Acompanhe agenda, clientes, financeiro e processos em um único lugar.</p><div class="overview-status"><span id="overviewStatusDot" class="overview-dot"></span><span id="overviewStatusText">Atualizando informações…</span></div></div><div class="welcome-mark">KG</div></div><div class="dash-stats"><div class="d-card"><small>Clientes ativos</small><strong id="statClients">0</strong><span>cadastros</span></div><div class="d-card"><small>Compromissos hoje</small><strong id="statAgendaToday">0</strong><span>agenda + prazos</span></div><div class="d-card"><small>A receber</small><strong id="statReceivable">R$ 0</strong><span>receitas pendentes</span></div><div class="d-card"><small>Saldo</small><strong id="statBalance">R$ 0</strong><span>receitas − despesas</span></div><div class="d-card"><small>Processos</small><strong id="statProcesses">0</strong><span>cadastrados</span></div><div class="d-card"><small>Documentos</small><strong id="statDocuments">0</strong><span>salvos</span></div></div><div class="dash-grid2"><div class="d-panel"><div class="d-panel-head"><h2>Hoje no escritório</h2><button class="d-btn light" data-page-jump="agenda">Abrir agenda</button></div><div id="overviewAgenda"></div></div><div class="d-panel"><div class="d-panel-head"><h2>Acesso rápido</h2></div><div class="quick-grid"><button data-page-jump="clients"><b>+ Cliente</b>Novo cadastro</button><button data-page-jump="agenda"><b>+ Agenda</b>Novo compromisso</button><button data-page-jump="finance"><b>+ Financeiro</b>Novo lançamento</button><button data-page-jump="calculators"><b>🧮 Calculadoras</b>Nova simulação</button></div></div><div class="d-panel"><div class="d-panel-head"><h2>Pontos de atenção</h2><span class="eyebrow">Agora</span></div><div id="overviewAttention" class="overview-attention"></div></div><div class="d-panel"><div class="d-panel-head"><h2>Clientes acessados recentemente</h2><button class="d-btn light" data-page-jump="clients">Ver clientes</button></div><div id="overviewRecentClients"></div></div><div class="settings-card" style="grid-column:1/-1"><span class="eyebrow">Backup local</span><h3>Proteção e migração dos dados</h3><p class="muted">Exporte uma cópia dos cadastros, agenda, financeiro, processos, cálculos e anotações. Os arquivos de documentos ficam separados no armazenamento do navegador e, por isso, não entram neste JSON.</p><div class="form-actions"><button class="d-btn" id="exportBackup">Exportar backup</button><label class="d-btn light" style="cursor:pointer">Importar backup <input id="importBackup" type="file" accept="application/json" hidden></label></div><div class="mini-help">Use o backup como cópia de segurança e para migração. Esta versão é para testes locais. Não use dados reais de clientes até migrarmos para um ambiente com banco de dados, autenticação e armazenamento seguro.</div></div></div></section>
@@ -103,7 +186,46 @@ function importBackup(file){if(!file)return;const r=new FileReader();r.onload=()
 function renderAll(){const today=new Date();const iso=today.toISOString().slice(0,10);const todayBR=today.toLocaleDateString('pt-BR');document.querySelector('.dash-top>div>p').textContent=todayBR;const hour=today.getHours();const greeting=hour<12?'Bom dia':hour<18?'Boa tarde':'Boa noite';document.querySelector('.dash-top h1').textContent=greeting+', Kaliny 👋';document.getElementById('statClients').textContent=data.clients.length;const todayAgenda=data.agenda.filter(x=>x.date===iso||x.date===todayBR).length;const todayDeadlines=(data.processes||[]).filter(p=>p.deadline===iso&&p.status!=='Encerrado').length;document.getElementById('statAgendaToday').textContent=todayAgenda+todayDeadlines;const pending=data.finance.filter(x=>x.type==='receita'&&x.status==='pendente').reduce((s,x)=>s+Number(x.value||0),0);const income=data.finance.filter(x=>x.type==='receita').reduce((s,x)=>s+Number(x.value||0),0),expense=data.finance.filter(x=>x.type==='despesa').reduce((s,x)=>s+Number(x.value||0),0);document.getElementById('statReceivable').textContent=money(pending);const dashBalanceEl=document.getElementById('statBalance');if(dashBalanceEl){const dashBalance=income-expense;dashBalanceEl.textContent=money(dashBalance);dashBalanceEl.classList.remove('balance-dashboard-positive','balance-dashboard-negative');if(dashBalance>0)dashBalanceEl.classList.add('balance-dashboard-positive');else if(dashBalance<0)dashBalanceEl.classList.add('balance-dashboard-negative');}document.getElementById('statProcesses').textContent=(data.processes||[]).length;document.getElementById('statDocuments').textContent=(data.documents||[]).length;document.getElementById('finIncome').textContent=money(income);document.getElementById('finExpense').textContent=money(expense);const balanceEl=document.getElementById('finBalance');if(balanceEl){const balance=income-expense;balanceEl.textContent=money(balance);balanceEl.classList.remove('positive','negative');if(balance>0)balanceEl.classList.add('positive');else if(balance<0)balanceEl.classList.add('negative');}document.getElementById('finPending').textContent=money(pending);renderClients();renderAgenda();renderFinance();renderProcesses();renderDocuments();renderSettings();renderOverviewExtras();renderDossierOverview()}
 function renderProcesses(){const el=document.getElementById('processesTable');if(!el)return;const q=(document.getElementById('processSearch')?.value||'').toLowerCase().trim(), area=document.getElementById('processAreaFilter')?.value||'', status=document.getElementById('processStatusFilter')?.value||'', rows=(data.processes||[]).filter(p=>{const c=clientById(p.clientId), hay=[p.number,p.subject,p.court,c?.name].join(' ').toLowerCase();return(!q||hay.includes(q))&&(!area||p.area===area)&&(!status||p.status===status)}).sort((a,b)=>(a.deadline||'9999-12-31').localeCompare(b.deadline||'9999-12-31'));const total=(data.processes||[]).length, active=(data.processes||[]).filter(p=>p.status!=='Encerrado').length, deadlines=(data.processes||[]).filter(p=>p.deadline&&p.deadline>=new Date().toISOString().slice(0,10)&&p.deadline<=new Date(Date.now()+7*86400000).toISOString().slice(0,10)).length;document.getElementById('processSummary').innerHTML=`<div class="mini-card"><small class="muted">Total</small><strong>${total}</strong></div><div class="mini-card"><small class="muted">Em andamento</small><strong>${active}</strong></div><div class="mini-card"><small class="muted">Prazos próximos</small><strong>${deadlines}</strong></div><div class="mini-card"><small class="muted">Exibidos</small><strong>${rows.length}</strong></div>`;if(!rows.length){el.innerHTML='<div class="empty">Nenhum processo encontrado.</div>';return}const today=new Date().toISOString().slice(0,10);el.innerHTML='<table class="d-table"><thead><tr><th>Número</th><th>Cliente</th><th>Área</th><th>Status</th><th>Próximo prazo</th><th>Última atualização</th><th>Ações</th><th>Ações</th></tr></thead><tbody>'+rows.map(p=>{const c=clientById(p.clientId), due=p.deadline?new Date(p.deadline+'T12:00:00').toLocaleDateString('pt-BR'):'-';const cls=p.deadline&&p.deadline<today&&p.status!=='Encerrado'?' style="color:#a33;font-weight:700"':'';return `<tr><td><button class="d-link" type="button" onclick="openProcessDetail('${p.id}')"><b>${esc(p.number)}</b></button><div class="muted" style="font-size:12px">${esc(p.court||p.tribunal||'Órgão não informado')}</div></td><td>${c?esc(c.name):'<span class="muted">Sem vínculo</span>'}</td><td>${esc(p.area)}</td><td><span class="tag">${esc(p.status)}</span></td><td${cls}>${due}</td><td>${esc(p.updated||p.date)}</td><td><div style="display:flex;gap:5px;flex-wrap:wrap"><button class="d-btn light" type="button" onclick="openProcessDetail('${p.id}')">Abrir</button><button class="d-btn light" type="button" onclick="openProcessDetail('${p.id}')">Editar</button></div></td></tr>`}).join('')+'</tbody></table>'}
 function renderDocuments(){const el=document.getElementById('documentsTable');if(!el)return;const rows=data.calcHistory.slice().reverse();if(!rows.length){el.innerHTML='<div class="empty">Nenhuma simulação registrada ainda. Os relatórios aparecem aqui depois que uma calculadora for salva.</div>';return}el.innerHTML='<table class="d-table"><thead><tr><th>Data</th><th>Documento</th><th>Cliente</th><th>Ação</th></tr></thead><tbody>'+rows.map((h,i)=>{const c=clientById(h.clientId);return `<tr><td>${esc(h.date)}</td><td><b>${esc(h.label||h.type)}</b></td><td>${c?esc(c.name):'<span class="muted">Sem vínculo</span>'}</td><td><button class="d-btn light" onclick="printCalcReport(${data.calcHistory.length-1-i})">Gerar relatório</button></td></tr>`}).join('')+'</tbody></table>'}
-function printCalcReport(index){const h=data.calcHistory[index];if(!h)return;const c=clientById(h.clientId);const w=window.open('','_blank');if(!w){toast('Permita pop-ups para gerar o relatório');return}const clientName=c?esc(c.name):'Simulação sem cliente';const clientMeta=c?`${esc(c.area||'')} · ${esc(c.phone||'')}`:'Uso interno';w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(h.label||'Relatório')}</title><style>body{font-family:Arial,sans-serif;color:#3d2b20;max-width:820px;margin:50px auto;padding:0 30px;line-height:1.55}header{border-bottom:2px solid #b28a5b;padding-bottom:18px;margin-bottom:30px}h1{font-family:Georgia,serif;font-weight:500;margin:0 0 5px}h2{font-family:Georgia,serif;font-weight:500;margin-top:28px}.meta{color:#765f4e;font-size:13px}.box{background:#f5eee7;border:1px solid #eaded2;border-radius:10px;padding:18px;white-space:pre-wrap}.foot{margin-top:40px;padding-top:15px;border-top:1px solid #eaded2;font-size:11px;color:#8d7767}@media print{body{margin:20px auto}.no-print{display:none}}.audit-row{padding:10px 0;border-bottom:1px solid #eee3db;font-size:12px}.audit-row:last-child{border-bottom:0}.audit-row small{display:block;color:#8d7767;margin-top:3px}</style></head><body><header><h1>Kaliny Girardi Advocacia</h1><div class="meta">Relatório interno de simulação</div></header><h2>${esc(h.label||h.type)}</h2><p><b>Cliente:</b> ${clientName}<br><span class="meta">${clientMeta}</span><br><b>Data:</b> ${esc(h.date)}</p><div class="box">${esc(h.result)}</div><div class="foot">Documento gerado pelo sistema interno. Os valores e conclusões dependem dos dados informados e devem ser conferidos antes de qualquer utilização profissional.</div><p class="no-print"><button onclick="window.print()">Imprimir / Salvar como PDF</button></p><script>window.onload=()=>setTimeout(()=>window.print(),250)<\/script></body></html>`);w.document.close()}
+function printCalcReport(index){const h=data.calcHistory[index];if(!h)return;const c=clientById(h.clientId);const w=window.open('','_blank');if(!w){toast('Permita pop-ups para gerar o relatório');return}const clientName=c?esc(c.name):'Simulação sem cliente';const clientMeta=c?`${esc(c.area||'')} · ${esc(c.phone||'')}`:'Uso interno';w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(h.label||'Relatório')}</title><style>body{font-family:Arial,sans-serif;color:#3d2b20;max-width:820px;margin:50px auto;padding:0 30px;line-height:1.55}header{border-bottom:2px solid #b28a5b;padding-bottom:18px;margin-bottom:30px}h1{font-family:Georgia,serif;font-weight:500;margin:0 0 5px}h2{font-family:Georgia,serif;font-weight:500;margin-top:28px}.meta{color:#765f4e;font-size:13px}.box{background:#f5eee7;border:1px solid #eaded2;border-radius:10px;padding:18px;white-space:pre-wrap}.foot{margin-top:40px;padding-top:15px;border-top:1px solid #eaded2;font-size:11px;color:#8d7767}@media print{body{margin:20px auto}.no-print{display:none}}.audit-row{padding:10px 0;border-bottom:1px solid #eee3db;font-size:12px}.audit-row:last-child{border-bottom:0}.audit-row small{display:block;color:#8d7767;margin-top:3px}</style></head><body><header><h1>Kaliny Girardi Advocacia</h1><div class="meta">Relatório interno de simulação</div></header><h2>${esc(h.label||h.type)}</h2><p><b>Cliente:</b> ${clientName}<br><span class="meta">${clientMeta}</span><br><b>Data:</b> ${esc(h.date)}</p><div class="box">${esc(h.result)}</div><div class="foot">Documento gerado pelo sistema interno. Os valores e conclusões dependem dos dados informados e devem ser conferidos antes de qualquer utilização profissional.</div><p class="no-print"><button onclick="window.print()">Imprimir / Salvar como PDF</button></p><script>window.onload=()=>setTimeout(()=>window.print(),250)<\/script>
+<script>
+(function(){
+  function initMobileNav(){
+    const desktop=document.querySelector('.dash-nav');
+    const mobile=document.getElementById('mobileNav');
+    const drawer=document.getElementById('mobileDrawer');
+    const overlay=document.getElementById('mobileOverlay');
+    const btn=document.getElementById('mobileMenuBtn');
+    if(!desktop||!mobile||!drawer||!overlay||!btn)return;
+    mobile.innerHTML=desktop.innerHTML;
+    mobile.querySelectorAll('button[data-page]').forEach(b=>{
+      b.addEventListener('click',function(){
+        const target=desktop.querySelector('button[data-page="'+this.getAttribute('data-page')+'"]');
+        if(target)target.click();
+        closeMenu();
+      });
+    });
+    const ml=mobile.querySelector('#logoutBtn');
+    if(ml)ml.addEventListener('click',function(){
+      const dl=desktop.querySelector('#logoutBtn'); if(dl)dl.click();
+    });
+    function openMenu(){drawer.classList.add('open');overlay.classList.add('open');document.body.style.overflow='hidden'}
+    function closeMenu(){drawer.classList.remove('open');overlay.classList.remove('open');document.body.style.overflow=''}
+    btn.addEventListener('click',openMenu);
+    overlay.addEventListener('click',closeMenu);
+    mobile.querySelectorAll('button').forEach(b=>b.addEventListener('click',function(){
+      setTimeout(()=>{
+        const page=this.getAttribute('data-page');
+        if(page){
+          mobile.querySelectorAll('button[data-page]').forEach(x=>x.classList.toggle('active',x.getAttribute('data-page')===page));
+        }
+      },30);
+    }));
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initMobileNav);
+  else initMobileNav();
+})();
+</script>
+</body></html>`);w.document.close()}
 function renderClients(){const el=document.getElementById('clientsTable');if(!el)return;const search=(document.getElementById('clientSearch')?.value||'').trim().toLowerCase();const area=document.getElementById('clientAreaFilter')?.value||'';const status=document.getElementById('clientStatusFilter')?.value||'';const all=data.clients||[];const filtered=all.filter(c=>{const hay=[c.name,c.phone,c.cpf].filter(Boolean).join(' ').toLowerCase();return (!search||hay.includes(search))&&(!area||c.area===area)&&(!status||(c.status||'Ativo')===status)});const active=all.filter(c=>(c.status||'Ativo')==='Ativo').length;const inactive=all.length-active;const summary=document.getElementById('clientSummary');if(summary)summary.innerHTML=`<div class="mini-card"><small class="muted">Total</small><strong>${all.length}</strong></div><div class="mini-card"><small class="muted">Ativos</small><strong>${active}</strong></div><div class="mini-card"><small class="muted">Inativos</small><strong>${inactive}</strong></div><div class="mini-card"><small class="muted">Exibindo</small><strong>${filtered.length}</strong></div>`;if(!filtered.length){el.innerHTML='<div class="empty">Nenhum cliente encontrado com os filtros atuais.</div>';return}el.innerHTML='<table class="d-table"><thead><tr><th>Nome</th><th>Telefone</th><th>Área</th><th>Status</th><th>Cadastro</th><th>Ações</th></tr></thead><tbody>'+filtered.map(c=>`<tr><td><b>${esc(c.name)}</b></td><td>${c.phone?`<a href="${phoneHref(c.phone)}">${esc(c.phone)}</a>`:'-'}</td><td><span class="tag">${esc(c.area||'Não informada')}</span></td><td><span class="tag">${esc(c.status||'Ativo')}</span></td><td>${esc(c.date||'-')}</td><td><div class="client-actions"><button class="d-btn light" onclick="viewClient('${c.id}')">Ficha</button><button class="d-btn light" onclick="openEditClient('${c.id}')">Editar</button><button class="d-btn" onclick="openCalcForClient('${c.id}')">+ Calculadora</button><button class="d-btn" style="background:#8b3f35;color:#fff" onclick="deleteClient('${c.id}')">Excluir</button></div></td></tr>`).join('')+'</tbody></table>'}
 
 function renderOverviewExtras(){
