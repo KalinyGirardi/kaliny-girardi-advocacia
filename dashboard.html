@@ -87,6 +87,18 @@ function navigateTo(section){
   .d-btn{min-height:40px}
   input,select,textarea{font-size:16px!important}
 }
+</style><style>/* V145.11 — mobile overflow */
+@media(max-width:600px){
+  html,body{width:100%;max-width:100%;overflow-x:hidden!important}
+  .dash-app,.dash-main,.dash-page,.dash-grid2,.d-panel,.settings-card{min-width:0!important;max-width:100%!important}
+  .dash-grid2{grid-template-columns:minmax(0,1fr)!important}
+  .quick-grid{grid-template-columns:minmax(0,1fr)!important}
+  .quick-grid button{min-width:0!important;width:100%!important}
+  .d-panel-head,.overview-welcome{min-width:0!important}
+  .overview-welcome>div{min-width:0}
+  .overview-welcome h2,.overview-welcome p{overflow-wrap:anywhere}
+  .settings-card p,.settings-card .mini-help{overflow-wrap:anywhere}
+}
 </style></head><body>
 <div class="mobile-header mobile-only">
   <div class="mobile-brand">
@@ -1240,7 +1252,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
 <script>
 (function(){
   function initMobileNav(){
-    const desktop=document.querySelector('.dash-nav');
+    const desktop=document.querySelector('.dash-side .dash-nav');
     const mobile=document.getElementById('mobileNav');
     const drawer=document.getElementById('mobileDrawer');
     const overlay=document.getElementById('mobileOverlay');
