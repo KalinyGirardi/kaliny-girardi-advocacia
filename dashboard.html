@@ -1477,7 +1477,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
    Regras: vence a alteração mais recente (updatedAt); exclusões viram marcação (deletedAt);
    resposta vazia ou com erro do servidor nunca apaga dados deste navegador. */
 (function(){
-  const VERSION='V145.21';
+  const VERSION='V145.22';
   const META_KEY='kaliny_sync_meta_v1';
   const COLLECTIONS=['processes','finance','notes','calcHistory','previdenciario','documents'];
   const BATCH=50;
@@ -2318,6 +2318,57 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
   }
   window.kalinyFinanceReport={open:openReport,summarize,chargeMessage};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installUi);else installUi();
+})();
+</script>
+<script>
+/* V145.22 — Cartão "Status do sistema" em Configurações (substitui rodar verificarSeguranca no editor). */
+(function(){
+  const OK='✅',WARN='⚠️',WAIT='⏳';
+  const row=(icon,label,value)=>`<div style="display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid #eee3db;font-size:14px"><span>${icon} ${esc(label)}</span><span class="muted" style="text-align:right">${esc(value)}</span></div>`;
+  const brDateTime=iso=>{const d=new Date(iso);return isNaN(d)?'':d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})};
+  function docsIcon(txt){const m=txt.match(/(\d+) de (\d+)/);if(m)return m[1]===m[2]?OK:WAIT;return /Nenhum/.test(txt)?OK:WARN}
+  function localRows(){
+    const sync=document.getElementById('dataSyncStatus'),docs=document.getElementById('docsDriveInfo');
+    let trusted=false;try{trusted=!!localStorage.getItem('kaliny_trusted_device')}catch(e){}
+    const syncOk=sync&&/✓/.test(sync.textContent)&&!/parcial/.test(sync.textContent);
+    return row(OK,'Painel',(window.kalinySync&&window.kalinySync.version)||'-')+
+      row(syncOk?OK:WARN,'Sincronização com a planilha',sync?(sync.getAttribute('title')||sync.textContent):'-')+
+      (docs&&docs.textContent?row(docsIcon(docs.textContent),'Documentos',docs.textContent.replace(/^Documentos:?\s*/,'')):'')+
+      row(trusted?OK:WAIT,'Este aparelho',trusted?'lembrado (entra sem código por 30 dias)':'pede o código por e-mail no login');
+  }
+  function serverRows(s){
+    const agenda={active:[OK,'ativa — consultas e prazos na agenda da Kaliny'],waiting_share:[WAIT,'aguardando a Kaliny compartilhar a agenda'],off:[WARN,'desligada']}[s.agenda]||[WARN,'-'];
+    return row(OK,'Servidor (Apps Script)',s.version||'-')+
+      row(s.password==='salted'&&!s.defaultPassword?OK:WARN,'Senha do painel',s.password!=='salted'?'formato antigo — entre de novo para converter':s.defaultPassword?'é a senha padrão antiga — troque já':'protegida')+
+      (s.masterKey?row(WARN,'Chave mestra','ainda existe — será removida no próximo login'):'')+
+      row(s.twoFactor?OK:WARN,'Código por e-mail no login',s.twoFactor?'ativo · '+s.trustedDevices+' aparelho(s) lembrado(s)':'desligado (LOGIN_2FA = 0)')+
+      row(s.reminders?OK:WARN,'Lembretes de consulta por e-mail',s.reminders?'ativos':'desligados — rode setup no Apps Script')+
+      row(s.digest?OK:WAIT,'Resumo diário de prazos (7h)',s.digest?'ativo':'será instalado em até 15 minutos')+
+      row(s.backup?OK:WARN,'Backup diário da planilha',s.backup?(s.lastBackup?'último: '+brDateTime(s.lastBackup):'ativo (primeiro backup às 2h)'):'desligado — rode setup no Apps Script')+
+      row(agenda[0],'Google Agenda',agenda[1])+
+      row(Number(s.mailQuota)>=20?OK:WARN,'E-mails disponíveis hoje',String(s.mailQuota));
+  }
+  async function refresh(){
+    const box=document.getElementById('systemStatusList');if(!box)return;
+    box.innerHTML=localRows()+row(WAIT,'Servidor','consultando…');
+    const cfg=onlineConfig();
+    if(!cfg.url||!cfg.token){box.innerHTML=localRows()+row(WARN,'Servidor','sessão expirada — entre novamente');return}
+    try{
+      const r=await fetch(cfg.url+'?'+new URLSearchParams({action:'systemStatus',token:cfg.token}),{cache:'no-store'}),j=await r.json();
+      if(j&&j.ok)box.innerHTML=localRows()+serverRows(j);
+      else box.innerHTML=localRows()+(j&&j.error==='unknown_action'?row(WAIT,'Servidor','versão anterior — o status completo aparece depois da atualização do Apps Script (V145.22)'):j&&j.error==='unauthorized'?row(WARN,'Servidor','sessão expirada — entre novamente'):row(WARN,'Servidor','não foi possível consultar agora'));
+    }catch(e){box.innerHTML=localRows()+row(WARN,'Servidor','sem conexão agora')}
+    const t=document.getElementById('systemStatusTime');if(t)t.textContent='Atualizado às '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  }
+  function install(){
+    const grid=document.querySelector('#page-settings .settings-grid');
+    if(!grid||document.getElementById('systemStatusCard'))return;
+    grid.insertAdjacentHTML('afterbegin',`<div class="settings-card" id="systemStatusCard"><span class="eyebrow">Status do sistema</span><h3>Tudo funcionando?</h3><div id="systemStatusList"></div><div class="form-actions" style="margin-top:12px"><button class="d-btn light" type="button" id="systemStatusRefresh">Atualizar</button><span id="systemStatusTime" class="muted" style="font-size:12px;align-self:center"></span></div></div>`);
+    document.getElementById('systemStatusRefresh').addEventListener('click',refresh);
+  }
+  document.addEventListener('click',ev=>{const b=ev.target.closest&&ev.target.closest('[data-page="settings"]');if(b)setTimeout(()=>{install();refresh()},50)});
+  window.kalinyStatus={refresh};
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else setTimeout(install,0);
 })();
 </script>
 </body></html>

@@ -1,5 +1,5 @@
 KALINY GIRARDI ADVOCACIA — site institucional + painel administrativo
-Versão: V145.21
+Versão: V145.22
 
 ESTRUTURA
 - index.html ............ site público (agendamento online, áreas, conteúdos, contato)
@@ -42,3 +42,6 @@ HISTÓRICO
 - V145.21: código de acesso por e-mail no login (lembrar aparelho por 30 dias),
   limpeza do formato antigo da senha e painel mais leve (logotipo do contrato em
   assets/contract-logo.png).
+- V145.22: cartão "Status do sistema" em Configurações (senha, código por e-mail,
+  lembretes, resumo, backup, Google Agenda, cota de e-mails) — dispensa rodar
+  verificarSeguranca no editor. A parte do servidor exige o Code.gs V145.22.
