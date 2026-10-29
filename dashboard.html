@@ -1477,7 +1477,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
    Regras: vence a alteração mais recente (updatedAt); exclusões viram marcação (deletedAt);
    resposta vazia ou com erro do servidor nunca apaga dados deste navegador. */
 (function(){
-  const VERSION='V145.18';
+  const VERSION='V145.19';
   const META_KEY='kaliny_sync_meta_v1';
   const COLLECTIONS=['processes','finance','notes','calcHistory','previdenciario','documents'];
   const BATCH=50;
@@ -2146,6 +2146,176 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
     };
   }
   window.kalinyPrazos={calc,holidaysFor,easter,open:openPrazoCalc};
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installUi);else installUi();
+})();
+</script>
+<script>
+/* V145.19 — Relatório financeiro mensal e cobrança de parcelas por WhatsApp. */
+(function(){
+  const COLORS={received:'#b06a1e',expense:'#3f7fbf'}; // validados (contraste e daltonismo) sobre #fffaf6
+  const MONTHS=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+  const MONTHS_FULL=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const pad=n=>String(n).padStart(2,'0');
+  function parseDay(v){const s=String(v||'').trim();let m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);if(m)return new Date(+m[1],m[2]-1,+m[3]);m=s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);return m?new Date(+m[3],m[2]-1,+m[1]):null}
+  const br=d=>d?pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear():'';
+  const today=()=>{const t=new Date();t.setHours(0,0,0,0);return t};
+  const lower=v=>String(v||'').trim().toLowerCase();
+  const isIncome=f=>lower(f.type||'receita')!=='despesa';
+  const isPaid=f=>lower(f.status||'pago')!=='pendente';
+  const refDate=f=>parseDay(f.dueDate)||parseDay(f.date);
+
+  // Situação de cada lançamento: recebido, a receber, vencido, despesa paga, despesa a pagar.
+  function classify(f){
+    const d=refDate(f);
+    if(isIncome(f))return isPaid(f)?'received':(d&&d<today()?'overdue':'receivable');
+    return isPaid(f)?'expense':'payable';
+  }
+  const LABEL={received:'Recebido',receivable:'A receber',overdue:'Vencido',expense:'Despesa paga',payable:'Despesa a pagar'};
+
+  function summarize(year,month){
+    const items=(data.finance||[]).filter(f=>{if(!f)return false;const d=refDate(f);return d&&d.getFullYear()===year&&(month==null||d.getMonth()===month)});
+    const months=Array.from({length:12},()=>({received:0,receivable:0,overdue:0,expense:0,payable:0}));
+    const tot={received:0,receivable:0,overdue:0,expense:0,payable:0},byArea={},byClient={};
+    items.forEach(f=>{
+      const k=classify(f),v=Number(f.value||0),d=refDate(f);
+      months[d.getMonth()][k]+=v;tot[k]+=v;
+      if(k==='received'){
+        const c=f.clientId?clientById(f.clientId):null,area=(c&&c.area)||'Sem área';
+        byArea[area]=(byArea[area]||0)+v;
+        const name=c?c.name:'Sem cliente';byClient[name]=(byClient[name]||0)+v;
+      }
+    });
+    return {items,months,tot,byArea,byClient};
+  }
+
+  function chartSvg(months){
+    const W=720,H=240,L=84,R=12,T=14,B=30,iw=W-L-R,ih=H-T-B;
+    const max=Math.max(1,...months.map(m=>Math.max(m.received,m.expense)));
+    const step=niceStep(max/4),top=Math.ceil(max/step)*step;
+    const y=v=>T+ih-(v/top)*ih,slot=iw/12,bw=Math.min(18,(slot-10)/2);
+    let g='';
+    for(let v=0;v<=top+0.001;v+=step)g+=`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="#eaded2" stroke-width="1"/><text x="${L-8}" y="${y(v)+4}" text-anchor="end" font-size="11" fill="#8d7767">${short(v)}</text>`;
+    months.forEach((m,i)=>{
+      const cx=L+slot*i+slot/2;
+      [['received',cx-bw-1],['expense',cx+1]].forEach(([k,x])=>{
+        const v=m[k];if(!v)return;const h=Math.max(1,ih-(y(v)-T)),yy=y(v),r=Math.min(4,bw/2,h);
+        g+=`<path d="M${x},${T+ih} V${yy+r} Q${x},${yy} ${x+r},${yy} H${x+bw-r} Q${x+bw},${yy} ${x+bw},${yy+r} V${T+ih} Z" fill="${COLORS[k]}"/>`;
+      });
+      g+=`<text x="${cx}" y="${H-10}" text-anchor="middle" font-size="11" fill="#8d7767">${MONTHS[i]}</text>`;
+      g+=`<rect class="fin-hit" data-m="${i}" x="${L+slot*i}" y="${T}" width="${slot}" height="${ih}" fill="transparent"/>`;
+    });
+    g+=`<line x1="${L}" x2="${W-R}" y1="${T+ih}" y2="${T+ih}" stroke="#cdbcab" stroke-width="1"/>`;
+    return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Recebido e despesas pagas por mês" style="display:block;max-width:100%">${g}</svg>`;
+  }
+  function niceStep(raw){const p=Math.pow(10,Math.floor(Math.log10(raw||1))),n=raw/p;return (n<=1?1:n<=2?2:n<=5?5:10)*p}
+  function short(v){return v>=1e6?'R$ '+(v/1e6).toLocaleString('pt-BR',{maximumFractionDigits:1})+' mi':v>=1e3?'R$ '+(v/1e3).toLocaleString('pt-BR',{maximumFractionDigits:1})+' mil':'R$ '+v.toLocaleString('pt-BR')}
+
+  function tile(label,value,extra){return `<div class="mini-card"><small class="muted">${label}</small><strong ${extra||''}>${value}</strong></div>`}
+  function reportHtml(year,month){
+    const s=summarize(year,month),t=s.tot,saldo=t.received-t.expense;
+    const saldoStyle=saldo>0?'style="color:#557a62"':saldo<0?'style="color:#9a5a55"':'';
+    const period=month==null?String(year):MONTHS_FULL[month]+' de '+year;
+    let html=`<div class="client-mini-grid" style="margin-top:4px">${tile('Recebido',money(t.received))}${tile('Despesas pagas',money(t.expense))}${tile('Saldo do período',money(saldo),saldoStyle)}${tile('A receber',money(t.receivable))}${tile('⚠ Vencido',money(t.overdue),t.overdue?'style="color:#9a5a55"':'')}</div>`;
+    if(t.payable)html+=`<p class="muted" style="margin:8px 0 0">Despesas ainda a pagar no período: <b>${money(t.payable)}</b>.</p>`;
+    if(month==null){
+      html+=`<h3 style="margin:22px 0 6px;font:500 20px Georgia,serif">Recebido × despesas pagas por mês</h3>
+<div style="display:flex;gap:16px;font-size:13px;margin-bottom:6px"><span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${COLORS.received};margin-right:6px"></span>Recebido</span><span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${COLORS.expense};margin-right:6px"></span>Despesas pagas</span></div>
+<div id="finChartWrap" style="position:relative">${chartSvg(s.months)}<div id="finTip" style="position:absolute;pointer-events:none;display:none;background:#3d2b20;color:#fff;font-size:12px;line-height:1.45;padding:8px 10px;border-radius:8px;white-space:nowrap;z-index:2"></div></div>
+<div style="overflow-x:auto;margin-top:14px"><table class="d-table"><thead><tr><th>Mês</th><th>Recebido</th><th>Despesas pagas</th><th>Saldo</th><th>A receber</th><th>Vencido</th></tr></thead><tbody>${s.months.map((m,i)=>`<tr><td>${MONTHS_FULL[i]}</td><td>${money(m.received)}</td><td>${money(m.expense)}</td><td>${money(m.received-m.expense)}</td><td>${money(m.receivable)}</td><td>${money(m.overdue)}</td></tr>`).join('')}</tbody></table></div>`;
+    }
+    const areas=Object.entries(s.byArea).sort((a,b)=>b[1]-a[1]),clients=Object.entries(s.byClient).sort((a,b)=>b[1]-a[1]).slice(0,5);
+    if(areas.length)html+=`<h3 style="margin:22px 0 6px;font:500 20px Georgia,serif">Recebido por área</h3><table class="d-table"><thead><tr><th>Área</th><th>Recebido</th><th>%</th></tr></thead><tbody>${areas.map(([a,v])=>`<tr><td>${esc(a)}</td><td>${money(v)}</td><td>${(t.received?v/t.received*100:0).toLocaleString('pt-BR',{maximumFractionDigits:1})}%</td></tr>`).join('')}</tbody></table>`;
+    if(clients.length)html+=`<h3 style="margin:22px 0 6px;font:500 20px Georgia,serif">Maiores clientes (recebido)</h3><table class="d-table"><thead><tr><th>Cliente</th><th>Recebido</th></tr></thead><tbody>${clients.map(([c,v])=>`<tr><td>${esc(c)}</td><td>${money(v)}</td></tr>`).join('')}</tbody></table>`;
+    const overdue=(data.finance||[]).filter(f=>f&&classify(f)==='overdue').sort((a,b)=>refDate(a)-refDate(b));
+    html+=`<h3 style="margin:22px 0 6px;font:500 20px Georgia,serif">Parcelas vencidas (todas as datas)</h3>`+(overdue.length?`<div>${overdue.map(f=>{const c=f.clientId?clientById(f.clientId):null,d=refDate(f),days=Math.round((today()-d)/86400000);return `<div class="history-item" style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap"><div><b>${money(f.value)}</b> · ${esc(f.desc||'Lançamento')}${c?' · '+esc(c.name):''}<div class="muted" style="font-size:13px">Venceu em ${br(d)} (há ${days} dia${days===1?'':'s'})</div></div><div style="display:flex;gap:6px;flex-wrap:wrap">${waButton(f)}<button class="d-btn light" type="button" data-fin-paid="${esc(String(f.id))}">Marcar como paga</button></div></div>`}).join('')}</div>`:'<div class="empty">Nenhuma parcela vencida. 🎉</div>');
+    html+=`<p class="muted" style="font-size:12px;margin-top:14px">Período: ${esc(period)}. Os lançamentos entram no mês do vencimento (ou da data, quando não há vencimento). "Saldo" = recebido − despesas pagas.</p>`;
+    return {html,s,period};
+  }
+
+  function openReport(){
+    const years=new Set([new Date().getFullYear()]);(data.finance||[]).forEach(f=>{const d=f&&refDate(f);if(d)years.add(d.getFullYear())});
+    const ys=[...years].sort((a,b)=>b-a),cy=new Date().getFullYear();
+    openModal('Relatório financeiro',`<div class="form-grid" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px"><div class="field" style="min-width:0"><label>Ano</label><select id="finRepYear" style="width:100%">${ys.map(y=>`<option ${y===cy?'selected':''}>${y}</option>`).join('')}</select></div><div class="field" style="min-width:0"><label>Mês</label><select id="finRepMonth" style="width:100%"><option value="">Ano inteiro</option>${MONTHS_FULL.map((m,i)=>`<option value="${i}">${m}</option>`).join('')}</select></div></div><div class="form-actions" style="margin-top:10px"><button class="d-btn light" type="button" id="finRepCsv">Exportar para Excel (CSV)</button><button class="d-btn light" type="button" id="finRepPrint">Imprimir / PDF</button></div><div id="finRepBody"></div>`);
+    const draw=()=>{
+      const y=+document.getElementById('finRepYear').value,mv=document.getElementById('finRepMonth').value,m=mv===''?null:+mv;
+      const r=reportHtml(y,m);document.getElementById('finRepBody').innerHTML=r.html;wireTooltip(r.s.months);return {y,m,r};
+    };
+    let cur=draw();
+    document.getElementById('finRepYear').onchange=()=>{cur=draw()};
+    document.getElementById('finRepMonth').onchange=()=>{cur=draw()};
+    document.getElementById('finRepCsv').onclick=()=>exportCsv(cur.r.s.items,cur.y,cur.m);
+    document.getElementById('finRepPrint').onclick=()=>printReport(cur.r);
+  }
+  function wireTooltip(months){
+    const wrap=document.getElementById('finChartWrap'),tip=document.getElementById('finTip');if(!wrap||!tip)return;
+    wrap.querySelectorAll('.fin-hit').forEach(h=>{
+      h.addEventListener('mouseenter',()=>{const i=+h.getAttribute('data-m'),m=months[i];
+        tip.innerHTML=`<b>${MONTHS_FULL[i]}</b><br><span style="color:#f0c38e">■</span> Recebido: ${money(m.received)}<br><span style="color:#9cc3ea">■</span> Despesas pagas: ${money(m.expense)}<br>Saldo: ${money(m.received-m.expense)}`;
+        const box=wrap.getBoundingClientRect(),r=h.getBoundingClientRect();tip.style.display='block';
+        let left=r.left-box.left+r.width/2-tip.offsetWidth/2;left=Math.max(0,Math.min(left,box.width-tip.offsetWidth));tip.style.left=left+'px';tip.style.top='4px';
+        h.setAttribute('fill','rgba(122,90,67,.06)')});
+      h.addEventListener('mouseleave',()=>{tip.style.display='none';h.setAttribute('fill','transparent')});
+    });
+  }
+  function exportCsv(items,y,m){
+    const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"',num=v=>Number(v||0).toFixed(2).replace('.',',');
+    const rows=[['Data','Vencimento','Descrição','Cliente','Área','Tipo','Status','Situação','Forma de pagamento','Valor']];
+    items.slice().sort((a,b)=>refDate(a)-refDate(b)).forEach(f=>{const c=f.clientId?clientById(f.clientId):null;rows.push([br(parseDay(f.date))||f.date||'',br(parseDay(f.dueDate)),f.desc||'',c?c.name:'',c?c.area||'':'',isIncome(f)?'Receita':'Despesa',isPaid(f)?'Pago':'Pendente',LABEL[classify(f)],f.paymentMethod||f.formaPagamento||'',num(f.value)])});
+    const csv='﻿'+rows.map(r=>r.map((v,i)=>i===r.length-1&&r!==rows[0]?v:q(v)).join(';')).join('\r\n');
+    const a=document.createElement('a'),url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+    a.href=url;a.download='financeiro-'+y+(m==null?'':'-'+pad(m+1))+'.csv';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);
+    toast('Planilha exportada ✓');
+  }
+  function printReport(r){
+    const w=window.open('','_blank');if(!w){toast('Permita pop-ups para gerar o PDF');return}
+    const body=document.getElementById('finRepBody').cloneNode(true);body.querySelectorAll('button,#finTip,.fin-hit').forEach(b=>b.remove());
+    w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Relatório financeiro — ${esc(r.period)}</title><style>body{font-family:Arial,sans-serif;color:#3d2b20;max-width:860px;margin:36px auto;padding:0 28px;line-height:1.5}h1{font-family:Georgia,serif;font-weight:500;margin:0}h3{font-family:Georgia,serif;font-weight:500}.client-mini-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}.mini-card{border:1px solid #eaded2;border-radius:10px;padding:10px}.mini-card small{display:block;color:#8d7767;font-size:12px}.mini-card strong{font-size:15px}table{width:100%;border-collapse:collapse;font-size:13px}th,td{border-bottom:1px solid #eee3db;padding:6px 8px;text-align:left}.history-item{border-bottom:1px solid #eee3db;padding:8px 0}.muted{color:#8d7767}.empty{color:#8d7767}@media print{.no-print{display:none}}</style></head><body><header style="border-bottom:2px solid #b28a5b;padding-bottom:12px;margin-bottom:18px"><h1>Kaliny Girardi Advocacia</h1><div class="muted">Relatório financeiro — ${esc(r.period)} · gerado em ${br(new Date())}</div></header>${body.innerHTML}<p class="no-print"><button onclick="window.print()">Imprimir / Salvar como PDF</button></p><script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`);
+    w.document.close();
+  }
+
+  // Cobrança / lembrete de parcela por WhatsApp.
+  function waNumber(raw){let d=String(raw||'').replace(/\D/g,'').replace(/^0+/,'');if(d.length===10||d.length===11)d='55'+d;return d.length>=12&&d.length<=13?d:''}
+  function phoneFor(f){const c=f&&f.clientId?clientById(f.clientId):null;return waNumber(c&&c.phone)}
+  function waButton(f){
+    if(!f||!isIncome(f)||isPaid(f)||!phoneFor(f))return '';
+    const k=classify(f);
+    return `<button class="d-btn light" type="button" data-fin-wa="${esc(String(f.id))}" title="Abre o WhatsApp com a mensagem pronta">${k==='overdue'?'Cobrar no WhatsApp':'Lembrar no WhatsApp'}</button>`;
+  }
+  function chargeMessage(f){
+    const c=clientById(f.clientId),first=String(c&&c.name||'').trim().split(/\s+/)[0]||'',d=refDate(f),t=today();
+    const what='"'+(f.desc||'parcela')+'", no valor de '+money(f.value);
+    const hello='Olá'+(first?', '+first:'')+'! Tudo bem? Aqui é do escritório Kaliny Girardi Advocacia. ';
+    if(d&&d<t)return hello+'Consta em aberto o pagamento de '+what+', com vencimento em '+br(d)+'. Se já tiver feito o pagamento, por favor desconsidere esta mensagem e, se puder, envie o comprovante. Qualquer dúvida, estou à disposição.';
+    const when=d&&d.getTime()===t.getTime()?'hoje ('+br(d)+')':'em '+br(d);
+    return hello+'Passando para lembrar do pagamento de '+what+', com vencimento '+when+'. Qualquer dúvida, estou à disposição.';
+  }
+  document.addEventListener('click',ev=>{
+    const b=ev.target.closest&&ev.target.closest('[data-fin-wa]');if(!b)return;
+    ev.preventDefault();
+    const f=(data.finance||[]).find(x=>String(x.id)===b.getAttribute('data-fin-wa'));if(!f)return;
+    const n=phoneFor(f);if(!n){toast('Cliente sem telefone cadastrado');return}
+    window.open('https://wa.me/'+n+'?text='+encodeURIComponent(chargeMessage(f)),'_blank','noopener');
+  });
+  function decorate(root){
+    if(!root)return;
+    root.querySelectorAll('[data-fin-edit],[data-fin-paid]').forEach(btn=>{
+      const id=btn.getAttribute('data-fin-edit')||btn.getAttribute('data-fin-paid');
+      if(btn.parentNode.querySelector('[data-fin-wa="'+CSS.escape(id)+'"]'))return;
+      const f=(data.finance||[]).find(x=>String(x.id)===id);const html=waButton(f);
+      if(html)btn.insertAdjacentHTML('beforebegin',html);
+    });
+  }
+  const origFinance=window.renderFinance;
+  if(typeof origFinance==='function')window.renderFinance=function(){const r=origFinance.apply(this,arguments);try{decorate(document.getElementById('financeTable'))}catch(e){console.warn(e)}return r};
+  const origOverview=window.renderOverviewExtras;
+  if(typeof origOverview==='function')window.renderOverviewExtras=function(){const r=origOverview.apply(this,arguments);try{decorate(document.getElementById('overviewAttention'))}catch(e){console.warn(e)}return r};
+
+  function installUi(){
+    const btn=document.getElementById('newFinance');
+    if(btn&&!document.getElementById('financeReportBtn')){btn.insertAdjacentHTML('beforebegin','<button class="d-btn light" type="button" id="financeReportBtn" style="margin-right:8px">📊 Relatório</button>');document.getElementById('financeReportBtn').onclick=openReport}
+    try{decorate(document.getElementById('financeTable'));decorate(document.getElementById('overviewAttention'))}catch(e){}
+  }
+  window.kalinyFinanceReport={open:openReport,summarize,chargeMessage};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installUi);else installUi();
 })();
 </script>

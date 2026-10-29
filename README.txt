@@ -1,5 +1,5 @@
 KALINY GIRARDI ADVOCACIA — site institucional + painel administrativo
-Versão: V145.18
+Versão: V145.19
 
 ESTRUTURA
 - index.html ............ site público (agendamento online, áreas, conteúdos, contato)
@@ -36,3 +36,5 @@ HISTÓRICO
 - V145.18: documentos e contratos no Google Drive (envio automático, download no
   outro aparelho, exclusão vai para a lixeira do Drive); botão "Adicionar documento"
   da ficha do cliente corrigido.
+- V145.19: relatório financeiro (mês/ano, gráfico, por área e cliente, vencidas,
+  exportação CSV para Excel e PDF) e cobrança/lembrete de parcela por WhatsApp.
