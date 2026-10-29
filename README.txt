@@ -1,5 +1,5 @@
 KALINY GIRARDI ADVOCACIA — site institucional + painel administrativo
-Versão: V145.15
+Versão: V145.16
 
 ESTRUTURA
 - index.html ............ site público (agendamento online, áreas, conteúdos, contato)
@@ -12,8 +12,9 @@ ESTRUTURA
 
 ONDE FICAM OS DADOS
 - Planilha Google (via Apps Script): Agendamentos, Clientes, Processos (com prazos e
-  movimentações) e Financeiro. Sincronizam entre computador e celular.
-- Somente no navegador: documentos anexados, anotações e histórico de cálculos.
+  movimentações), Financeiro, Anotações, Cálculos e Previdenciário. Sincronizam entre
+  computador e celular.
+- Somente no navegador: arquivos anexados (PDF, Word).
   Use Configurações > Exportar backup (JSON) de vez em quando.
 
 APPS SCRIPT (não fica neste repositório)
@@ -26,3 +27,6 @@ HISTÓRICO
 - V145.14: mobile aprovado (cards, menu à direita).
 - V145.15: segurança do servidor, sincronização de Processos/Financeiro, backup diário
   da planilha, Política de Privacidade, consentimento no agendamento e SEO.
+- V145.16: anotações, cálculos e dossiê previdenciário sincronizados; e-mail diário de
+  prazos e parcelas vencidas (7h); lembrete por WhatsApp na agenda; parcelas vencidas
+  nos Pontos de atenção.

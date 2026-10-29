@@ -313,7 +313,7 @@ function navigateTo(section){
 <section class="dash-page" id="page-agenda"><div class="d-panel"><div class="d-panel-head"><div><h2>Agenda</h2><div class="muted">Visualização mensal de compromissos e prazos processuais.</div></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="d-btn light" id="agendaToday">Hoje</button><button class="d-btn light" id="agendaWeek">Semana</button><button class="d-btn light" id="enableNotifications">🔔 Ativar notificações</button><button class="d-btn light" id="syncOnlineAgenda">↻ Sincronizar online</button><button class="d-btn" id="newEvent">+ Novo compromisso</button></div></div><div class="calendar-toolbar"><button class="d-btn light" id="agendaPrev">←</button><h3 id="agendaMonthLabel"></h3><button class="d-btn light" id="agendaNext">→</button></div><div class="calendar-wrap"><div id="agendaCalendar"></div></div><div id="agendaSelectedDay" class="selected-day-panel" style="margin-top:16px"></div><div class="calendar-legend"><span><i class="legend-dot event"></i> Compromisso</span><span><i class="legend-dot deadline"></i> Prazo processual</span><span><i class="legend-dot today"></i> Hoje</span></div><div class="d-panel-head" style="margin-top:24px"><div><h2>Prazos processuais</h2><div class="muted">Prazos cadastrados nos processos aparecem automaticamente no calendário.</div></div></div><div id="processDeadlinesAgenda"></div></div></section>
 <section class="dash-page" id="page-finance"><div class="d-panel"><div class="d-panel-head"><h2>Financeiro</h2><button class="d-btn" id="newFinance">+ Novo lançamento</button></div><div class="dash-stats"><div class="d-card"><small>Receitas</small><strong id="finIncome">R$ 0</strong></div><div class="d-card"><small>Despesas</small><strong id="finExpense">R$ 0</strong></div><div class="d-card"><small>Saldo</small><strong id="finBalance" class="balance-value">R$ 0</strong></div><div class="d-card"><small>Pendente</small><strong id="finPending">R$ 0</strong></div></div><div id="financeTable"></div></div></section>
 <section class="dash-page" id="page-processes"><div class="d-panel"><div class="d-panel-head"><div><h2>Processos</h2><div class="muted">Controle interno dos processos vinculados aos clientes, com acompanhamento de prazos.</div></div><button class="d-btn" id="newProcess">+ Novo processo</button></div><div class="client-filterbar"><div class="field"><label>Buscar</label><input id="processSearch" placeholder="Número, cliente ou assunto"></div><div class="field"><label>Área</label><select id="processAreaFilter"><option value="">Todas as áreas</option><option>Cível</option><option>Família e Sucessões</option><option>Consumidor</option><option>Previdenciário</option><option>Imobiliário</option></select></div><div class="field"><label>Status</label><select id="processStatusFilter"><option value="">Todos</option><option>Em andamento</option><option>Aguardando prazo</option><option>Suspenso</option><option>Encerrado</option></select></div><button class="d-btn light" id="clearProcessFilters" type="button">Limpar filtros</button></div><div id="processSummary" class="client-summary"></div><div id="processesTable"></div></div></section>
-<section class="dash-page" id="page-calculators"><div class="d-panel"><div class="d-panel-head"><div><h2>Calculadoras</h2><span class="muted">Uso interno • histórico local nesta versão</span></div></div><div class="calc-grid"><div class="calc-card"><h3>Pensão alimentícia</h3><p class="muted">Simulação informativa com renda, dependentes e percentual.</p><button class="d-btn" onclick="openCalc('pension')">Abrir calculadora</button></div><div class="calc-card"><h3>Inventário</h3><p class="muted">Organize patrimônio, dívidas e estimativa de partilha.</p><button class="d-btn" onclick="openCalc('inventory')">Abrir calculadora</button></div><div class="calc-card"><h3>Aposentadoria</h3><p class="muted">Média salarial + percentual da regra geral, com triagem dos requisitos.</p><button class="d-btn" onclick="openCalc('retirement')">Abrir calculadora</button></div><div class="calc-card"><h3>Dossiê Previdenciário</h3><p class="muted">Centralize CNIS, holerites, CTPS e demais provas e monte a base salarial.</p><button class="d-btn" onclick="openDossieSelector()">Abrir dossiê</button></div></div></div><div class="d-panel"><div class="d-panel-head"><div><h2>Fluxo da análise previdenciária</h2><div class="muted">Documento → conferência → salários → atualização → média → cenário de benefício.</div></div></div><div class="dossier-help"><b>Importante:</b> o sistema não vai presumir que um valor extraído de holerite ou CNIS está correto. Cada competência fica marcada para conferência e a média corrigida só usa fator de atualização informado no dossiê. Sem os índices/fatores oficiais, o sistema mostra a média nominal e sinaliza que a atualização monetária ainda precisa ser preenchida.</div><div id="dossierOverview"></div></div></section>
+<section class="dash-page" id="page-calculators"><div class="d-panel"><div class="d-panel-head"><div><h2>Calculadoras</h2><span class="muted">Uso interno • histórico salvo na planilha</span></div></div><div class="calc-grid"><div class="calc-card"><h3>Pensão alimentícia</h3><p class="muted">Simulação informativa com renda, dependentes e percentual.</p><button class="d-btn" onclick="openCalc('pension')">Abrir calculadora</button></div><div class="calc-card"><h3>Inventário</h3><p class="muted">Organize patrimônio, dívidas e estimativa de partilha.</p><button class="d-btn" onclick="openCalc('inventory')">Abrir calculadora</button></div><div class="calc-card"><h3>Aposentadoria</h3><p class="muted">Média salarial + percentual da regra geral, com triagem dos requisitos.</p><button class="d-btn" onclick="openCalc('retirement')">Abrir calculadora</button></div><div class="calc-card"><h3>Dossiê Previdenciário</h3><p class="muted">Centralize CNIS, holerites, CTPS e demais provas e monte a base salarial.</p><button class="d-btn" onclick="openDossieSelector()">Abrir dossiê</button></div></div></div><div class="d-panel"><div class="d-panel-head"><div><h2>Fluxo da análise previdenciária</h2><div class="muted">Documento → conferência → salários → atualização → média → cenário de benefício.</div></div></div><div class="dossier-help"><b>Importante:</b> o sistema não vai presumir que um valor extraído de holerite ou CNIS está correto. Cada competência fica marcada para conferência e a média corrigida só usa fator de atualização informado no dossiê. Sem os índices/fatores oficiais, o sistema mostra a média nominal e sinaliza que a atualização monetária ainda precisa ser preenchida.</div><div id="dossierOverview"></div></div></section>
 <section class="dash-page" id="page-documents"><div class="d-panel"><div class="d-panel-head"><div><h2>Documentos e relatórios</h2><div class="muted">Gere relatórios imprimíveis a partir do histórico das simulações.</div></div></div><div id="documentsTable"></div></div></section><section class="dash-page" id="page-settings"><div class="d-panel"><div class="d-panel-head"><div><h2>Configurações</h2><div class="muted">Sessão, usuários e segurança do protótipo.</div></div><button class="d-btn light" id="lockNow">Bloquear painel</button></div><div class="settings-grid"><div class="settings-card"><span class="eyebrow">Agendamento online</span><h3>Conexão com a agenda do site</h3><p class="muted">A chave administrativa fica somente neste navegador. Ela não é publicada no site público.</p><div class="field"><label>URL do Apps Script</label><input id="appointmentsApiUrl" type="url" placeholder="https://script.google.com/macros/s/.../exec"></div><div class="field" style="margin-top:10px"><label>Chave administrativa</label><input id="appointmentsAdminKey" type="password" placeholder="Cole a ADMIN_KEY aqui"></div><div class="form-actions"><button class="d-btn" id="saveAppointmentSettings">Salvar conexão</button><button class="d-btn light" id="testAppointmentConnection">Testar conexão</button></div><div id="appointmentConnectionStatus" class="mini-help">Configure a chave para sincronizar os agendamentos recebidos pelo site.</div></div><div class="settings-card"><span class="eyebrow">Horários de atendimento</span><h3>Disponibilidade para agendamento</h3><p class="muted">Defina os dias e horários que aparecem para clientes no botão “Agende uma consulta”. Os horários ocupados são retirados automaticamente.</p><div class="field"><label>Intervalo entre consultas</label><select id="scheduleInterval"><option value="30">30 minutos</option><option value="60">60 minutos</option><option value="90">90 minutos</option></select></div><div id="scheduleEditor" class="schedule-editor"></div><div class="form-actions"><button class="d-btn light" id="loadAppointmentSchedule">Carregar agenda</button><button class="d-btn" id="saveAppointmentSchedule">Salvar horários</button></div><div id="appointmentScheduleStatus" class="mini-help">Configure a conexão online primeiro.</div></div><div class="settings-card"><span class="eyebrow">Sessão atual</span><h3 id="currentUserName"></h3><p id="currentUserMeta" class="muted"></p><div class="notice"><b>Modo local:</b> a sessão expira após 30 minutos de inatividade. Esta versão funciona sem Node.js ou servidor e é destinada a testes. Antes de usar dados reais, será necessário migrar usuários, documentos e dados para um ambiente seguro com autenticação, banco de dados, criptografia, controle de acesso e backups.</div></div><div class="settings-card"><span class="eyebrow">Usuários</span><div id="usersList"></div><button class="d-btn" id="newUser">+ Novo usuário</button></div></div></div></section>
 </main></div><div class="modal" id="modal"><div class="modal-box"><div class="modal-head"><h2 id="modalTitle"></h2><button class="close" onclick="closeModal()">×</button></div><div id="modalBody"></div></div></div><div class="toast" id="toast"></div>
 <script>
@@ -428,7 +428,7 @@ function showAgendaDay(key){
       if(status==='Pendente') onlineActions+=`<button class="d-btn light" type="button" onclick="updateOnlineAppointmentStatus((data.agenda||[]).find(x=>String(x.onlineId)===String('${esc(e.onlineId)}')),'Confirmado')">Confirmar</button>`;
       if(status!=='Cancelado') onlineActions+=`<button class="d-btn light" type="button" onclick="updateOnlineAppointmentStatus((data.agenda||[]).find(x=>String(x.onlineId)===String('${esc(e.onlineId)}')),'Cancelado')">Cancelar</button>`;
     }
-    items.push(`<div class="history-item"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><div><strong>${esc(e.title)}</strong> <span class="tag">${esc(e.time||'')}</span> ${online}<p class="muted">${esc(c?c.name:(e.client||'Sem cliente'))}${e.area?' · '+esc(e.area):''}${e.mode?' · '+esc(e.mode):''}</p>${e.email?`<small class="muted">${esc(e.email)} · ${esc(e.phone||'')}</small>`:''}</div><div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">${onlineActions}<button class="d-btn light" type="button" onclick="openEventForm('${e.clientId||''}','${e.id}')">Editar</button><button class="d-btn light" type="button" onclick="deleteAgendaEvent('${e.id}')">Excluir</button></div></div></div>`);
+    items.push(`<div class="history-item"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><div><strong>${esc(e.title)}</strong> <span class="tag">${esc(e.time||'')}</span> ${online}<p class="muted">${esc(c?c.name:(e.client||'Sem cliente'))}${e.area?' · '+esc(e.area):''}${e.mode?' · '+esc(e.mode):''}</p>${e.email?`<small class="muted">${esc(e.email)} · ${esc(e.phone||'')}</small>`:''}</div><div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">${typeof whatsAppReminderButton==='function'?whatsAppReminderButton(e,c):''}${onlineActions}<button class="d-btn light" type="button" onclick="openEventForm('${e.clientId||''}','${e.id}')">Editar</button><button class="d-btn light" type="button" onclick="deleteAgendaEvent('${e.id}')">Excluir</button></div></div></div>`);
   });
   deadlines.forEach(p=>{const c=clientById(p.clientId);items.push(`<div class="history-item"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><div><strong>⚖ ${esc(p.number||'Prazo processual')}</strong> <span class="tag">Prazo</span><p class="muted">${esc(c?c.name:'Sem cliente')} · ${esc(p.status||'')}</p><p>${esc(p.subject||'Sem assunto informado')}</p></div><button class="d-btn light" type="button" onclick="openProcessForm('${p.clientId||''}','${p.id}')">Editar processo</button></div></div>`)});
   openModal(`Agenda — ${formatDateBR(key)}`,items.length?items.join(''):'<div class="empty">Nenhum compromisso ou prazo nesta data.</div>');
@@ -438,7 +438,7 @@ function openModal(title,html){document.getElementById('modalTitle').textContent
 function clientById(id){return data.clients.find(c=>c.id===id)}
 function openClientTab(id,tab){document.querySelectorAll('.client-tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));document.querySelectorAll('.client-tab-panel').forEach(p=>p.classList.toggle('active',p.dataset.panel===tab));if(tab==='documents')renderClientDocuments(id);if(tab==='notes')renderClientNotes(id)}
 function renderClientNotes(id){const el=document.getElementById('clientNotesList');if(!el)return;const notes=(data.notes||[]).filter(n=>n.clientId===id).slice().reverse();if(!notes.length){el.innerHTML='<div class="empty">Nenhuma anotação registrada para este cliente.</div>';return}el.innerHTML=notes.map(n=>`<div class="history-item"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><div><strong>${esc(n.title||'Anotação')}</strong><div class="muted" style="font-size:12px;margin-top:4px">${esc(n.date)}${n.time?' · '+esc(n.time):''}</div></div><button class="d-btn light" onclick="deleteClientNote('${n.id}','${id}')">Excluir</button></div><div style="margin-top:10px;white-space:pre-wrap;color:#5d5047">${esc(n.text)}</div></div>`).join('')}
-function openNoteForm(clientId){openModal('Nova anotação de atendimento',`<form id="noteForm"><div class="form-grid"><div class="field full"><label>Título</label><input name="title" placeholder="Ex.: Reunião com cliente, orientação, retorno..." required></div><div class="field"><label>Data</label><input type="date" name="date" value="${new Date().toISOString().slice(0,10)}" required></div><div class="field"><label>Horário</label><input type="time" name="time"></div><div class="field full"><label>Anotação</label><textarea name="text" placeholder="Registre o que foi tratado, documentos solicitados, orientações, próximos passos..." required></textarea></div></div><div class="mini-help">Nesta versão, as anotações ficam salvas apenas neste navegador. Em produção, o ideal é ter usuário, permissões, histórico de alterações e banco de dados seguro.</div><div class="form-actions"><button class="d-btn" type="submit">Salvar anotação</button></div></form>`);document.getElementById('noteForm').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target);data.notes=data.notes||[];data.notes.push({id:'note_'+Date.now(),clientId,title:f.get('title'),date:f.get('date'),time:f.get('time'),text:f.get('text')});save();closeModal();viewClient(clientId);openClientTab(clientId,'notes');toast('Anotação registrada')}}
+function openNoteForm(clientId){openModal('Nova anotação de atendimento',`<form id="noteForm"><div class="form-grid"><div class="field full"><label>Título</label><input name="title" placeholder="Ex.: Reunião com cliente, orientação, retorno..." required></div><div class="field"><label>Data</label><input type="date" name="date" value="${new Date().toISOString().slice(0,10)}" required></div><div class="field"><label>Horário</label><input type="time" name="time"></div><div class="field full"><label>Anotação</label><textarea name="text" placeholder="Registre o que foi tratado, documentos solicitados, orientações, próximos passos..." required></textarea></div></div><div class="mini-help">As anotações ficam na planilha do Google e aparecem no computador e no celular.</div><div class="form-actions"><button class="d-btn" type="submit">Salvar anotação</button></div></form>`);document.getElementById('noteForm').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target);data.notes=data.notes||[];data.notes.push({id:'note_'+Date.now(),clientId,title:f.get('title'),date:f.get('date'),time:f.get('time'),text:f.get('text')});save();closeModal();viewClient(clientId);openClientTab(clientId,'notes');toast('Anotação registrada')}}
 function deleteClientNote(noteId,clientId){if(!confirm('Excluir esta anotação?'))return;data.notes=(data.notes||[]).filter(n=>n.id!==noteId);save();viewClient(clientId);openClientTab(clientId,'notes');toast('Anotação excluída')}
 window.openContractEditor=openContractEditor;
 function renderClientDocuments(id){const el=document.getElementById('clientDocsList');if(!el)return;const docs=(data.documents||[]).filter(d=>d.clientId===id).slice().reverse();if(!docs.length){el.innerHTML='<div class="empty">Nenhum documento salvo para este cliente.</div>';return}el.innerHTML='<div class="doc-list">'+docs.map(d=>`<div class="doc-item"><div class="doc-main"><strong>${esc(d.name)}</strong><small>${esc(d.category||'Documento')} · ${esc(d.date)} · ${esc(d.sizeLabel||'')}</small></div><div class="doc-actions"><button class="d-btn light" onclick="downloadClientDocument('${d.id}')">Baixar</button><button class="d-btn light" onclick="deleteClientDocument('${d.id}','${id}')">Excluir</button></div></div>`).join('')+'</div>'}
@@ -1472,15 +1472,18 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
 })();
 </script>
 <script>
-/* V145.15 — Sincronização de Processos e Financeiro com a planilha (Google Sheets).
+/* V145.15/V145.16 — Sincronização com a planilha (Google Sheets): processos, financeiro,
+   anotações, histórico de cálculos e dossiê previdenciário.
    Regras: vence a alteração mais recente (updatedAt); exclusões viram marcação (deletedAt);
    resposta vazia ou com erro do servidor nunca apaga dados deste navegador. */
 (function(){
-  const VERSION='V145.15';
+  const VERSION='V145.16';
   const META_KEY='kaliny_sync_meta_v1';
-  const COLLECTIONS=['processes','finance'];
+  const COLLECTIONS=['processes','finance','notes','calcHistory','previdenciario'];
   const BATCH=50;
-  const LABELS={processes:'processo',finance:'lançamento'};
+  const LABELS={processes:'processo',finance:'lançamento',notes:'anotação',calcHistory:'cálculo',previdenciario:'dossiê previdenciário'};
+  const ID_PREFIX={processes:'proc_',finance:'fin_',notes:'note_',calcHistory:'calc_',previdenciario:'prev_'};
+  const unsupported=new Set(); // coleções que o Apps Script instalado ainda não conhece
   let meta=loadMeta(),busy=false,again=false,timer=null,lastState={kind:'',text:''},warnedLarge=false;
 
   function loadMeta(){
@@ -1498,7 +1501,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
   function contentHash(item){const copy={...item};delete copy.updatedAt;return hash(JSON.stringify(copy))}
   function list(col){if(!Array.isArray(data[col]))data[col]=[];return data[col]}
   function isPending(col,id){const m=meta[col][id];return !!m&&m.c!==m.s}
-  function pendingCount(){return COLLECTIONS.reduce((n,c)=>n+Object.keys(meta[c]).filter(id=>isPending(c,id)).length+Object.keys(meta.tombs[c]).length,0)}
+  function pendingCount(){return COLLECTIONS.filter(c=>!unsupported.has(c)).reduce((n,c)=>n+Object.keys(meta[c]).filter(id=>isPending(c,id)).length+Object.keys(meta.tombs[c]).length,0)}
 
   // Marca o que mudou desde a última vez (inclusive edições feitas por qualquer tela do painel).
   function detectChanges(){
@@ -1507,7 +1510,8 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
       const seen=new Set();
       list(col).forEach(item=>{
         if(!item||typeof item!=='object')return;
-        const id=String(item.id||'').trim();if(!id)return;
+        let id=String(item.id||'').trim();
+        if(!id){id=ID_PREFIX[col]+Date.now()+'_'+Math.random().toString(36).slice(2,7);item.id=id;touched=true}
         seen.add(id);
         const c=contentHash(item),m=meta[col][id];
         if(!m){meta[col][id]={c,s:''};if(!item.updatedAt){item.updatedAt=nowISO();touched=true}}
@@ -1550,7 +1554,10 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
   async function pull(){
     let changed=false;
     for(const col of COLLECTIONS){
-      const j=await call('GET',{action:'syncPull',collection:col});
+      let j;
+      try{j=await call('GET',{action:'syncPull',collection:col})}
+      catch(e){if(String(e&&e.message)==='invalid_collection'){unsupported.add(col);continue}throw e}
+      unsupported.delete(col);
       if(!Array.isArray(j.items))throw new Error('invalid_response');
       const local=new Map(list(col).map(x=>[String(x&&x.id),x]));
       const remoteIds=new Set();
@@ -1575,6 +1582,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
       // Itens daqui que a planilha não tem: reenviar (nunca apagar).
       list(col).forEach(x=>{const id=String(x&&x.id||'');if(id&&!remoteIds.has(id)&&meta[col][id])meta[col][id].s=''});
     }
+    if(dedupePrev())changed=true;
     saveMeta();
     if(changed){persistData();try{renderAll()}catch(e){console.warn('Sync: renderAll',e)}}
     return changed;
@@ -1584,6 +1592,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
   async function push(){
     let changed=false;
     for(const col of COLLECTIONS){
+      if(unsupported.has(col))continue;
       const items=list(col).filter(x=>x&&x.id&&isPending(col,String(x.id))).map(x=>({item:JSON.parse(JSON.stringify(x)),c:meta[col][String(x.id)].c}));
       Object.entries(meta.tombs[col]).forEach(([id,at])=>items.push({item:{id,updatedAt:at,deletedAt:at},tomb:true}));
       for(let i=0;i<items.length;i+=BATCH){
@@ -1637,9 +1646,10 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
       await push();
       const n=pendingCount();
       meta.lastSync=nowISO();saveMeta();
-      if(n)setState('warn','Planilha: '+n+' pendente'+(n>1?'s':''),n+' alteração(ões) ainda não enviada(s). Tentaremos de novo em instantes.');
-      else setState('ok','Planilha ✓ '+hhmm(new Date()),'Processos e financeiro sincronizados com a planilha às '+hhmm(new Date())+'.');
-      if(opts.manual)toast(n?'Sincronização parcial — '+n+' pendente(s)':'Processos e financeiro sincronizados ✓');
+      if(!n&&unsupported.size)setState('warn','Planilha ✓ parcial','Processos e financeiro sincronizados. Para sincronizar também anotações, cálculos e dossiê previdenciário, instale o Code.gs V145.16 no Apps Script.');
+      else if(n)setState('warn','Planilha: '+n+' pendente'+(n>1?'s':''),n+' alteração(ões) ainda não enviada(s). Tentaremos de novo em instantes.');
+      else setState('ok','Planilha ✓ '+hhmm(new Date()),'Dados sincronizados com a planilha às '+hhmm(new Date())+'.');
+      if(opts.manual)toast(n?'Sincronização parcial — '+n+' pendente(s)':'Dados sincronizados ✓');
       return !n;
     }catch(e){
       console.warn('Sync:',e);
@@ -1690,10 +1700,10 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
     if(usersCard&&!document.getElementById('syncCard')){
       const card=document.createElement('div');card.className='settings-card';card.id='syncCard';
       card.innerHTML='<span class="eyebrow">Dados e backup</span><h3>Sincronização com a planilha</h3>'+
-        '<p class="muted">Clientes, agenda, processos (com prazos e movimentações) e financeiro ficam na planilha do Google e aparecem no computador e no celular.</p>'+
+        '<p class="muted">Clientes, agenda, processos (com prazos e movimentações), financeiro, anotações, cálculos e dossiê previdenciário ficam na planilha do Google e aparecem no computador e no celular.</p>'+
         '<div id="dataSyncInfo" class="mini-help">Verificando…</div>'+
         '<div class="form-actions"><button class="d-btn" type="button" id="syncNowBtn">Sincronizar agora</button><button class="d-btn light" type="button" id="exportBackupBtn">Exportar backup (JSON)</button></div>'+
-        '<p class="muted" style="font-size:12px;margin-top:10px">Documentos anexados, anotações e histórico de cálculos ainda ficam só neste navegador. Exporte o backup de vez em quando.</p>'+
+        '<p class="muted" style="font-size:12px;margin-top:10px">Os arquivos anexados (PDF, Word) ainda ficam só neste navegador. Exporte o backup de vez em quando.</p>'+
         '<div id="usersList" hidden></div>'; // mantido oculto: renderSettings() ainda escreve nele
       usersCard.replaceWith(card);
       card.querySelector('#syncNowBtn').addEventListener('click',()=>syncNow({manual:true}));
@@ -1710,6 +1720,108 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
     }
     if(lastState.text)setState(lastState.kind,lastState.text);
   }
+
+  // Previdenciário: o painel cria um dossiê vazio ao abrir a ficha. Se outro aparelho já tinha um
+  // dossiê do mesmo cliente, descarta o vazio e deixa o mais completo primeiro (dossierByClient usa o primeiro).
+  function dedupePrev(){
+    const arr=list('previdenciario');if(arr.length<2)return false;
+    const score=d=>(Array.isArray(d&&d.salaries)?d.salaries.length:0)*10+String(d&&d.notes||'').length;
+    const groups={};arr.forEach(d=>{const k=String(d&&d.clientId||'');(groups[k]=groups[k]||[]).push(d)});
+    const drop=new Set();
+    Object.values(groups).forEach(g=>{
+      if(g.length<2)return;
+      g.sort((a,b)=>score(b)-score(a)||String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')));
+      g.slice(1).forEach(d=>{if(!score(d))drop.add(d)});
+    });
+    const ordered=[],done=new Set();
+    arr.forEach(d=>{const k=String(d&&d.clientId||'');if(done.has(k))return;done.add(k);groups[k].forEach(x=>{if(!drop.has(x))ordered.push(x)})});
+    if(ordered.length===arr.length&&ordered.every((d,i)=>d===arr[i]))return false;
+    data.previdenciario=ordered;
+    return true;
+  }
+
+  // Agenda: lembrete por WhatsApp com mensagem pronta.
+  function waNumber(raw){let d=String(raw||'').replace(/\D/g,'').replace(/^0+/,'');if(d.length===10||d.length===11)d='55'+d;return d.length>=12&&d.length<=13?d:''}
+  function dayLabel(key){
+    const m=String(key||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);if(!m)return '';
+    const d=new Date(Number(m[1]),Number(m[2])-1,Number(m[3])),t=new Date();t.setHours(0,0,0,0);
+    const diff=Math.round((d-t)/86400000);
+    return diff===0?'hoje':diff===1?'amanhã':'no dia '+m[3]+'/'+m[2];
+  }
+  function agendaStatus(e){const s=String(e&&e.status||'Pendente').trim().toLowerCase();return s==='confirmado'?'Confirmado':s==='cancelado'?'Cancelado':'Pendente'}
+  window.whatsAppReminderButton=function(e,c){
+    try{
+      if(!e||agendaStatus(e)==='Cancelado'||!waNumber(e.phone||(c&&c.phone)))return '';
+      return `<button class="d-btn light" type="button" data-wa-reminder="${esc(String(e.id))}" title="Abre o WhatsApp com a mensagem pronta">WhatsApp</button>`;
+    }catch(err){return ''}
+  };
+  function openWhatsAppReminder(e){
+    const c=e.clientId?clientById(e.clientId):null,num=waNumber(e.phone||(c&&c.phone));
+    if(!num){toast('Telefone não informado');return}
+    const first=String((c&&c.name)||e.client||'').trim().split(/\s+/)[0]||'';
+    const when=dayLabel(e.date)+(e.time?' às '+e.time:'');
+    const mode=e.mode==='Online'?' (online)':e.mode==='Presencial'?' (presencial, na Rua Marechal Cândido Rondon, 954)':'';
+    const hello='Olá'+(first?', '+first:'')+'! Aqui é do escritório Kaliny Girardi Advocacia. ';
+    const msg=agendaStatus(e)==='Pendente'
+      ?hello+'Recebemos sua solicitação de consulta para '+when+mode+'. Podemos confirmar?'
+      :hello+'Passando para lembrar da sua consulta '+when+mode+'. Se precisar remarcar, é só responder esta mensagem.';
+    window.open('https://wa.me/'+num+'?text='+encodeURIComponent(msg),'_blank','noopener');
+  }
+  document.addEventListener('click',ev=>{
+    const b=ev.target.closest&&ev.target.closest('[data-wa-reminder]');if(!b)return;
+    ev.preventDefault();
+    const e=(data.agenda||[]).find(x=>String(x.id)===b.getAttribute('data-wa-reminder'));
+    if(e)openWhatsAppReminder(e);
+  });
+
+  // Dashboard: parcelas vencidas (ou vencendo hoje) nos Pontos de atenção.
+  function parseDay(v){
+    const s=String(v||'').trim();let m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if(m)return new Date(Number(m[1]),Number(m[2])-1,Number(m[3]));
+    m=s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    return m?new Date(Number(m[3]),Number(m[2])-1,Number(m[1])):null;
+  }
+  function overdueReceivables(){
+    const t=new Date();t.setHours(0,0,0,0);
+    return (data.finance||[]).filter(f=>f&&String(f.type||'receita').toLowerCase()==='receita'&&String(f.status||'').toLowerCase()==='pendente').map(f=>{
+      const d=parseDay(f.dueDate||f.date);if(!d)return null;
+      return {f,d,days:Math.round((d-t)/86400000)};
+    }).filter(x=>x&&x.days<=0).sort((a,b)=>a.d-b.d);
+  }
+  function injectOverdue(){
+    const att=document.getElementById('overviewAttention');if(!att)return;
+    const list=overdueReceivables();if(!list.length)return;
+    const cards=list.slice(0,3).map(({f,d,days})=>{
+      const c=f.clientId?clientById(f.clientId):null;
+      const badge=days===0?'Vence hoje':'Vencida há '+(-days)+' dia'+(days===-1?'':'s');
+      return `<div class="history-item attention-deadline critical"><div class="attention-deadline-head"><strong>💰 Parcela a receber</strong><span class="attention-deadline-badge"><span class="attention-dot"></span>${badge}</span></div><p><b>${money(f.value)}</b> · ${esc(f.desc||'Lançamento')}${c?' · '+esc(c.name):''}</p><p class="muted">Vencimento: ${d.toLocaleDateString('pt-BR')}</p><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="d-btn light" type="button" data-fin-paid="${esc(String(f.id))}">Marcar como paga</button><button class="d-btn light" type="button" onclick="showPage('finance')">Ver financeiro</button></div></div>`;
+    });
+    if(list.length>3){
+      const rest=list.slice(3),total=rest.reduce((s,x)=>s+Number(x.f.value||0),0);
+      cards.push(`<div class="history-item"><strong>Mais ${rest.length} parcela(s) vencida(s)</strong><p>${money(total)} no total.</p><button class="d-btn light" type="button" onclick="showPage('finance')">Ver financeiro</button></div>`);
+    }
+    const html=cards.join('');
+    if(att.querySelector('.empty')){att.innerHTML=html;return}
+    const deadlines=att.querySelectorAll('.attention-deadline');
+    if(deadlines.length)deadlines[deadlines.length-1].insertAdjacentHTML('afterend',html);
+    else att.insertAdjacentHTML('afterbegin',html);
+  }
+  const originalOverview=window.renderOverviewExtras;
+  if(typeof originalOverview==='function'){
+    window.renderOverviewExtras=function(){
+      const r=originalOverview.apply(this,arguments);
+      try{injectOverdue()}catch(e){console.warn('Pontos de atenção (financeiro):',e)}
+      return r;
+    };
+  }
+  document.addEventListener('click',ev=>{
+    const b=ev.target.closest&&ev.target.closest('[data-fin-paid]');if(!b)return;
+    ev.preventDefault();
+    const f=(data.finance||[]).find(x=>String(x.id)===b.getAttribute('data-fin-paid'));
+    if(!f)return;
+    f.status='pago';f.paidAt=new Date().toISOString().slice(0,10);
+    save();toast('Parcela marcada como paga ✓');
+  });
 
   window.kalinySync={syncNow,exportBackup,pendingCount,version:VERSION};
   function start(){
