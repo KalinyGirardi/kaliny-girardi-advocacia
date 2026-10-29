@@ -28,19 +28,57 @@ let backendWarm=false;
   if(!url||url.includes('COLE_AQUI'))return;
   try{const r=await fetch(url+'?action=ping',{cache:'no-store'});backendWarm=r.ok;}catch(e){}
 })();
-loginForm.onsubmit=async e=>{
- e.preventDefault();const f=new FormData(e.target),email=String(f.get('email')||'').trim(),password=String(f.get('password')||'');loginError.textContent='';
- const url=String(APPOINTMENTS_API_URL||'').trim();if(!url||url.includes('COLE_AQUI')){loginError.textContent='Servidor de autenticação não configurado.';return;}
- loginButton.disabled=true;loginButton.textContent='Entrando…';
- const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),20000);
- try{
-  const body=new URLSearchParams({action:'login',email,password});
-  const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body,signal:controller.signal,cache:'no-store'});
-  const j=await r.json();
-  if(!j.ok){loginError.textContent=j.error==='invalid_credentials'?'E-mail ou senha inválidos.':j.error==='too_many_attempts'?'Muitas tentativas erradas. Por segurança, aguarde 15 minutos e tente novamente.':j.error==='not_configured'?'A senha do painel ainda não foi definida no Apps Script.':'Não foi possível autenticar agora.';return;}
+const DEVICE_KEY='kaliny_trusted_device';
+const LOGIN_ERRORS={invalid_credentials:'E-mail ou senha inválidos.',too_many_attempts:'Muitas tentativas erradas. Por segurança, aguarde 15 minutos e tente novamente.',not_configured:'A senha do painel ainda não foi definida no Apps Script.',too_many_codes:'Muitos códigos enviados. Aguarde 15 minutos e tente novamente.',invalid_code:'Código incorreto. Confira o e-mail e tente de novo.',code_expired:'O código expirou. Clique em "Reenviar código".'};
+function readDevice(){try{return localStorage.getItem(DEVICE_KEY)||''}catch(e){return ''}}
+function saveDevice(t){try{if(t)localStorage.setItem(DEVICE_KEY,t)}catch(e){}}
+// Etapa 2: código enviado por e-mail.
+loginForm.insertAdjacentHTML('afterend',`<form id="codeForm" hidden style="animation:itemIn .3s ease-out both"><p id="codeInfo" style="margin:0 0 12px">Enviamos um código de 6 dígitos para o e-mail do escritório.</p><div class="field"><label>Código</label><input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="000000" required style="letter-spacing:4px;font-size:20px;text-align:center"></div><label style="display:flex;gap:8px;align-items:center;margin:4px 0 14px;font-size:14px;text-transform:none;letter-spacing:0"><input type="checkbox" name="remember" checked style="width:auto"> Lembrar este aparelho por 30 dias</label><button class="btn primary" type="submit">Confirmar código →</button><div class="login-error" id="codeError"></div><p style="margin:14px 0 0;font-size:14px"><a href="#" id="resendCode">Reenviar código</a> · <a href="#" id="backToLogin">Voltar</a></p></form>`);
+const codeForm=document.getElementById('codeForm'),codeError=document.getElementById('codeError'),codeButton=codeForm.querySelector('button[type=submit]');
+let pending=null; // {email,password,challenge}
+async function callServer(params){
+  const url=String(APPOINTMENTS_API_URL||'').trim();if(!url||url.includes('COLE_AQUI'))throw new Error('not_configured_url');
+  const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),20000);
+  try{const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:new URLSearchParams(params),signal:controller.signal,cache:'no-store'});return await r.json()}
+  finally{clearTimeout(timeout)}
+}
+function netError(err){return err&&err.message==='not_configured_url'?'Servidor de autenticação não configurado.':err&&err.name==='AbortError'?'O servidor demorou para responder. Tente novamente.':'Não foi possível conectar ao servidor de autenticação.'}
+function enter(j){
+  if(j.deviceToken)saveDevice(j.deviceToken);
   sessionStorage.setItem(AUTH_KEY,JSON.stringify({id:'usr_kaliny',name:j.user.name,email:j.user.email,role:j.user.role,loginAt:new Date().toISOString(),expiresAt:j.expiresAt,token:j.token,mode:'server'}));
   location.href='../dashboard.html';
- }catch(err){console.error(err);loginError.textContent=err.name==='AbortError'?'O servidor demorou para responder. Tente novamente.':'Não foi possível conectar ao servidor de autenticação.';}
- finally{clearTimeout(timeout);loginButton.disabled=false;loginButton.textContent='Entrar no painel →';}
+}
+function showCodeStep(j){
+  pending.challenge=j.challenge;
+  document.getElementById('codeInfo').textContent='Enviamos um código de 6 dígitos para '+(j.sentTo||'o e-mail do escritório')+'. Ele vale por 10 minutos.';
+  loginForm.hidden=true;codeForm.hidden=false;codeError.textContent='';codeForm.code.value='';codeForm.code.focus();
+}
+async function sendLogin(email,password){
+  const j=await callServer({action:'login',email,password,device:readDevice()});
+  if(j.ok)return enter(j);
+  if(j.error==='code_required'){pending={email,password};return showCodeStep(j)}
+  return j;
+}
+loginForm.onsubmit=async e=>{
+ e.preventDefault();const f=new FormData(e.target),email=String(f.get('email')||'').trim(),password=String(f.get('password')||'');loginError.textContent='';
+ loginButton.disabled=true;loginButton.textContent='Entrando…';
+ try{const j=await sendLogin(email,password);if(j&&!j.ok)loginError.textContent=LOGIN_ERRORS[j.error]||'Não foi possível autenticar agora.';}
+ catch(err){console.error(err);loginError.textContent=netError(err);}
+ finally{loginButton.disabled=false;loginButton.textContent='Entrar no painel →';}
 };
+codeForm.onsubmit=async e=>{
+ e.preventDefault();codeError.textContent='';if(!pending)return;
+ codeButton.disabled=true;codeButton.textContent='Confirmando…';
+ try{const j=await callServer({action:'loginCode',challenge:pending.challenge,code:codeForm.code.value,remember:codeForm.remember.checked?'1':'0'});
+   if(j.ok)return enter(j);
+   codeError.textContent=LOGIN_ERRORS[j.error]||'Não foi possível confirmar agora.';}
+ catch(err){console.error(err);codeError.textContent=netError(err);}
+ finally{codeButton.disabled=false;codeButton.textContent='Confirmar código →';}
+};
+document.getElementById('resendCode').onclick=async e=>{
+ e.preventDefault();if(!pending)return;codeError.textContent='Reenviando…';
+ try{const j=await sendLogin(pending.email,pending.password);if(j&&!j.ok)codeError.textContent=LOGIN_ERRORS[j.error]||'Não foi possível reenviar agora.';else if(j===undefined&&!codeForm.hidden)codeError.textContent='Novo código enviado.';}
+ catch(err){codeError.textContent=netError(err);}
+};
+document.getElementById('backToLogin').onclick=e=>{e.preventDefault();pending=null;codeForm.hidden=true;loginForm.hidden=false;};
 </script></body></html>

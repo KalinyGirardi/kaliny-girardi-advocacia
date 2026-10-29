@@ -1,5 +1,5 @@
 KALINY GIRARDI ADVOCACIA — site institucional + painel administrativo
-Versão: V145.19
+Versão: V145.21
 
 ESTRUTURA
 - index.html ............ site público (agendamento online, áreas, conteúdos, contato)
@@ -38,3 +38,7 @@ HISTÓRICO
   da ficha do cliente corrigido.
 - V145.19: relatório financeiro (mês/ano, gráfico, por área e cliente, vencidas,
   exportação CSV para Excel e PDF) e cobrança/lembrete de parcela por WhatsApp.
+- V145.20 (Apps Script): consultas confirmadas e prazos na Google Agenda da Kaliny.
+- V145.21: código de acesso por e-mail no login (lembrar aparelho por 30 dias),
+  limpeza do formato antigo da senha e painel mais leve (logotipo do contrato em
+  assets/contract-logo.png).
