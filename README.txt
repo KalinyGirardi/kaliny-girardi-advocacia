@@ -1,27 +1,28 @@
-KALINY GIRARDI ADVOCACIA — V8
+KALINY GIRARDI ADVOCACIA — site institucional + painel administrativo
+Versão: V145.15
 
-Protótipo do site + dashboard.
+ESTRUTURA
+- index.html ............ site público (agendamento online, áreas, conteúdos, contato)
+- privacidade.html ...... Política de Privacidade (LGPD)
+- gestao/index.html ..... login do painel
+- dashboard.html ........ painel (todo o JavaScript fica embutido neste arquivo)
+- assets/appointment-config.js ... URL do Apps Script usada pelo site e pelo painel
+- css/style.css ......... estilos do site e do painel
+- robots.txt, sitemap.xml, 404.html, CNAME
 
-Nesta versão, as calculadoras internas foram aprimoradas, especialmente a de inventário para o Paraná: patrimônio bruto, dívidas, meação, patrimônio transmitido, ITCMD de 4% como parâmetro atual, honorários ajustáveis, custos de cartório e registros informados pelo usuário, modalidade judicial/extrajudicial e memória do cálculo.
+ONDE FICAM OS DADOS
+- Planilha Google (via Apps Script): Agendamentos, Clientes, Processos (com prazos e
+  movimentações) e Financeiro. Sincronizam entre computador e celular.
+- Somente no navegador: documentos anexados, anotações e histórico de cálculos.
+  Use Configurações > Exportar backup (JSON) de vez em quando.
 
-A calculadora continua sendo uma ferramenta de simulação e triagem. Custas, emolumentos, honorários e requisitos dependem do caso e das tabelas oficiais vigentes.
+APPS SCRIPT (não fica neste repositório)
+- O Code.gs fica apenas no projeto do Apps Script. Não publique o Code.gs aqui:
+  o repositório é público.
+- Ao atualizar: Implantar > Gerenciar implantações > editar > Nova versão
+  (nunca "Nova implantação", que muda a URL).
 
-Abra index.html para o site.
-A área interna não é mais vinculada pelo site institucional. O acesso administrativo fica em `gestao/` e o painel continua protegido por sessão.
-
-
-V8 — Calculadora previdenciária: regra geral do RGPS com média salarial informada, coeficiente de 60% + 2 p.p. por ano excedente (15 anos mulheres / 20 homens), requisitos de referência e alertas sobre transições. Não substitui cálculo do CNIS ou análise individual.
-
-V11 - Documentos por cliente
-- A ficha do cliente agora possui abas Dados, Cálculos e Documentos.
-- É possível adicionar arquivos por categoria, baixar e excluir documentos.
-- Nesta versão local/protótipo, os metadados ficam em localStorage e os arquivos ficam em IndexedDB do navegador.
-- Para uso real com dados de clientes, recomenda-se migrar para backend autenticado, armazenamento seguro e controle de permissões.
-
-
-V17 — Segurança do protótipo
-- Login com hash SHA-256 via Web Crypto em vez de senha em texto puro.
-- Sessão com expiração de 30 minutos e renovação por atividade.
-- Perfis: Administradora, Advogada e Assistente, com navegação por permissões.
-- Registro de auditoria local para login, falhas, logout e criação de usuários.
-- Ainda não é produção: autenticação, banco, arquivos e dados devem migrar para backend seguro antes de uso com clientes reais.
+HISTÓRICO
+- V145.14: mobile aprovado (cards, menu à direita).
+- V145.15: segurança do servidor, sincronização de Processos/Financeiro, backup diário
+  da planilha, Política de Privacidade, consentimento no agendamento e SEO.

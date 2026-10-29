@@ -362,7 +362,7 @@ function renderScheduleEditor(s){const cfg=cloneSchedule(s),intEl=document.getEl
 function readScheduleEditor(){const cfg=cloneSchedule(DEFAULT_SCHEDULE);cfg.interval=Number(document.getElementById("scheduleInterval")?.value||60);WEEK_DAYS.forEach(([d])=>{const row=document.querySelector(`.schedule-row [data-day-enabled][data-day="${d}"]`)?.closest(".schedule-row");if(!row)return;cfg.days[d]={enabled:row.querySelector("[data-day-enabled]").checked,morningStart:row.querySelector('[data-schedule="morningStart"]').value,morningEnd:row.querySelector('[data-schedule="morningEnd"]').value,afternoonStart:row.querySelector('[data-schedule="afternoonStart"]').value,afternoonEnd:row.querySelector('[data-schedule="afternoonEnd"]').value}});return cfg}
 async function loadAppointmentSchedule(){const {url,key}=onlineConfig();if(!url||url.includes("COLE_AQUI")||!key){setScheduleStatus("Configure a URL e a chave administrativa em Configurações.","warn");return false}setScheduleStatus("Carregando horários...");try{const r=await fetch(url+"?action=adminGetSettings&key="+encodeURIComponent(key));const j=await r.json();if(!j.ok){setScheduleStatus(j.error==="unauthorized"?"Chave administrativa inválida":"Não foi possível carregar os horários.","warn");return false}renderScheduleEditor(j.settings);setScheduleStatus("Horários carregados.","ok");return true}catch(e){setScheduleStatus("Falha ao carregar a configuração de horários.","warn");return false}}
 async function saveAppointmentSchedule(){const {url,key}=onlineConfig();if(!url||url.includes("COLE_AQUI")||!key){setScheduleStatus("Configure a URL e a chave administrativa em Configurações.","warn");return false}const settings=readScheduleEditor();for(const [d,x] of Object.entries(settings.days)){if(!x.enabled)continue;if(x.morningEnd<=x.morningStart||x.afternoonEnd<=x.afternoonStart){toast("Verifique os horários de "+WEEK_DAYS.find(y=>y[0]===d)[1]);return false}}setScheduleStatus("Salvando horários...");try{const body=new URLSearchParams({action:"adminSaveSettings",key,settings:JSON.stringify(settings)});const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8"},body});const j=await r.json();if(!j.ok){setScheduleStatus(j.error==="unauthorized"?"Chave administrativa inválida":"Não foi possível salvar os horários.","warn");return false}renderScheduleEditor(j.settings);setScheduleStatus("Horários salvos. O site público já usará esta configuração.","ok");toast("Horários de atendimento atualizados");return true}catch(e){setScheduleStatus("Falha ao salvar os horários.","warn");return false}}
-function renderSettings(){const name=document.getElementById('currentUserName'),meta=document.getElementById('currentUserMeta'),list=document.getElementById('usersList');if(!name)return;name.textContent=session.name;meta.textContent=session.email+' · '+session.role+' · modo local';const users=JSON.parse(localStorage.getItem(USERS_KEY)||'[]');list.innerHTML=users.map(u=>`<div class="user-row"><div><b>${esc(u.name)}</b><small>${esc(u.email)} · ${esc(u.role)}</small></div><span class="tag">${u.active===false?'Inativo':'Ativo'}</span></div>`).join('');const cfg=onlineConfig(),urlEl=document.getElementById('appointmentsApiUrl'),keyEl=document.getElementById('appointmentsAdminKey');if(urlEl)urlEl.value=cfg.url;if(keyEl){keyEl.value='';keyEl.placeholder='Gerenciada pela sessão de login';keyEl.disabled=true}setAppointmentConnectionStatus(cfg.token?'Sessão autenticada. Clique em “Testar conexão”.':'Faça login novamente para sincronizar.');if(cfg.key&&!document.getElementById("scheduleEditor")?.children.length)loadAppointmentSchedule()}
+function renderSettings(){const name=document.getElementById('currentUserName'),meta=document.getElementById('currentUserMeta'),list=document.getElementById('usersList');if(!name)return;name.textContent=session.name;meta.textContent=session.email+' · '+session.role;const users=JSON.parse(localStorage.getItem(USERS_KEY)||'[]');list.innerHTML=users.map(u=>`<div class="user-row"><div><b>${esc(u.name)}</b><small>${esc(u.email)} · ${esc(u.role)}</small></div><span class="tag">${u.active===false?'Inativo':'Ativo'}</span></div>`).join('');const cfg=onlineConfig(),urlEl=document.getElementById('appointmentsApiUrl'),keyEl=document.getElementById('appointmentsAdminKey');if(urlEl)urlEl.value=cfg.url;if(keyEl){keyEl.value='';keyEl.placeholder='Gerenciada pela sessão de login';keyEl.disabled=true}setAppointmentConnectionStatus(cfg.token?'Sessão autenticada. Clique em “Testar conexão”.':'Faça login novamente para sincronizar.');if(cfg.key&&!document.getElementById("scheduleEditor")?.children.length)loadAppointmentSchedule()}
 function logout(){sessionStorage.removeItem(AUTH_KEY);localStorage.removeItem('kaliny_online_seen_initialized');window.location.assign('/gestao/');}
 setInterval(()=>{if(!touchSession())return},60000);['click','keydown'].forEach(ev=>document.addEventListener(ev,()=>{touchSession()}, {passive:true}));
 setTimeout(()=>syncOnlineAppointments({silent:true}),800); onlineAppointmentsTimer=setInterval(()=>syncOnlineAppointments({silent:true}),15000);
@@ -750,6 +750,8 @@ async function syncClientsFromServer(options={}){
       return false
     }
     // A planilha é a fonte oficial dos clientes.
+    // V145.15: uma lista vazia do servidor não apaga os clientes deste navegador.
+    if(!j.clients.length&&(data.clients||[]).length){console.warn('clientList vazio; clientes locais mantidos');return false}
     data.clients=j.clients;
     linkAppointmentsToClients();
     localStorage.setItem(KEY,JSON.stringify(data));
@@ -1467,6 +1469,257 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initMobileNav);
   else initMobileNav();
+})();
+</script>
+<script>
+/* V145.15 — Sincronização de Processos e Financeiro com a planilha (Google Sheets).
+   Regras: vence a alteração mais recente (updatedAt); exclusões viram marcação (deletedAt);
+   resposta vazia ou com erro do servidor nunca apaga dados deste navegador. */
+(function(){
+  const VERSION='V145.15';
+  const META_KEY='kaliny_sync_meta_v1';
+  const COLLECTIONS=['processes','finance'];
+  const BATCH=50;
+  const LABELS={processes:'processo',finance:'lançamento'};
+  let meta=loadMeta(),busy=false,again=false,timer=null,lastState={kind:'',text:''},warnedLarge=false;
+
+  function loadMeta(){
+    let m=null;try{m=JSON.parse(localStorage.getItem(META_KEY)||'null')}catch(e){m=null}
+    m=m&&typeof m==='object'?m:{};
+    COLLECTIONS.forEach(c=>{m[c]=m[c]&&typeof m[c]==='object'?m[c]:{};});
+    m.tombs=m.tombs&&typeof m.tombs==='object'?m.tombs:{};
+    COLLECTIONS.forEach(c=>{m.tombs[c]=m.tombs[c]&&typeof m.tombs[c]==='object'?m.tombs[c]:{};});
+    return m;
+  }
+  function saveMeta(){try{localStorage.setItem(META_KEY,JSON.stringify(meta))}catch(e){console.warn('Sync: não foi possível salvar o controle de sincronização',e)}}
+  function persistData(){try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){console.error('Sync: falha ao salvar dados locais',e)}}
+  function nowISO(){return new Date().toISOString()}
+  function hash(str){let h=0x811c9dc5;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,0x01000193)}return (h>>>0).toString(16)}
+  function contentHash(item){const copy={...item};delete copy.updatedAt;return hash(JSON.stringify(copy))}
+  function list(col){if(!Array.isArray(data[col]))data[col]=[];return data[col]}
+  function isPending(col,id){const m=meta[col][id];return !!m&&m.c!==m.s}
+  function pendingCount(){return COLLECTIONS.reduce((n,c)=>n+Object.keys(meta[c]).filter(id=>isPending(c,id)).length+Object.keys(meta.tombs[c]).length,0)}
+
+  // Marca o que mudou desde a última vez (inclusive edições feitas por qualquer tela do painel).
+  function detectChanges(){
+    let touched=false;
+    COLLECTIONS.forEach(col=>{
+      const seen=new Set();
+      list(col).forEach(item=>{
+        if(!item||typeof item!=='object')return;
+        const id=String(item.id||'').trim();if(!id)return;
+        seen.add(id);
+        const c=contentHash(item),m=meta[col][id];
+        if(!m){meta[col][id]={c,s:''};if(!item.updatedAt){item.updatedAt=nowISO();touched=true}}
+        else if(m.c!==c){m.c=c;item.updatedAt=nowISO();touched=true}
+        if(meta.tombs[col][id])delete meta.tombs[col][id];
+      });
+      Object.keys(meta[col]).forEach(id=>{
+        if(seen.has(id))return;
+        if(meta[col][id].s)meta.tombs[col][id]=nowISO(); // já estava na planilha: enviar exclusão
+        delete meta[col][id];
+      });
+    });
+    saveMeta();
+    return touched;
+  }
+  function markSynced(col,item){const c=contentHash(item);meta[col][item.id]={c,s:c}}
+  function replaceInPlace(target,src){Object.keys(target).forEach(k=>delete target[k]);Object.assign(target,src)}
+  function removeLocal(col,id){data[col]=list(col).filter(x=>String(x&&x.id)!==String(id));delete meta[col][id]}
+
+  async function call(method,params){
+    const cfg=onlineConfig();
+    if(!cfg.url||cfg.url.includes('COLE_AQUI')||!cfg.token)throw new Error('no_session');
+    const controller=new AbortController(),t=setTimeout(()=>controller.abort(),25000);
+    try{
+      let r;
+      if(method==='GET'){
+        const q=new URLSearchParams({...params,token:cfg.token});
+        r=await fetch(cfg.url+'?'+q.toString(),{cache:'no-store',signal:controller.signal});
+      }else{
+        const body=new URLSearchParams({...params,token:cfg.token});
+        r=await fetch(cfg.url,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body,signal:controller.signal});
+      }
+      const j=await r.json();
+      if(!j||!j.ok)throw new Error(j&&j.error||'server_error');
+      return j;
+    }finally{clearTimeout(t)}
+  }
+
+  // Traz da planilha e junta com o que está neste navegador.
+  async function pull(){
+    let changed=false;
+    for(const col of COLLECTIONS){
+      const j=await call('GET',{action:'syncPull',collection:col});
+      if(!Array.isArray(j.items))throw new Error('invalid_response');
+      const local=new Map(list(col).map(x=>[String(x&&x.id),x]));
+      const remoteIds=new Set();
+      for(const r of j.items){
+        const id=String(r&&r.id||'').trim();if(!id)continue;
+        remoteIds.add(id);
+        const l=local.get(id),tomb=meta.tombs[col][id],ru=String(r.updatedAt||'');
+        if(r.deletedAt){
+          if(tomb)delete meta.tombs[col][id];
+          if(l&&!(isPending(col,id)&&String(l.updatedAt||'')>ru)){removeLocal(col,id);changed=true}
+          continue;
+        }
+        if(tomb){
+          if(tomb>ru)continue; // a exclusão daqui é mais nova: será enviada
+          delete meta.tombs[col][id];
+        }
+        if(!l){list(col).push(r);markSynced(col,r);changed=true;continue}
+        if(isPending(col,id)&&String(l.updatedAt||'')>=ru)continue; // alteração daqui é mais nova
+        if(contentHash(l)!==contentHash(r)||String(l.updatedAt||'')!==ru){replaceInPlace(l,r);changed=true}
+        markSynced(col,l);
+      }
+      // Itens daqui que a planilha não tem: reenviar (nunca apagar).
+      list(col).forEach(x=>{const id=String(x&&x.id||'');if(id&&!remoteIds.has(id)&&meta[col][id])meta[col][id].s=''});
+    }
+    saveMeta();
+    if(changed){persistData();try{renderAll()}catch(e){console.warn('Sync: renderAll',e)}}
+    return changed;
+  }
+
+  // Envia para a planilha o que mudou aqui.
+  async function push(){
+    let changed=false;
+    for(const col of COLLECTIONS){
+      const items=list(col).filter(x=>x&&x.id&&isPending(col,String(x.id))).map(x=>({item:JSON.parse(JSON.stringify(x)),c:meta[col][String(x.id)].c}));
+      Object.entries(meta.tombs[col]).forEach(([id,at])=>items.push({item:{id,updatedAt:at,deletedAt:at},tomb:true}));
+      for(let i=0;i<items.length;i+=BATCH){
+        const batch=items.slice(i,i+BATCH);
+        const j=await call('POST',{action:'syncPush',collection:col,data:JSON.stringify(batch.map(b=>b.item))});
+        const byId=new Map(batch.map(b=>[String(b.item.id),b]));
+        (j.results||[]).forEach(res=>{
+          const b=byId.get(String(res.id));if(!b)return;
+          const id=String(res.id);
+          if(res.status==='saved'){
+            if(b.tomb){if(meta.tombs[col][id]===b.item.deletedAt)delete meta.tombs[col][id]}
+            else if(meta[col][id])meta[col][id].s=b.c;
+          }else if(res.status==='stale'&&res.item){
+            const srv=res.item;if(b.tomb)delete meta.tombs[col][id];
+            const l=list(col).find(x=>String(x&&x.id)===id);
+            if(srv.deletedAt){if(l){removeLocal(col,id);changed=true}}
+            else if(l){replaceInPlace(l,srv);markSynced(col,l);changed=true}
+            else{list(col).push(srv);markSynced(col,srv);changed=true}
+          }else if(res.status==='too_large'&&!warnedLarge){
+            warnedLarge=true;toast('Um '+LABELS[col]+' é grande demais para a planilha (texto muito longo). Ele continua salvo neste navegador.');
+          }
+        });
+        saveMeta();
+      }
+    }
+    if(changed){persistData();try{renderAll()}catch(e){console.warn('Sync: renderAll',e)}}
+  }
+
+  function setState(kind,text,title){
+    lastState={kind,text};
+    const el=document.getElementById('dataSyncStatus');
+    if(el){el.textContent=text;el.className='sync-badge'+(kind?' '+kind:'');el.title=title||text}
+    const info=document.getElementById('dataSyncInfo');if(info)info.textContent=title||text;
+  }
+  function hhmm(d){return d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}
+  function describeError(e){
+    const m=String(e&&e.message||e);
+    if(m==='no_session'||m==='unauthorized')return 'Sessão expirada. Saia e entre novamente para sincronizar.';
+    if(m==='unknown_action'||m==='invalid_collection')return 'O Apps Script ainda não foi atualizado para a V145.15.';
+    return 'Sem conexão com a planilha agora. As alterações ficam guardadas neste navegador e serão enviadas depois.';
+  }
+
+  async function syncNow(opts={}){
+    if(busy){again=true;return false}
+    busy=true;
+    try{
+      if(detectChanges())persistData();
+      setState('','Planilha: sincronizando…');
+      await pull();
+      if(detectChanges())persistData();
+      await push();
+      const n=pendingCount();
+      meta.lastSync=nowISO();saveMeta();
+      if(n)setState('warn','Planilha: '+n+' pendente'+(n>1?'s':''),n+' alteração(ões) ainda não enviada(s). Tentaremos de novo em instantes.');
+      else setState('ok','Planilha ✓ '+hhmm(new Date()),'Processos e financeiro sincronizados com a planilha às '+hhmm(new Date())+'.');
+      if(opts.manual)toast(n?'Sincronização parcial — '+n+' pendente(s)':'Processos e financeiro sincronizados ✓');
+      return !n;
+    }catch(e){
+      console.warn('Sync:',e);
+      const msg=describeError(e);
+      setState('warn','Planilha: offline',msg);
+      if(opts.manual)toast(msg);
+      return false;
+    }finally{
+      busy=false;
+      if(again){again=false;schedule(1500)}
+    }
+  }
+  function schedule(ms){clearTimeout(timer);timer=setTimeout(()=>syncNow(),ms==null?2000:ms)}
+
+  // Toda gravação do painel passa por save(): detecta a mudança e agenda o envio.
+  const originalSave=window.save;
+  if(typeof originalSave==='function'){
+    window.save=function(){
+      try{detectChanges()}catch(e){console.warn('Sync: detectChanges',e)}
+      const r=originalSave.apply(this,arguments);
+      schedule(2000);
+      return r;
+    };
+  }
+
+  function exportBackup(){
+    try{
+      if(detectChanges())persistData();
+      const payload={app:'Kaliny Girardi Advocacia',version:VERSION,exportedAt:nowISO(),note:'Arquivos anexados (PDF, Word) não entram neste backup; ficam no navegador.',data};
+      const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+      const a=document.createElement('a'),url=URL.createObjectURL(blob);
+      a.href=url;a.download='kaliny-backup-'+new Date().toISOString().slice(0,10)+'.json';
+      document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);
+      toast('Backup exportado ✓');
+    }catch(e){console.error(e);toast('Não foi possível exportar o backup')}
+  }
+
+  function installUi(){
+    // Selo de status ao lado do indicador da agenda.
+    const user=document.querySelector('.dash-user');
+    if(user&&!document.getElementById('dataSyncStatus')){
+      const b=document.createElement('span');b.id='dataSyncStatus';b.className='sync-badge';b.textContent='Planilha: …';
+      user.insertBefore(b,user.firstChild);
+    }
+    // Configurações: troca o cartão de usuários locais (não funcionava com o login do servidor) por backup/sincronização.
+    const usersList=document.getElementById('usersList');
+    const usersCard=usersList&&usersList.closest('.settings-card');
+    if(usersCard&&!document.getElementById('syncCard')){
+      const card=document.createElement('div');card.className='settings-card';card.id='syncCard';
+      card.innerHTML='<span class="eyebrow">Dados e backup</span><h3>Sincronização com a planilha</h3>'+
+        '<p class="muted">Clientes, agenda, processos (com prazos e movimentações) e financeiro ficam na planilha do Google e aparecem no computador e no celular.</p>'+
+        '<div id="dataSyncInfo" class="mini-help">Verificando…</div>'+
+        '<div class="form-actions"><button class="d-btn" type="button" id="syncNowBtn">Sincronizar agora</button><button class="d-btn light" type="button" id="exportBackupBtn">Exportar backup (JSON)</button></div>'+
+        '<p class="muted" style="font-size:12px;margin-top:10px">Documentos anexados, anotações e histórico de cálculos ainda ficam só neste navegador. Exporte o backup de vez em quando.</p>'+
+        '<div id="usersList" hidden></div>'; // mantido oculto: renderSettings() ainda escreve nele
+      usersCard.replaceWith(card);
+      card.querySelector('#syncNowBtn').addEventListener('click',()=>syncNow({manual:true}));
+      card.querySelector('#exportBackupBtn').addEventListener('click',exportBackup);
+    }
+    document.querySelectorAll('#page-settings .d-panel-head .muted').forEach(el=>{if(/protótipo/i.test(el.textContent))el.textContent='Conexão, horários, sessão e backup.'});
+    document.querySelectorAll('#page-settings .notice').forEach(el=>{if(/Modo local/i.test(el.textContent))el.innerHTML='<b>Sessão:</b> por segurança, o painel pede login novamente após 30 minutos sem uso.'});
+    // Versão discreta no rodapé.
+    const main=document.querySelector('.dash-main');
+    if(main&&!document.getElementById('appVersion')){
+      const v=document.createElement('div');v.id='appVersion';v.textContent='Painel '+VERSION;
+      v.style.cssText='text-align:right;font-size:11px;color:#a08b7a;padding:18px 4px 6px;opacity:.8';
+      main.appendChild(v);
+    }
+    if(lastState.text)setState(lastState.kind,lastState.text);
+  }
+
+  window.kalinySync={syncNow,exportBackup,pendingCount,version:VERSION};
+  function start(){
+    installUi();
+    setTimeout(()=>syncNow(),1800);
+    setInterval(()=>{if(document.visibilityState==='visible')syncNow()},60000);
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')schedule(800)});
+    window.addEventListener('online',()=>schedule(800));
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
 })();
 </script>
 </body></html>

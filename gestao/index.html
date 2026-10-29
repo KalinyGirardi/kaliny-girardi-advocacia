@@ -37,7 +37,7 @@ loginForm.onsubmit=async e=>{
   const body=new URLSearchParams({action:'login',email,password});
   const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body,signal:controller.signal,cache:'no-store'});
   const j=await r.json();
-  if(!j.ok){loginError.textContent=j.error==='invalid_credentials'?'E-mail ou senha inválidos.':'Não foi possível autenticar agora.';return;}
+  if(!j.ok){loginError.textContent=j.error==='invalid_credentials'?'E-mail ou senha inválidos.':j.error==='too_many_attempts'?'Muitas tentativas erradas. Por segurança, aguarde 15 minutos e tente novamente.':j.error==='not_configured'?'A senha do painel ainda não foi definida no Apps Script.':'Não foi possível autenticar agora.';return;}
   sessionStorage.setItem(AUTH_KEY,JSON.stringify({id:'usr_kaliny',name:j.user.name,email:j.user.email,role:j.user.role,loginAt:new Date().toISOString(),expiresAt:j.expiresAt,token:j.token,mode:'server'}));
   location.href='../dashboard.html';
  }catch(err){console.error(err);loginError.textContent=err.name==='AbortError'?'O servidor demorou para responder. Tente novamente.':'Não foi possível conectar ao servidor de autenticação.';}
