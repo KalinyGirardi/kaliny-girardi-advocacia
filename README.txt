@@ -1,5 +1,5 @@
 KALINY GIRARDI ADVOCACIA — site institucional + painel administrativo
-Versão: V145.17
+Versão: V145.18
 
 ESTRUTURA
 - index.html ............ site público (agendamento online, áreas, conteúdos, contato)
@@ -12,10 +12,10 @@ ESTRUTURA
 
 ONDE FICAM OS DADOS
 - Planilha Google (via Apps Script): Agendamentos, Clientes, Processos (com prazos e
-  movimentações), Financeiro, Anotações, Cálculos e Previdenciário. Sincronizam entre
-  computador e celular.
-- Somente no navegador: arquivos anexados (PDF, Word).
-  Use Configurações > Exportar backup (JSON) de vez em quando.
+  movimentações), Financeiro, Anotações, Cálculos, Previdenciário e Documentos
+  (metadados). Sincronizam entre computador e celular.
+- Google Drive: arquivos anexados, na pasta "Documentos — Kaliny Girardi Advocacia",
+  com uma subpasta por cliente (até 15 MB por arquivo).
 
 APPS SCRIPT (não fica neste repositório)
 - O Code.gs fica apenas no projeto do Apps Script. Não publique o Code.gs aqui:
@@ -33,3 +33,6 @@ HISTÓRICO
 - V145.17: calculadora de prazos processuais (dias úteis do CPC, feriados nacionais,
   Carnaval/Corpus Christi, recesso forense, Justiça Federal, feriados municipais
   editáveis) com gravação do vencimento no processo.
+- V145.18: documentos e contratos no Google Drive (envio automático, download no
+  outro aparelho, exclusão vai para a lixeira do Drive); botão "Adicionar documento"
+  da ficha do cliente corrigido.
