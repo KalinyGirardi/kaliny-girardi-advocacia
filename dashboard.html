@@ -857,7 +857,7 @@ function dossierMetrics(d){
 function openDossieSelector(){const opts=data.clients.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');if(!opts){toast('Cadastre um cliente primeiro');return}openModal('Dossiê Previdenciário',`<div class="dossier-help">Selecione o cliente para abrir o dossiê. O espaço concentra documentos, base de salários, conferência e média.</div><div class="field" style="margin-top:14px"><label>Cliente</label><select id="dossierSelector">${opts}</select></div><div class="form-actions"><button class="d-btn" onclick="openDossie(document.getElementById('dossierSelector').value)">Abrir dossiê</button></div>`)}
 function openDossie(clientId){const c=clientById(clientId);if(!c)return;const d=dossierByClient(clientId),m=dossierMetrics(d),docs=dossierDocs(clientId);const rows=d.salaries.slice().sort((a,b)=>String(a.competencia).localeCompare(String(b.competencia)));const avgStart=d.avgStart||'1994-07';const avgEnd=d.avgEnd||'';const duplicateSet=new Set(m.duplicateCompetencias.map(x=>x.competencia));const rowHtml=rows.length?rows.map(r=>{const flags=[];if(r.indicadores)flags.push('Indicador: '+r.indicadores);if(duplicateSet.has(r.competencia))flags.push('Mais de uma remuneração na competência');const flagHtml=flags.length?`<div class="dossier-row-warning">⚠ ${esc(flags.join(' · '))}</div>`:'';return `<tr><td><input data-sal-field="competencia" data-sal-id="${r.id}" type="month" value="${esc(r.competencia||'')}">${flagHtml}</td><td><input data-sal-field="empresa" data-sal-id="${r.id}" value="${esc(r.empresa||'')}"></td><td><input data-sal-field="salario" data-sal-id="${r.id}" class="money-input" value="${esc(money(r.salario||0))}"></td><td><input data-sal-field="fator" data-sal-id="${r.id}" type="number" step="0.000001" min="0" value="${esc(String(r.fator??1))}"></td><td><input data-sal-field="fonte" data-sal-id="${r.id}" value="${esc(r.fonte||'CNIS')}"></td><td><select data-sal-field="status" data-sal-id="${r.id}"><option value="conferir" ${r.status!=='conferido'?'selected':''}>Aguardando conferência</option><option value="conferido" ${r.status==='conferido'?'selected':''}>Conferido</option></select></td><td class="dossier-actions-cell"><button class="d-btn light" onclick="deleteSalaryRow('${clientId}','${r.id}')">Excluir</button></td></tr>`}).join(''):'<tr><td colspan="7"><div class="empty">Nenhuma competência cadastrada. Adicione manualmente ou importe um CSV.</div></td></tr>';
 const docsHtml=docs.length?`<div class="dossier-file-list">${docs.slice().reverse().map(x=>`<div class="dossier-file"><div><strong>${esc(x.name)}</strong><small><span class="doc-category">${esc(x.category||'Previdenciário')}</span> · ${esc(x.date)} · ${esc(x.sizeLabel||'')}</small></div><div class="dossier-inline-actions"><button class="d-btn light" onclick="downloadClientDocument('${x.id}')">Baixar</button><button class="d-btn light" onclick="deletePrevidDoc('${x.id}','${clientId}')">Excluir</button></div></div>`).join('')}</div>`:'<div class="empty">Nenhum documento previdenciário anexado.</div>';
-openModal('Dossiê Previdenciário — '+c.name,`<div class="dossier-help"><b>Base da análise:</b> use CNIS e documentos de suporte para conferir as remunerações. Holerites, CTPS, carnês/GPS, PPP, LTCAT, CTC, carta de concessão e processos administrativos podem ser anexados como prova. O sistema não considera OCR ou valores importados como definitivos sem conferência.</div><div class="dossier-grid"><div class="dossier-card"><small>Competências</small><strong>${m.rows.length}</strong></div><div class="dossier-card"><small>Média nominal</small><strong>${money(m.nominal)}</strong></div><div class="dossier-card"><small>Média com fatores</small><strong>${money(m.avgCorrected)}</strong></div><div class="dossier-card"><small>Conferidos</small><strong>${m.confirmed.length}</strong></div></div><div class="dossier-mini-grid"><div class="dossier-card"><small>Indicadores no CNIS</small><strong>${m.indicators}</strong></div><div class="dossier-card"><small>Competências com múltiplos valores</small><strong>${m.duplicateCompetencias.length}</strong></div><div class="dossier-card"><small>Lacunas no período</small><strong>${m.missing}</strong></div></div>${(m.indicators||m.duplicateCompetencias.length||m.missing)?`<div class="dossier-alert"><strong>🔎 Pontos para conferência</strong><ul>${m.indicators?`<li>${m.indicators} competência(s) possuem indicador informado no CNIS.</li>`:''}${m.duplicateCompetencias.length?`<li>${m.duplicateCompetencias.length} competência(s) aparecem com mais de uma remuneração; isso não é automaticamente um erro e deve ser analisado.</li>`:''}${m.missing?`<li>${m.missing} mês(es) estão ausentes entre ${esc(m.from)} e ${esc(m.to)}. Ausência no extrato não significa, sozinha, inexistência de tempo ou direito.</li>`:''}</ul></div>`:''}<div class="dossier-section"><h3>1. Documentos do dossiê</h3><div class="dossier-toolbar"><button class="d-btn" onclick="openPrevidDocUpload('${clientId}')">+ Anexar documento</button><button class="d-btn light" onclick="downloadSalaryCsvTemplate()">Baixar modelo CSV</button><button class="d-btn light" onclick="clearImportedCnis('${clientId}')">Limpar CNIS importado</button><label class="d-btn gold" style="cursor:pointer">📄 Importar CNIS (PDF)<input id="cnisPdfInput" type="file" accept="application/pdf,.pdf" hidden></label><label class="d-btn light" style="cursor:pointer">Importar CSV<input id="salaryCsvInput" type="file" accept=".csv,text/csv" hidden></label></div>${docsHtml}</div><div class="dossier-section"><h3>2. Base salarial — CNIS + conferências</h3><div class="dossier-note">Competência no formato AAAA-MM. O fator de atualização é editável; deixe 1 quando ainda não houver fator oficial preenchido. A média com fatores só deve ser tratada como corrigida após conferência dos índices aplicáveis.</div><div class="dossier-toolbar"><button class="d-btn" onclick="openSalaryRowForm('${clientId}')">+ Adicionar competência</button><button class="d-btn light" onclick="saveDossierTable('${clientId}')">Salvar alterações da tabela</button></div><div class="dossier-table-wrap"><table class="dossier-table"><thead><tr><th>Competência</th><th>Empregador / fonte</th><th>Salário</th><th>Fator</th><th>Origem</th><th>Status</th><th></th></tr></thead><tbody>${rowHtml}</tbody></table></div></div><div class="dossier-section"><h3>3. Conferência da média</h3><div class="form-grid"><div class="field"><label>Início do período da média</label><input id="dossierAvgStart" type="month" value="${esc(avgStart)}"></div><div class="field"><label>Fim do período da média</label><input id="dossierAvgEnd" type="month" value="${esc(avgEnd)}" placeholder="Deixe vazio para usar até a última competência"></div></div><div class="dossier-help">Para a regra geral pós-EC 103/2019, a base de cálculo considera 100% do período contributivo desde julho de 1994, ou desde o início da contribuição se posterior. O dossiê mantém esse início como padrão, mas permite ajustar o período para a análise do caso.</div><div class="dossier-help">Período cadastrado: <b>${esc(m.from||'—')}</b> a <b>${esc(m.to||'—')}</b> · período da média: <b>${esc(m.avgStart)}</b> a <b>${esc(m.avgEnd||m.to||'última competência')}</b> · competências na média: <b>${m.rows.length}</b> · conferidas: <b>${m.confirmed.length}</b> · pendentes: <b>${m.pending}</b> · lacunas no cadastro: <b>${m.missing}</b>.</div><div class="dossier-toolbar"><button class="d-btn gold" onclick="useDossierAverage('${clientId}')">Usar média conferida na calculadora de aposentadoria</button><button class="d-btn light" onclick="saveDossierNotes('${clientId}')">Salvar observações</button></div><div class="field"><label>Observações do dossiê</label><textarea id="dossierNotes" placeholder="Ex.: períodos sem remuneração, indicadores do CNIS, divergências com holerites, documentos pendentes...">${esc(d.notes||'')}</textarea></div></div><div class="dossier-note" style="margin-top:12px">⚠️ Esta versão trabalha localmente no navegador. Para uso com dados reais de clientes, o sistema ainda precisa de autenticação, controle de acesso, armazenamento seguro e backup adequado.</div>`);
+openModal('Dossiê Previdenciário — '+c.name,`<div class="dossier-help"><b>Base da análise:</b> use CNIS e documentos de suporte para conferir as remunerações. Holerites, CTPS, carnês/GPS, PPP, LTCAT, CTC, carta de concessão e processos administrativos podem ser anexados como prova. O sistema não considera OCR ou valores importados como definitivos sem conferência.</div><div class="dossier-grid"><div class="dossier-card"><small>Competências</small><strong>${m.rows.length}</strong></div><div class="dossier-card"><small>Média nominal</small><strong>${money(m.nominal)}</strong></div><div class="dossier-card"><small>Média com fatores</small><strong>${money(m.avgCorrected)}</strong></div><div class="dossier-card"><small>Conferidos</small><strong>${m.confirmed.length}</strong></div></div><div class="dossier-mini-grid"><div class="dossier-card"><small>Indicadores no CNIS</small><strong>${m.indicators}</strong></div><div class="dossier-card"><small>Competências com múltiplos valores</small><strong>${m.duplicateCompetencias.length}</strong></div><div class="dossier-card"><small>Lacunas no período</small><strong>${m.missing}</strong></div></div>${(m.indicators||m.duplicateCompetencias.length||m.missing)?`<div class="dossier-alert"><strong>🔎 Pontos para conferência</strong><ul>${m.indicators?`<li>${m.indicators} competência(s) possuem indicador informado no CNIS.</li>`:''}${m.duplicateCompetencias.length?`<li>${m.duplicateCompetencias.length} competência(s) aparecem com mais de uma remuneração; isso não é automaticamente um erro e deve ser analisado.</li>`:''}${m.missing?`<li>${m.missing} mês(es) estão ausentes entre ${esc(m.from)} e ${esc(m.to)}. Ausência no extrato não significa, sozinha, inexistência de tempo ou direito.</li>`:''}</ul></div>`:''}<div class="dossier-section"><h3>1. Documentos do dossiê</h3><div class="dossier-toolbar"><button class="d-btn" onclick="openPrevidDocUpload('${clientId}')">+ Anexar documento</button><button class="d-btn light" onclick="downloadSalaryCsvTemplate()">Baixar modelo CSV</button><button class="d-btn light" onclick="clearImportedCnis('${clientId}')">Limpar CNIS importado</button><label class="d-btn gold" style="cursor:pointer">📄 Importar CNIS (PDF)<input id="cnisPdfInput" type="file" accept="application/pdf,.pdf" hidden></label><label class="d-btn light" style="cursor:pointer">Importar CSV<input id="salaryCsvInput" type="file" accept=".csv,text/csv" hidden></label></div>${docsHtml}</div><div class="dossier-section"><h3>2. Base salarial — CNIS + conferências</h3><div class="dossier-note">Competência no formato AAAA-MM. O fator de atualização é editável; deixe 1 quando ainda não houver fator oficial preenchido. A média com fatores só deve ser tratada como corrigida após conferência dos índices aplicáveis.</div><div class="dossier-toolbar"><button class="d-btn" onclick="openSalaryRowForm('${clientId}')">+ Adicionar competência</button><button class="d-btn light" onclick="saveDossierTable('${clientId}')">Salvar alterações da tabela</button></div><div class="dossier-table-wrap"><table class="dossier-table"><thead><tr><th>Competência</th><th>Empregador / fonte</th><th>Salário</th><th>Fator</th><th>Origem</th><th>Status</th><th></th></tr></thead><tbody>${rowHtml}</tbody></table></div></div><div class="dossier-section"><h3>3. Conferência da média</h3><div class="form-grid"><div class="field"><label>Início do período da média</label><input id="dossierAvgStart" type="month" value="${esc(avgStart)}"></div><div class="field"><label>Fim do período da média</label><input id="dossierAvgEnd" type="month" value="${esc(avgEnd)}" placeholder="Deixe vazio para usar até a última competência"></div></div><div class="dossier-help">Para a regra geral pós-EC 103/2019, a base de cálculo considera 100% do período contributivo desde julho de 1994, ou desde o início da contribuição se posterior. O dossiê mantém esse início como padrão, mas permite ajustar o período para a análise do caso.</div><div class="dossier-help">Período cadastrado: <b>${esc(m.from||'—')}</b> a <b>${esc(m.to||'—')}</b> · período da média: <b>${esc(m.avgStart)}</b> a <b>${esc(m.avgEnd||m.to||'última competência')}</b> · competências na média: <b>${m.rows.length}</b> · conferidas: <b>${m.confirmed.length}</b> · pendentes: <b>${m.pending}</b> · lacunas no cadastro: <b>${m.missing}</b>.</div><div class="dossier-toolbar"><button class="d-btn gold" onclick="useDossierAverage('${clientId}')">Usar média conferida na calculadora de aposentadoria</button><button class="d-btn light" onclick="saveDossierNotes('${clientId}')">Salvar observações</button></div><div class="field"><label>Observações do dossiê</label><textarea id="dossierNotes" placeholder="Ex.: períodos sem remuneração, indicadores do CNIS, divergências com holerites, documentos pendentes...">${esc(d.notes||'')}</textarea></div></div><div class="dossier-note" style="margin-top:12px">Os dados do dossiê (salários e observações) ficam na planilha do Google. Os documentos anexados ficam só neste navegador.</div>`);
 wireMoneyInputs(document.getElementById('modalBody')||document);
 const csv=document.getElementById('salaryCsvInput');if(csv)csv.onchange=e=>importSalaryCsv(clientId,e.target.files?.[0]);const cnis=document.getElementById('cnisPdfInput');if(cnis)cnis.onchange=e=>importCnisPdf(clientId,e.target.files?.[0]);const as=document.getElementById('dossierAvgStart'),ae=document.getElementById('dossierAvgEnd');if(as)as.onchange=()=>{d.avgStart=as.value||'1994-07';d.updatedAt=new Date().toISOString();save();openDossie(clientId)};if(ae)ae.onchange=()=>{d.avgEnd=ae.value||'';d.updatedAt=new Date().toISOString();save();openDossie(clientId)};
 }
@@ -1477,7 +1477,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
    Regras: vence a alteração mais recente (updatedAt); exclusões viram marcação (deletedAt);
    resposta vazia ou com erro do servidor nunca apaga dados deste navegador. */
 (function(){
-  const VERSION='V145.16';
+  const VERSION='V145.17';
   const META_KEY='kaliny_sync_meta_v1';
   const COLLECTIONS=['processes','finance','notes','calcHistory','previdenciario'];
   const BATCH=50;
@@ -1832,6 +1832,220 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
     window.addEventListener('online',()=>schedule(800));
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
+})();
+</script>
+<script>
+/* V145.17 — Calculadora de prazos processuais (CPC): dias úteis, feriados, recesso forense
+   e gravação do resultado como prazo do processo. Ferramenta de apoio: o prazo oficial é o
+   informado pelo sistema do tribunal (Projudi/eproc/PJe). */
+(function(){
+  const CONFIG_ID='cfg_prazos';
+  const NATIONAL=[['01-01','Confraternização Universal'],['04-21','Tiradentes'],['05-01','Dia do Trabalho'],['09-07','Independência'],['10-12','Nossa Senhora Aparecida'],['11-02','Finados'],['11-15','Proclamação da República'],['11-20','Consciência Negra'],['12-25','Natal']];
+  const FEDERAL_FIXED=[['08-11','Feriado forense (Lei 5.010/66)'],['11-01','Feriado forense (Lei 5.010/66)'],['12-08','Dia da Justiça (Lei 5.010/66)']];
+  const pad=n=>String(n).padStart(2,'0');
+  const key=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+  const parse=s=>{const m=String(s||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);return m?new Date(Number(m[1]),Number(m[2])-1,Number(m[3])):null};
+  const addDays=(d,n)=>{const x=new Date(d.getFullYear(),d.getMonth(),d.getDate()+n);return x};
+  const br=d=>pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear();
+  const WEEK=['domingo','segunda-feira','terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado'];
+  function easter(y){const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),mo=Math.floor((h+l-7*m+114)/31),da=((h+l-7*m+114)%31)+1;return new Date(y,mo-1,da)}
+
+  // Mapa data → motivo para um ano, conforme as opções.
+  function holidaysFor(year,opts){
+    const out={};
+    const put=(d,why)=>{const k=key(d);if(!out[k])out[k]=why};
+    NATIONAL.forEach(([md,n])=>put(parse(year+'-'+md),n+' (feriado nacional)'));
+    const e=easter(year);
+    put(addDays(e,-2),'Sexta-feira Santa (feriado nacional)');
+    if(opts.forenses){
+      put(addDays(e,-48),'Carnaval (sem expediente forense)');
+      put(addDays(e,-47),'Carnaval (sem expediente forense)');
+      put(addDays(e,60),'Corpus Christi (sem expediente forense)');
+    }
+    if(opts.court==='federal'){
+      for(let i=-4;i<=-3;i++)put(addDays(e,i),'Semana Santa (Lei 5.010/66)');
+      FEDERAL_FIXED.forEach(([md,n])=>put(parse(year+'-'+md),n));
+    }
+    (opts.custom||[]).forEach(c=>{const d=parse(c.date);if(d&&d.getFullYear()===year)put(d,(c.desc||'Suspensão de prazos')+' (personalizado)')});
+    return out;
+  }
+  function inRecess(d){const m=d.getMonth()+1,day=d.getDate();return (m===12&&day>=20)||(m===1&&day<=20)}
+
+  // Calcula o vencimento. opts: {date, marco:'intimacao'|'dje'|'portal', days, mode:'uteis'|'corridos', dobro, recesso, forenses, court, custom}
+  function calc(opts){
+    const cache={};
+    const why=d=>{
+      const y=d.getFullYear();cache[y]=cache[y]||holidaysFor(y,opts);
+      const h=cache[y][key(d)];if(h)return h;
+      if(opts.recesso&&inRecess(d))return 'Recesso forense (CPC, art. 220)';
+      const w=d.getDay();if(w===0||w===6)return 'fim de semana';
+      return '';
+    };
+    const isUtil=d=>!why(d);
+    const nextUtil=d=>{let x=addDays(d,1);let guard=0;while(!isUtil(x)&&guard++<400)x=addDays(x,1);return x};
+    const base=parse(opts.date);if(!base)throw new Error('Informe a data.');
+    let n=Math.floor(Number(opts.days));if(!(n>0))throw new Error('Informe o número de dias.');
+    if(opts.dobro)n*=2;
+    const steps=[];let ref=base;
+    if(opts.marco==='dje'){
+      steps.push('Disponibilização no Diário Eletrônico: '+br(base)+' ('+WEEK[base.getDay()]+').');
+      ref=nextUtil(base);
+      steps.push('Publicação (primeiro dia útil seguinte — CPC, art. 224, §§ 2º e 3º): '+br(ref)+'.');
+    }else if(opts.marco==='portal'){
+      steps.push('Intimação enviada pelo portal eletrônico: '+br(base)+'.');
+      ref=addDays(base,10);
+      if(!isUtil(ref))ref=nextUtil(addDays(ref,-1));
+      steps.push('Ciência presumida após 10 dias corridos sem consulta (Lei 11.419/2006, art. 5º, § 3º): '+br(ref)+'.');
+    }else{
+      steps.push('Intimação / ciência: '+br(base)+' ('+WEEK[base.getDay()]+').');
+    }
+    const skipped=[],after=[];let end,start;
+    if(opts.mode==='corridos'){
+      start=addDays(ref,1);
+      if(!isUtil(start)){skipped.push([start,why(start)]);start=nextUtil(start);}
+      let count=0,d=addDays(start,-1);
+      while(count<n){d=addDays(d,1);if(opts.recesso&&inRecess(d)){skipped.push([d,'Recesso forense (CPC, art. 220)']);continue}count++}
+      end=d;
+      if(!isUtil(end)){const w=why(end);end=nextUtil(end);after.push('O último dia caiu em dia sem expediente ('+w+'); prorrogado para o primeiro dia útil seguinte (CPC, art. 224, § 1º).')}
+    }else{
+      let count=0,d=ref;start=null;let guard=0;
+      while(count<n&&guard++<5000){d=addDays(d,1);const w=why(d);if(w){if(w!=='fim de semana')skipped.push([d,w]);continue}if(!start)start=d;count++}
+      end=d;
+    }
+    steps.push('Início da contagem: '+br(start)+' (exclui-se o dia do começo — CPC, art. 224).');
+    steps.push('Prazo: '+n+' dia'+(n>1?'s':'')+' '+(opts.mode==='corridos'?'corridos':'úteis (CPC, art. 219)')+(opts.dobro?' — já contado em dobro':'')+'.');
+    steps.push(...after);
+    const uniq={};skipped.forEach(([d,w])=>{const wd=d.getDay();if(d<=end&&wd!==0&&wd!==6)uniq[key(d)]=br(d)+' — '+w});
+    return {end,endKey:key(end),endLabel:br(end)+' ('+WEEK[end.getDay()]+')',steps,skipped:Object.values(uniq)};
+  }
+
+  // Configuração sincronizada (fica junto das anotações, num registro interno).
+  function getConfig(){
+    data.notes=Array.isArray(data.notes)?data.notes:[];
+    let c=data.notes.find(n=>n&&n.id===CONFIG_ID);
+    if(!c){c={id:CONFIG_ID,clientId:'__config__',title:'Configuração da calculadora de prazos',date:'',text:'Registro interno do painel.',config:{court:'estadual',forenses:true,recesso:true,custom:[]}};data.notes.push(c)}
+    c.config=c.config||{};c.config.custom=Array.isArray(c.config.custom)?c.config.custom:[];
+    return c.config;
+  }
+  function saveConfig(){save()}
+
+  function processOptions(selected){
+    const procs=(data.processes||[]).filter(p=>p&&String(p.status||'').toLowerCase()!=='encerrado');
+    return '<option value="">Não salvar em processo</option>'+procs.map(p=>{const c=clientById(p.clientId);return `<option value="${esc(p.id)}" ${String(p.id)===String(selected)?'selected':''}>${esc(p.number||'Sem número')}${c?' · '+esc(c.name):''}</option>`}).join('');
+  }
+  function customListHtml(cfg){
+    if(!cfg.custom.length)return '<div class="muted" style="font-size:13px">Nenhum feriado municipal ou suspensão cadastrado.</div>';
+    return cfg.custom.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(c=>`<div class="history-item" style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px"><span>${esc(br(parse(c.date)))} — ${esc(c.desc||'')}</span><button class="d-btn light" type="button" data-prazo-del="${esc(c.date)}">Remover</button></div>`).join('');
+  }
+
+  let last=null;
+  function openPrazoCalc(processId){
+    const cfg=getConfig(),today=key(new Date());
+    openModal('Calculadora de prazos processuais',`
+<style>#prazoForm .form-grid,#prazoCustomBox .form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}#prazoForm .field,#prazoCustomBox .field{min-width:0}#prazoForm input,#prazoForm select,#prazoCustomBox input{width:100%;max-width:100%;min-width:0;box-sizing:border-box}#prazoForm .prazo-checks{grid-column:1/-1;display:flex;flex-direction:column;gap:8px}#prazoForm .prazo-checks label{display:flex;gap:10px;align-items:center;text-transform:none;letter-spacing:0;font-size:14px;color:inherit;margin:0}#prazoForm .prazo-checks input{width:auto;flex:none}@media(max-width:640px){#prazoForm .form-grid,#prazoCustomBox .form-grid{grid-template-columns:1fr}}</style>
+<form id="prazoForm"><div class="form-grid">
+  <div class="field"><label>Marco inicial</label><select name="marco"><option value="intimacao">Intimação / ciência</option><option value="dje">Disponibilização no DJe/DJEN</option><option value="portal">Intimação pelo portal (10 dias)</option></select></div>
+  <div class="field"><label>Data</label><input type="date" name="date" value="${today}" required></div>
+  <div class="field"><label>Prazo (dias)</label><input type="number" name="days" min="1" max="365" value="15" required></div>
+  <div class="field"><label>Contagem</label><select name="mode"><option value="uteis">Dias úteis (CPC, art. 219)</option><option value="corridos">Dias corridos</option></select></div>
+  <div class="field"><label>Justiça</label><select name="court"><option value="estadual" ${cfg.court!=='federal'?'selected':''}>Estadual (TJPR)</option><option value="federal" ${cfg.court==='federal'?'selected':''}>Federal (Lei 5.010/66)</option></select></div>
+  <div class="field"><label>Salvar no processo</label><select name="processId">${processOptions(processId)}</select></div>
+  <div class="prazo-checks">
+    <label><input type="checkbox" name="dobro"> Prazo em dobro (CPC, arts. 180, 183, 186 e 229)</label>
+    <label><input type="checkbox" name="recesso" ${cfg.recesso!==false?'checked':''}> Recesso forense de 20/12 a 20/01 (CPC, art. 220)</label>
+    <label><input type="checkbox" name="forenses" ${cfg.forenses!==false?'checked':''}> Carnaval e Corpus Christi sem expediente</label>
+  </div>
+</div>
+<div class="form-actions"><button class="d-btn" type="submit">Calcular vencimento</button></div></form>
+<div id="prazoResult"></div>
+<details id="prazoCustomBox" style="margin-top:16px"><summary style="cursor:pointer;font-weight:600">Feriados municipais e suspensões de prazo (${cfg.custom.length})</summary>
+  <p class="muted" style="font-size:13px;margin:8px 0">Cadastre os feriados de Cascavel e as suspensões do tribunal (portarias, indisponibilidade do sistema). A lista vale para o computador e o celular.</p>
+  <div id="prazoCustomList">${customListHtml(cfg)}</div>
+  <div class="form-grid" style="margin-top:10px"><div class="field"><label>Data</label><input type="date" id="prazoCustomDate"></div><div class="field"><label>Descrição</label><input id="prazoCustomDesc" placeholder="Ex.: Feriado municipal / Portaria TJPR nº ..."></div></div>
+  <div class="form-actions"><button class="d-btn light" type="button" id="prazoCustomAdd">Adicionar</button></div>
+</details>
+<div class="mini-help" style="margin-top:14px">⚠️ Ferramenta de apoio. Confira sempre o prazo no sistema do tribunal (Projudi, eproc, PJe) e o calendário oficial, que pode ter suspensões extras.</div>`);
+    const form=document.getElementById('prazoForm');
+    form.onsubmit=e=>{
+      e.preventDefault();
+      const f=Object.fromEntries(new FormData(form).entries());
+      const opts={date:f.date,marco:f.marco,days:f.days,mode:f.mode,court:f.court,dobro:!!f.dobro,recesso:!!f.recesso,forenses:!!f.forenses,custom:getConfig().custom};
+      const c=getConfig();
+      if(c.court!==opts.court||c.recesso!==opts.recesso||c.forenses!==opts.forenses){c.court=opts.court;c.recesso=opts.recesso;c.forenses=opts.forenses;saveConfig()}
+      let r;try{r=calc(opts)}catch(err){toast(err.message);return}
+      last={r,opts,processId:f.processId};
+      const proc=(data.processes||[]).find(p=>String(p.id)===String(f.processId));
+      document.getElementById('prazoResult').innerHTML=`<div class="history-item attention-deadline" style="margin-top:14px"><div class="attention-deadline-head"><strong>Vencimento</strong></div><p style="font:500 26px Georgia,serif;margin:6px 0">${esc(r.endLabel)}</p><ul style="margin:8px 0 0 18px;padding:0">${r.steps.map(s=>`<li>${esc(s)}</li>`).join('')}</ul>${r.skipped.length?`<p style="margin:10px 0 4px"><b>Dias não contados (além dos fins de semana):</b></p><ul style="margin:0 0 0 18px;padding:0">${r.skipped.map(s=>`<li>${esc(s)}</li>`).join('')}</ul>`:''}
+<div class="field" style="margin-top:12px"><label>Descrição do prazo</label><input id="prazoTitle" value="Prazo de ${esc(String(opts.dobro?opts.days*2:opts.days))} dias"></div>
+<div class="form-actions">${proc?`<button class="d-btn" type="button" id="prazoSaveProcess">Salvar como prazo do processo ${esc(proc.number||'')}</button>`:''}<button class="d-btn light" type="button" id="prazoSaveHistory">Salvar no histórico de cálculos</button></div></div>`;
+      document.getElementById('prazoSaveProcess')?.addEventListener('click',()=>saveToProcess(proc));
+      document.getElementById('prazoSaveHistory').addEventListener('click',saveToHistory);
+    };
+    document.getElementById('prazoCustomAdd').onclick=()=>{
+      const d=document.getElementById('prazoCustomDate').value,desc=document.getElementById('prazoCustomDesc').value.trim();
+      if(!parse(d)){toast('Informe a data');return}
+      const c=getConfig();c.custom=c.custom.filter(x=>x.date!==d);c.custom.push({date:d,desc:desc||'Suspensão de prazos'});saveConfig();
+      document.getElementById('prazoCustomList').innerHTML=customListHtml(c);
+      document.getElementById('prazoCustomDate').value='';document.getElementById('prazoCustomDesc').value='';
+      toast('Data adicionada ✓');
+    };
+  }
+  function memory(){
+    const {r,opts}=last;
+    return 'Vencimento: '+r.endLabel+'\n'+r.steps.join('\n')+(r.skipped.length?'\nDias não contados: '+r.skipped.join('; '):'')+'\n'+(opts.court==='federal'?'Justiça Federal':'Justiça Estadual')+'. Conferir no sistema do tribunal.';
+  }
+  function recomputeNextDeadline(p){
+    const t=key(new Date());
+    const pend=(p.deadlines||[]).filter(d=>d&&d.date&&!String(d.status||'').toLowerCase().startsWith('conclu')).map(d=>d.date).sort();
+    p.deadline=pend.find(d=>d>=t)||pend[pend.length-1]||p.deadline||'';
+  }
+  function saveToProcess(p){
+    if(!last||!p)return;
+    p.deadlines=Array.isArray(p.deadlines)?p.deadlines:[];
+    const title=(document.getElementById('prazoTitle')?.value||'').trim()||'Prazo processual';
+    p.deadlines.push({id:'prd_'+Date.now(),date:last.r.endKey,title,status:'Pendente',note:memory()});
+    recomputeNextDeadline(p);
+    p.updated=key(new Date());
+    save();closeModal();
+    try{openProcessDetail(p.id)}catch(e){}
+    toast('Prazo salvo no processo ✓');
+  }
+  function saveToHistory(){
+    if(!last)return;
+    const p=(data.processes||[]).find(x=>String(x.id)===String(last.processId));
+    data.calcHistory=Array.isArray(data.calcHistory)?data.calcHistory:[];
+    data.calcHistory.push({id:'calc_'+Date.now(),type:'prazo',label:'Prazo processual',clientId:p?p.clientId||'':'',date:new Date().toLocaleDateString('pt-BR'),result:memory()});
+    save();toast('Cálculo salvo no histórico ✓');
+  }
+  document.addEventListener('click',ev=>{
+    const del=ev.target.closest&&ev.target.closest('[data-prazo-del]');
+    if(del){const c=getConfig();c.custom=c.custom.filter(x=>x.date!==del.getAttribute('data-prazo-del'));saveConfig();const el=document.getElementById('prazoCustomList');if(el)el.innerHTML=customListHtml(c);return}
+    const open=ev.target.closest&&ev.target.closest('[data-prazo-calc]');
+    if(open){ev.preventDefault();openPrazoCalc(open.getAttribute('data-prazo-calc')||'')}
+  });
+
+  function installUi(){
+    const grid=document.querySelector('#page-calculators .calc-grid');
+    if(grid&&!document.getElementById('prazoCalcCard')){
+      const card=document.createElement('div');card.className='calc-card';card.id='prazoCalcCard';
+      card.innerHTML='<h3>Prazos processuais</h3><p class="muted">Vencimento em dias úteis (CPC), com feriados, recesso forense e prazo em dobro.</p><button class="d-btn" type="button" data-prazo-calc="">Abrir calculadora</button>';
+      grid.insertBefore(card,grid.firstChild);
+    }
+  }
+  // Na ficha do processo, um atalho ao lado de "+ Novo prazo".
+  const originalDetail=window.openProcessDetail;
+  if(typeof originalDetail==='function'){
+    window.openProcessDetail=function(id){
+      const r=originalDetail.apply(this,arguments);
+      try{
+        const btn=[...document.querySelectorAll('#modal button')].find(b=>/addProcessDeadline\(/.test(b.getAttribute('onclick')||''));
+        if(btn&&!btn.parentNode.querySelector('[data-prazo-calc]'))btn.insertAdjacentHTML('beforebegin',`<button class="d-btn light" type="button" data-prazo-calc="${esc(String(id))}" style="margin-right:6px">⏱ Calcular prazo</button>`);
+      }catch(e){console.warn('Atalho da calculadora de prazos:',e)}
+      return r;
+    };
+  }
+  window.kalinyPrazos={calc,holidaysFor,easter,open:openPrazoCalc};
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installUi);else installUi();
 })();
 </script>
 </body></html>

@@ -1,5 +1,5 @@
 KALINY GIRARDI ADVOCACIA — site institucional + painel administrativo
-Versão: V145.16
+Versão: V145.17
 
 ESTRUTURA
 - index.html ............ site público (agendamento online, áreas, conteúdos, contato)
@@ -30,3 +30,6 @@ HISTÓRICO
 - V145.16: anotações, cálculos e dossiê previdenciário sincronizados; e-mail diário de
   prazos e parcelas vencidas (7h); lembrete por WhatsApp na agenda; parcelas vencidas
   nos Pontos de atenção.
+- V145.17: calculadora de prazos processuais (dias úteis do CPC, feriados nacionais,
+  Carnaval/Corpus Christi, recesso forense, Justiça Federal, feriados municipais
+  editáveis) com gravação do vencimento no processo.
