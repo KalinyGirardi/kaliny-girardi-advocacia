@@ -3,7 +3,7 @@ const APPOINTMENTS_API_URL = 'https://script.google.com/macros/s/AKfycbwkIeXM0Jv
 /* Perfil da Empresa no Google. Quando o perfil estiver verificado, cole em "avaliar" o link de
    "Pedir avaliações" (algo como https://g.page/r/XXXX/review). Enquanto estiver vazio, os botões abrem o perfil. */
 window.KG_GOOGLE = {
-  perfil: 'https://www.google.com/maps/search/?api=1&query=Kaliny+Girardi+Advocacia+Cascavel+PR',
-  avaliar: ''
+  perfil: 'https://g.page/r/CT1paptxaOU_EAI',
+  avaliar: 'https://g.page/r/CT1paptxaOU_EAI/review'
 };
 window.kgReviewLink = function(){ var g = window.KG_GOOGLE || {}; return g.avaliar || g.perfil; };
