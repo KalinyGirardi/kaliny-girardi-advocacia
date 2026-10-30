@@ -1481,7 +1481,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
    Regras: vence a alteração mais recente (updatedAt); exclusões viram marcação (deletedAt);
    resposta vazia ou com erro do servidor nunca apaga dados deste navegador. */
 (function(){
-  const VERSION='V145.38';
+  const VERSION='V145.39';
   const META_KEY='kaliny_sync_meta_v1';
   const COLLECTIONS=['processes','finance','notes','calcHistory','previdenciario','documents','tasks'];
   const IS_COLLAB=(typeof session!=='undefined'&&session&&session.role==='colaboradora'),COLLAB_PUSH=new Set(['finance','tasks']);let warnedForbidden=false;
@@ -4391,6 +4391,127 @@ body.kg-collab [onclick^="openDocumentUpload"],body.kg-collab [onclick^="openPro
   document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-page="settings"]');if(b)setTimeout(teamCard,90)});
   setTimeout(()=>{try{renderTasks()}catch(e){}if(!COLLAB)refreshTeam()},1200);
   window.kalinyTeam={renderTasks,renderCollabFinance,refreshTeam,isCollab:COLLAB};
+})();
+</script>
+<script>
+/* V145.39 — Repasses, equipe do caso e tarefas no Dashboard.
+   Repasse: parcela recebida de contrato com parceira gera a parte dela "aguardando repasse"; ao registrar, vira uma
+   despesa do escritório (categoria Repasse) e cada parcela ganha a data do repasse, que ela vê no Meu financeiro. */
+(function(){
+  const S=(typeof session!=='undefined'&&session)||{};
+  const COLLAB=S.role==='colaboradora',ME=String(S.email||'').toLowerCase();
+  const lower=v=>String(v||'').trim().toLowerCase();
+  const pad=n=>String(n).padStart(2,'0'),todayIso=()=>{const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())};
+  const br=s=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(s||'');return m?m[3]+'/'+m[2]+'/'+m[1]:''};
+  const isPaid=f=>['pago','recebido'].includes(lower(f.status));
+  const team=()=>{try{return JSON.parse(localStorage.getItem('kaliny_team_v1')||'[]')||[]}catch(e){return []}};
+  const round2=v=>Math.round(v*100)/100;
+  const css=`.tm2-rep{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;background:#fbf6ee;border:1px solid #efe2cf;border-radius:14px;padding:11px 14px;margin:0 0 12px;font-size:14px;color:#4d3a2e}
+.tm2-rep b{color:#3d2b20}.tm2-pl{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 10px;border:1px solid #eaded2;border-radius:12px;margin-bottom:6px;background:#fff;font-size:14px}
+.tm2-pl small{display:block;color:#8d7767;font-size:12px}.tm2-tot{font:500 22px Georgia,serif;color:#3d2b20}
+.tm2-team{margin-top:14px;padding:10px 14px;border:1px solid rgba(75,52,37,.10);border-radius:12px;background:#fbf8f4}.tm2-team .tm2-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.tm2-chip{border:1px solid #eaded2;background:#fff;border-radius:999px;padding:7px 13px;font-size:13px;cursor:pointer;color:#3d2b20}.tm2-chip.on{background:#557a62;color:#fff;border-color:#557a62}
+#tmOverview .tm2-t{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid #f1e8df;font-size:14px}#tmOverview .tm2-t:last-child{border-bottom:0}
+#tmOverview .tm2-t small{display:block;color:#8d7767;font-size:12px}#tmOverview .tm2-late{color:#9a5a55;font-weight:600}
+#tmOverview .tm-chk{width:20px;height:20px;border-radius:50%;border:2px solid #cdbcab;background:#fff;cursor:pointer}`;
+  function style(){if(!document.getElementById('tm2Css')){const s=document.createElement('style');s.id='tm2Css';s.textContent=css;document.head.appendChild(s)}}
+
+  /* ---------- repasses (administradora) ---------- */
+  const share=f=>round2(Number(f.value||0)*Number(f.collab&&f.collab.pct||0)/100);
+  function pendingByCollab(){
+    const by={};(data.finance||[]).forEach(f=>{if(!f||f.deletedAt||f.type==='despesa'||!f.collab||!f.collab.email||!isPaid(f)||f.repasseAt)return;
+      const k=lower(f.collab.email);(by[k]=by[k]||{email:f.collab.email,name:f.collab.name||f.collab.email,items:[],total:0});by[k].items.push(f);by[k].total=round2(by[k].total+share(f))});
+    return Object.values(by).filter(x=>x.total>0);
+  }
+  function drawRepasse(){
+    if(COLLAB)return;const app=document.getElementById('finApp');if(!app)return;style();
+    let box=document.getElementById('tmRepasse');const pend=pendingByCollab();
+    if(!pend.length){if(box)box.remove();return}
+    if(!box||box.parentNode!==app){if(box)box.remove();app.insertAdjacentHTML('afterbegin','<div id="tmRepasse"></div>');box=document.getElementById('tmRepasse')}
+    box.innerHTML=pend.map(p=>`<div class="tm2-rep"><span>🤝 Repasse pendente para <b>${esc(p.name)}</b>: <b>${money(p.total)}</b> · ${p.items.length} parcela${p.items.length>1?'s':''} recebida${p.items.length>1?'s':''}</span><button class="d-btn" type="button" data-tm2-rep="${esc(p.email)}">Ver e registrar repasse</button></div>`).join('');
+  }
+  function repasseModal(email){
+    const p=pendingByCollab().find(x=>lower(x.email)===lower(email));if(!p)return toast('Nenhum repasse pendente');
+    const cn=f=>{const c=f.clientId?clientById(f.clientId):null;return c?c.name:''};
+    openModal('Repasse para '+p.name,`<form id="tm2RepForm"><p class="muted" style="margin-top:0">Parcelas já recebidas dos contratos em que ${esc(String(p.name).split(' ')[0])} é parceira. Marque as que você vai repassar agora.</p>
+${p.items.slice().sort((a,b)=>String(a.paidAt||a.dueDate||'').localeCompare(String(b.paidAt||b.dueDate||''))).map(f=>`<label class="tm2-pl"><input type="checkbox" name="f" value="${esc(String(f.id))}" checked data-v="${share(f)}"><span><b>${esc(f.desc||'Honorários')}</b><small>${esc([cn(f),'recebida '+br(f.paidAt||f.dueDate||f.date),money(f.value)+' × '+f.collab.pct+'%'].filter(Boolean).join(' · '))}</small></span><b>${money(share(f))}</b></label>`).join('')}
+<div class="form-grid" style="margin-top:12px"><div class="field"><label>Data do repasse</label><input name="date" type="date" required value="${todayIso()}"></div><div class="field"><label>Forma</label><select name="method"><option>Pix</option><option>Transferência</option><option>Dinheiro</option></select></div></div>
+<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap"><span>Total: <span class="tm2-tot" id="tm2Tot">${money(p.total)}</span></span><button class="d-btn" type="submit">Registrar repasse</button></div>
+<div class="mini-help">Vira uma despesa “Repasse a parceira” no seu Financeiro, e ela vê no painel dela que já foi repassado.</div></form>`);
+    const form=document.getElementById('tm2RepForm');
+    const tot=()=>round2([...form.querySelectorAll('input[name=f]:checked')].reduce((s,i)=>s+Number(i.dataset.v),0));
+    form.onchange=()=>{document.getElementById('tm2Tot').textContent=money(tot())};
+    form.onsubmit=e=>{e.preventDefault();const ids=[...form.querySelectorAll('input[name=f]:checked')].map(i=>i.value),v=tot();if(!ids.length||!v)return toast('Marque ao menos uma parcela');
+      const now=new Date().toISOString(),date=form.date.value||todayIso(),rid='fin_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+      data.finance.push({id:rid,type:'despesa',category:'Repasse a parceira',desc:'Repasse — '+p.name+' ('+ids.length+' parcela'+(ids.length>1?'s':'')+')',value:v,status:'pago',date,dueDate:date,paidAt:date,paymentMethod:form.method.value,repasseTo:p.email,repasseOf:ids,createdAt:now,updatedAt:now});
+      (data.finance||[]).forEach(f=>{if(f&&ids.includes(String(f.id))){f.repasseAt=date;f.repasseId=rid;f.updatedAt=now}});
+      save();closeModal();toast('Repasse de '+money(v)+' registrado');try{window.kalinySync&&window.kalinySync.syncNow()}catch(err){}};
+  }
+  // excluir a despesa de repasse devolve as parcelas para "aguardando repasse"
+  document.addEventListener('click',e=>{
+    const b=!COLLAB&&e.target.closest&&e.target.closest('[data-fa-del]');if(!b)return;
+    const f=(data.finance||[]).find(x=>String(x&&x.id)===b.dataset.faDel);if(!f||!Array.isArray(f.repasseOf))return;const rid=String(f.id);
+    setTimeout(()=>{if((data.finance||[]).some(x=>String(x&&x.id)===rid))return;let ch=false;const now=new Date().toISOString();
+      (data.finance||[]).forEach(x=>{if(x&&String(x.repasseId||'')===rid){x.repasseAt='';x.repasseId='';x.updatedAt=now;ch=true}});if(ch){save();toast('As parcelas voltaram para “aguardando repasse”')}},400);
+  },true);
+
+  /* ---------- meu financeiro (colaboradora): repasse ---------- */
+  function decorateCollab(){
+    if(!COLLAB)return;const el=document.querySelector('.tm-myfin .tm-kpis');if(!el||el.dataset.tm2)return;el.dataset.tm2='1';
+    const rec=(data.finance||[]).filter(f=>f&&!f.deletedAt&&f.type!=='despesa'&&isPaid(f));
+    const sum=a=>a.reduce((s,f)=>s+Number(f.value||0),0),waiting=rec.filter(f=>!f.repasseAt),done=rec.filter(f=>f.repasseAt);
+    const k=el.children[1];if(k)k.innerHTML=`<small>Recebida pelo escritório</small><strong>${money(sum(rec))}</strong><span style="font-size:12px;color:#8d7767">${money(sum(waiting))} aguardando repasse · ${money(sum(done))} já repassado</span>`;
+  }
+
+  /* ---------- equipe do caso (ficha do cliente) ---------- */
+  function teamBox(id){
+    if(COLLAB)return;const c=clientById(id),tabs=document.querySelector('#modal .client-tabs'),t=team();
+    if(!c||!tabs||!t.length||document.querySelector('#modal .tm2-team'))return;style();
+    const on=e=>(Array.isArray(c.team)?c.team:[]).map(lower).includes(lower(e));
+    tabs.insertAdjacentHTML('beforebegin',`<div class="tm2-team" data-tm2-client="${esc(String(id))}"><b>Equipe do caso</b> <span class="muted" style="font-size:13px">— quem está marcado vê este cliente, os processos, documentos e despesas dele.</span><div class="tm2-chips">${t.map(u=>`<button class="tm2-chip ${on(u.email)?'on':''}" type="button" data-tm2-team="${esc(u.email)}">${on(u.email)?'✓ ':''}${esc(u.name)}</button>`).join('')}</div></div>`);
+  }
+  async function toggleTeam(id,email){
+    const c=clientById(id);if(!c)return;c.team=Array.isArray(c.team)?c.team:[];
+    const has=c.team.map(lower).includes(lower(email)),name=(team().find(u=>lower(u.email)===lower(email))||{}).name||email;
+    if(has){if(!confirm('Tirar '+name+' da equipe deste caso? Ela deixa de ver este cliente (se não houver contrato ou tarefa dela aqui).'))return;c.team=c.team.filter(e=>lower(e)!==lower(email))}else c.team.push(email);
+    save();const box=document.querySelector('.tm2-team');if(box)box.remove();teamBox(id);
+    try{const ok=await saveClientRemote(c,true);toast(ok===false?'Não consegui salvar no servidor agora':(has?name+' saiu da equipe do caso':name+' agora vê este caso'))}catch(e){toast('Sem conexão com o servidor')}
+  }
+  if(typeof window.viewClient==='function'){const ov=window.viewClient;window.viewClient=function(id){const r=ov.apply(this,arguments);try{teamBox(id)}catch(e){console.warn('Equipe do caso:',e)}return r}}
+
+  /* ---------- tarefas no Dashboard ---------- */
+  function overviewTasks(){
+    const grid=document.querySelector('#page-overview .dash-grid2');if(!grid)return;style();
+    const all=(data.tasks||[]).filter(t=>t&&!t.deletedAt&&t.status!=='feita');
+    const mine=t=>COLLAB?lower(t.assignee)===ME:true;
+    const list=all.filter(mine).sort((a,b)=>String(a.dueDate||'9999').localeCompare(String(b.dueDate||'9999')));
+    let box=document.getElementById('tmOverview');
+    if(!box){grid.insertAdjacentHTML('afterbegin',`<div class="d-panel" id="tmOverview"><div class="d-panel-head"><h2>Tarefas</h2><button class="d-btn light" type="button" data-page-jump="tasks">Ver todas</button></div><div class="tm2-body"></div></div>`);box=document.getElementById('tmOverview')}
+    const nameOf=e=>{if(!e)return 'Kaliny';const u=team().find(x=>lower(x.email)===lower(e));return u?String(u.name).split(' ')[0]:String(e).split('@')[0]};
+    const t0=todayIso();
+    box.querySelector('.tm2-body').innerHTML=list.length?list.slice(0,5).map(t=>{const late=t.dueDate&&t.dueDate<t0,c=t.clientId?clientById(t.clientId):null;
+      return `<div class="tm2-t"><button class="tm-chk" type="button" data-tm-toggle="${esc(t.id)}" title="Marcar como feita"></button><span><b>${esc(t.title||'Tarefa')}</b><small>${esc([COLLAB?'':'👤 '+nameOf(t.assignee),c?c.name:''].filter(Boolean).join(' · '))}</small></span><span class="${late?'tm2-late':'muted'}" style="font-size:12px;white-space:nowrap">${t.dueDate?(late?'atrasada · ':t.dueDate===t0?'hoje · ':'')+br(t.dueDate).slice(0,5):''}</span></div>`}).join('')+(list.length>5?`<div class="muted" style="font-size:12px;padding-top:6px">+ ${list.length-5} outras</div>`:'')
+      :'<div class="muted" style="padding:6px 0">Nenhuma tarefa pendente. 🎉</div>';
+  }
+
+  document.addEventListener('click',e=>{
+    const g=k=>e.target.closest&&e.target.closest('['+k+']');let b;
+    if((b=g('data-tm2-rep')))return repasseModal(b.dataset.tm2Rep);
+    if((b=g('data-tm2-team'))){const box=b.closest('[data-tm2-client]');return toggleTeam(box.dataset.tm2Client,b.dataset.tm2Team)}
+    if((b=g('data-page-jump'))&&b.dataset.pageJump==='tasks'){const nb=document.querySelector('.dash-nav button[data-page="tasks"]');if(nb){e.preventDefault();e.stopPropagation();nb.click()}}
+  },true);
+
+  const oRender=window.renderAll;
+  window.renderAll=function(){
+    const r=oRender.apply(this,arguments);
+    try{overviewTasks()}catch(e){console.warn('Tarefas no Dashboard:',e)}
+    try{drawRepasse()}catch(e){console.warn('Repasses:',e)}
+    try{decorateCollab()}catch(e){}
+    return r};
+  const oFin=window.renderFinance;
+  if(typeof oFin==='function')window.renderFinance=function(){const r=oFin.apply(this,arguments);try{drawRepasse();decorateCollab()}catch(e){}return r};
+  setTimeout(()=>{try{overviewTasks();drawRepasse();decorateCollab()}catch(e){}},1300);
+  window.kalinyRepasse={pendingByCollab,repasseModal,overviewTasks};
 })();
 </script>
 </body></html>
