@@ -1479,7 +1479,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
    Regras: vence a alteração mais recente (updatedAt); exclusões viram marcação (deletedAt);
    resposta vazia ou com erro do servidor nunca apaga dados deste navegador. */
 (function(){
-  const VERSION='V145.35';
+  const VERSION='V145.36';
   const META_KEY='kaliny_sync_meta_v1';
   const COLLECTIONS=['processes','finance','notes','calcHistory','previdenciario','documents'];
   const BATCH=50;
@@ -3679,6 +3679,7 @@ ${chk('isNet','O valor acima já é líquido')}${chk('clt','Tem carteira assinad
     const docs=(data.documents||[]).filter(d=>d&&String(d.clientId)===S),has=re=>docs.some(d=>re.test(lower(d.name)+' '+lower(d.category)+' '+lower(d.title)));
     if(!has(/procura/))out.push({lvl:'info',ic:'📄',t:'Nenhuma procuração na ficha',s:'Gere pelo modelo, já com os dados do cliente.',btns:`<button class="d-btn light" type="button" data-fc-model="procuracao">Gerar procuração</button>`});
     if(!docs.some(d=>d.contract)&&!has(/contrato/))out.push({lvl:'info',ic:'✍',t:'Sem contrato de honorários',s:'O contrato também cria as parcelas no Financeiro.',btns:`<button class="d-btn light" type="button" data-fc-contract="1">Fazer contrato</button>`});
+    try{const ck=window.kalinyChecklist&&window.kalinyChecklist.attention(c);if(ck)out.push(ck)}catch(e){}
     return out;
   }
 
@@ -4125,6 +4126,75 @@ ${SIGN}`}};
   document.addEventListener('click',ev=>{const b=ev.target.closest&&ev.target.closest('[data-page="settings"]');if(b)setTimeout(card,80)});
   setTimeout(load,1500);
   window.kalinyOffice={load,get:()=>prof};
+})();
+</script>
+<script>
+/* V145.36 — Checklist de documentos por tipo de caso na ficha do cliente (aba Documentos): marca sozinho o que já
+   foi anexado ou gerado, guarda as marcações (sincroniza como anotação) e pede ao cliente o que falta pelo WhatsApp. */
+(function(){
+  const D=(k,t,re)=>({k,t,re});
+  const BASE=[D('rg','RG ou CNH',/\brg\b|identidade|\bcnh\b|habilita/),D('cpf','CPF (se não constar no RG/CNH)',/\bcpf\b|\bcnh\b|identidade/),D('res','Comprovante de residência atualizado (até 90 dias)',/resid[êe]ncia|comprovante de endere|conta de (luz|[áa]gua)|fatura/)];
+  const OFFICE=[D('proc','Procuração assinada',/procura[çc][ãa]o/),D('hon','Contrato de honorários assinado',/contrato de (presta|honor)/)];
+  const TYPES={
+    aposentadoria:{n:'Aposentadoria / revisão (INSS)',items:[...BASE,D('cnis','Extrato CNIS (Meu INSS)',/cnis/),D('ctps','Carteiras de trabalho (todas as páginas com registros)',/ctps|carteira de trabalho/),D('gps','Carnês/guias de contribuição (se contribuiu por conta própria)',/\bgps\b|carn[êe]|guia/),D('ppp','PPP / LTCAT (se trabalhou em atividade insalubre)',/\bppp\b|ltcat/),D('cert','Certidão de nascimento ou casamento',/certid[ãa]o de (nascimento|casamento)/),...OFFICE]},
+    bpc:{n:'BPC / LOAS',items:[...BASE,D('fam','RG e CPF de todos que moram na casa',/fam[íi]lia|grupo familiar/),D('cad','Cadastro Único (CadÚnico) atualizado',/cad[úu]nico|cadastro [úu]nico/),D('renda','Comprovantes de renda da família',/renda|holerite|contracheque|extrato/),D('laudo','Laudos, exames e atestados médicos (com CID), se for por deficiência',/laudo|atestado|exame|receita/),...OFFICE]},
+    incapacidade:{n:'Auxílio por incapacidade',items:[...BASE,D('cnis','Extrato CNIS (Meu INSS)',/cnis/),D('laudo','Laudos, exames e atestados médicos (com CID e data)',/laudo|atestado|exame|receita/),D('ctps','Carteira de trabalho',/ctps|carteira de trabalho/),D('indef','Carta de indeferimento ou decisão do INSS',/indefer|decis[ãa]o|carta|comunicado/),...OFFICE]},
+    divorcio:{n:'Divórcio / união estável',items:[...BASE,D('casam','Certidão de casamento atualizada (até 90 dias)',/casamento/),D('pacto','Pacto antenupcial ou contrato de união estável (se houver)',/pacto|uni[ãa]o est[áa]vel/),D('filhos','Certidão de nascimento dos filhos',/nascimento/),D('bens','Documentos dos bens (matrícula do imóvel, documento do veículo, extratos)',/matr[íi]cula|crlv|ve[íi]culo|im[óo]vel|extrato/),D('outro','RG, CPF e endereço do(a) outro(a) cônjuge',/c[ôo]njuge|esposo|esposa|companheir/),...OFFICE]},
+    pensao:{n:'Pensão alimentícia',items:[...BASE,D('nasc','Certidão de nascimento da criança',/nascimento/),D('desp','Comprovantes das despesas da criança (escola, saúde, alimentação)',/despesa|escola|mensalidade|recibo|nota fiscal|farm[áa]cia/),D('alim','Dados de quem vai pagar (nome, endereço, trabalho, renda)',/alimentante|genitor|pai|m[ãa]e/),D('renda','Comprovante de renda de quem cuida da criança',/renda|holerite|contracheque/),...OFFICE]},
+    inventario:{n:'Inventário',items:[D('obito','Certidão de óbito',/[óo]bito/),D('docf','RG e CPF do falecido',/falecid/),D('cas','Certidão de casamento do falecido (ou de nascimento, se solteiro)',/casamento|nascimento/),D('herd','RG, CPF e certidões dos herdeiros (e cônjuges)',/herdeir/),D('bens','Matrículas atualizadas dos imóveis, documentos de veículos e extratos',/matr[íi]cula|crlv|ve[íi]culo|im[óo]vel|extrato/),D('iptu','IPTU / ITR e certidões negativas de débitos',/iptu|\bitr\b|negativa|d[ée]bito/),D('test','Pesquisa de testamento (CENSEC) ou testamento, se houver',/testamento|censec/),...OFFICE]},
+    consumidor:{n:'Consumidor',items:[...BASE,D('nf','Nota fiscal, contrato ou comprovante da compra',/nota fiscal|nf-?e|cupom|contrato|pedido/),D('prot','Protocolos de atendimento (SAC, Procon, consumidor.gov.br)',/protocolo|procon|sac\b/),D('prova','Prints, conversas, e-mails e fotos do problema',/print|conversa|e-?mail|foto|whats/),D('pag','Comprovantes de pagamento',/pagamento|pix|boleto|fatura|comprovante de pag/),D('neg','Consulta SPC/Serasa (se o nome foi negativado)',/serasa|spc|negativa/),...OFFICE]},
+    civel:{n:'Cível (cobrança, indenização, contratos)',items:[...BASE,D('cont','Contrato, título ou documento da dívida',/contrato|nota promiss|cheque|t[íi]tulo|duplicata/),D('pag','Comprovantes de pagamento ou de prejuízo',/comprovante|recibo|or[çc]amento|nota fiscal/),D('prova','Conversas, fotos, e-mails e boletim de ocorrência (se houver)',/conversa|foto|e-?mail|print|boletim|\bbo\b/),D('parte','Nome, CPF/CNPJ e endereço da outra parte',/outra parte|r[ée]u|devedor/),...OFFICE]},
+    imobiliario:{n:'Imobiliário (compra, venda, usucapião, locação)',items:[...BASE,D('mat','Matrícula atualizada do imóvel',/matr[íi]cula/),D('iptu','Carnê do IPTU',/iptu/),D('cont','Contrato (compra e venda, gaveta, locação)',/contrato|gaveta|compra e venda|loca[çc][ãa]o/),D('posse','Provas da posse: contas antigas, fotos, declarações de vizinhos (usucapião)',/posse|conta|foto|declara[çc][ãa]o|vizinh/),D('planta','Planta e memorial descritivo (se houver)',/planta|memorial/),...OFFICE]}};
+  const BY_AREA={'Previdenciário':'aposentadoria','Família e Sucessões':'divorcio','Consumidor':'consumidor','Cível':'civel','Imobiliário':'imobiliario'};
+  const lower=v=>String(v||'').toLowerCase();
+  const recId=(cid)=>'chk_'+String(cid);
+  const rec=cid=>(data.notes||[]).find(n=>n&&n.id===recId(cid)&&!n.deletedAt);
+  function state(c){
+    const r=rec(c.id),type=(r&&r.checklist&&TYPES[r.checklist.type]&&r.checklist.type)||BY_AREA[c.area]||'civel',t=TYPES[type];
+    const manual=(r&&r.checklist&&r.checklist.type===type&&r.checklist.done)||{};
+    const docs=(data.documents||[]).filter(d=>d&&String(d.clientId)===String(c.id)&&!d.deletedAt);
+    const hay=docs.map(d=>lower([d.name,d.title,d.category,d.description,d.contractMeta&&d.contractMeta.templateId==='procuracao'?'procuração':'',d.contract&&(!d.contractMeta||d.contractMeta.templateId==='honorarios')?'contrato de honorários':''].join(' ')));
+    const items=t.items.map(i=>{const auto=hay.some(h=>i.re.test(h));const m=manual[i.k];return {...i,auto,done:m===false?false:(m===true||auto)}});
+    return {type,t,items,missing:items.filter(i=>!i.done),r};
+  }
+  function persist(c,type,done){
+    data.notes=Array.isArray(data.notes)?data.notes:[];let r=rec(c.id);const t=TYPES[type];
+    if(!r){r={id:recId(c.id),clientId:c.id,title:'',date:new Date().toISOString().slice(0,10),time:'',text:''};data.notes.push(r)}
+    r.checklist={type,done};const st=state(c);
+    r.title='Checklist de documentos — '+t.n;r.text=st.items.map(i=>(i.done?'✓ ':'• ')+i.t+(i.done?'':' (falta)')).join('\n');r.date=new Date().toISOString().slice(0,10);r.updatedAt=new Date().toISOString();
+    save();
+  }
+  function waText(c,st){const first=String(c.name||'').trim().split(/\s+/)[0]||'';
+    return `Olá${first?', '+first:''}! Aqui é do escritório Kaliny Girardi Advocacia. Para darmos andamento ao seu caso (${st.t.n.split(' (')[0].toLowerCase()}), precisamos dos documentos abaixo:\n\n${st.missing.map(i=>'• '+i.t).join('\n')}\n\nPode enviar foto ou PDF por aqui mesmo. Qualquer dúvida, estamos à disposição.`}
+  const css=`#docChecklist .ck-head{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}#docChecklist h3{margin:0;color:#4b3425}
+#docChecklist .ck-bar{height:8px;border-radius:6px;background:#efe5dc;overflow:hidden;margin:10px 0 4px}#docChecklist .ck-bar i{display:block;height:100%;background:#557a62}
+#docChecklist ul{list-style:none;margin:8px 0 0;padding:0}#docChecklist li{display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px dashed #efe5dc;font-size:14px}#docChecklist li:last-child{border-bottom:0}
+#docChecklist li input{width:18px;height:18px;margin-top:1px;flex:none}#docChecklist li.ok span{color:#557a62}#docChecklist .ck-auto{font-size:11px;background:#e5efe8;color:#557a62;border-radius:999px;padding:1px 8px;margin-left:6px;white-space:nowrap}
+#docChecklist .ck-act{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}#docChecklist select{max-width:100%}`;
+  function render(id){
+    const el=document.getElementById('clientDocsList'),c=clientById(id);if(!el||!c)return;
+    let box=document.getElementById('docChecklist');
+    if(!box){const anchor=el.querySelector('#quickModels');(anchor||el.firstChild)?(anchor||el.firstChild).insertAdjacentHTML(anchor?'afterend':'beforebegin','<div class="contract-box" id="docChecklist"></div>'):el.insertAdjacentHTML('afterbegin','<div class="contract-box" id="docChecklist"></div>');box=document.getElementById('docChecklist')}
+    const st=state(c),done=st.items.length-st.missing.length,pct=Math.round(done/st.items.length*100);
+    box.dataset.client=String(c.id);
+    box.innerHTML=`<style>${css}</style><div class="ck-head"><div><h3>📋 Documentos do caso</h3><div class="muted">${done} de ${st.items.length} já temos${st.missing.length?' · faltam '+st.missing.length:' · tudo certo ✓'}</div></div><select data-ck-type aria-label="Tipo de caso">${Object.entries(TYPES).map(([k,t])=>`<option value="${k}" ${k===st.type?'selected':''}>${esc(t.n)}</option>`).join('')}</select></div>
+<div class="ck-bar"><i style="width:${pct}%"></i></div>
+<ul>${st.items.map(i=>`<li class="${i.done?'ok':''}"><input type="checkbox" data-ck-item="${i.k}" ${i.done?'checked':''} aria-label="${esc(i.t)}"><span>${esc(i.t)}${i.auto?'<span class="ck-auto">anexado</span>':''}</span></li>`).join('')}</ul>
+<div class="ck-act">${st.missing.length&&c.phone?`<a class="d-btn" data-ck-wa href="${whatsappHref(c.phone)}?text=${encodeURIComponent(waText(c,st))}" target="_blank" rel="noopener">💬 Pedir o que falta no WhatsApp</a>`:''}${st.missing.length?`<button class="d-btn light" type="button" data-ck-copy>Copiar lista</button>`:''}${!c.phone&&st.missing.length?'<span class="muted" style="align-self:center">Cadastre o telefone para pedir pelo WhatsApp.</span>':''}</div>
+<div class="mini-help">Os itens marcados como <b>anexado</b> foram reconhecidos pelos arquivos da ficha. Você pode marcar ou desmarcar à mão.</div>`;
+  }
+  document.addEventListener('change',e=>{const box=e.target.closest&&e.target.closest('#docChecklist');if(!box)return;const c=clientById(box.dataset.client);if(!c)return;
+    const st=state(c);
+    if(e.target.matches('[data-ck-type]')){persist(c,e.target.value,{});return render(c.id)}
+    if(e.target.matches('[data-ck-item]')){const done={...((st.r&&st.r.checklist&&st.r.checklist.type===st.type&&st.r.checklist.done)||{})};done[e.target.dataset.ckItem]=e.target.checked;persist(c,st.type,done);render(c.id)}
+  });
+  document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-ck-copy]');if(!b)return;const box=b.closest('#docChecklist'),c=clientById(box.dataset.client);if(!c)return;const st=state(c);
+    const txt=waText(c,st);(navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(()=>toast('Lista copiada'),()=>{window.prompt('Copie a lista:',txt)})});
+  const oDocs=window.renderClientDocuments;
+  window.renderClientDocuments=function(id){const r=oDocs.apply(this,arguments);try{render(id)}catch(e){console.warn('Checklist:',e)}return r};
+  window.kalinyChecklist={types:TYPES,state,
+    attention(c){try{if(!rec(c.id)&&!(data.documents||[]).some(d=>d&&String(d.clientId)===String(c.id)))return null;const st=state(c);if(!st.missing.length)return null;
+      return {lvl:'info',ic:'📋',t:`Faltam ${st.missing.length} documento${st.missing.length>1?'s':''} do caso (${st.t.n.split(' (')[0]})`,s:st.missing.slice(0,3).map(i=>i.t.split(' (')[0]).join(' · ')+(st.missing.length>3?'…':''),btns:'<button class="d-btn light" type="button" data-fc-tab="documents">Ver lista</button>'}}catch(e){return null}}};
 })();
 </script>
 </body></html>

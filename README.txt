@@ -1,5 +1,5 @@
 KALINY GIRARDI ADVOCACIA — site institucional + painel administrativo
-Versão: V145.35
+Versão: V145.36
 
 ESTRUTURA
 - index.html ............ site público (agendamento online, áreas, conteúdos, contato)
@@ -101,3 +101,7 @@ HISTÓRICO
 - V145.35: RG e CPF da advogada saem do código público — os modelos usam
   {{adv_rg}} e {{adv_cpf}}, buscados no servidor depois do login (Configurações →
   "Dados da advogada"). Apps Script V145.25: officeProfile / officeProfileSave.
+- V145.36: Checklist de documentos por tipo de caso na ficha (aba Documentos):
+  aposentadoria, BPC/LOAS, incapacidade, divórcio, pensão, inventário, consumidor,
+  cível e imobiliário. Marca sozinho o que foi anexado, guarda as marcações
+  (sincroniza como anotação), "Pedir o que falta no WhatsApp" e aviso no Resumo.
