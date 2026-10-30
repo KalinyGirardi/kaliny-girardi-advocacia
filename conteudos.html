@@ -30,7 +30,7 @@
 .kc-art img{width:64px;height:64px;border-radius:50%;object-fit:cover;box-shadow:0 0 0 4px rgba(255,255,255,.18)}
 .kc-art b{font:500 24px/1.12 'Cormorant Garamond',Georgia,serif;color:#fff;max-width:320px;text-shadow:0 2px 10px rgba(0,0,0,.25)}
 .video-thumb .play-button,.video-thumb .video-label,.video-thumb .video-hint{z-index:2}
-.video-thumb .kc-art b{font-size:21px}.video-card:first-child .video-thumb .kc-art b{font-size:30px}
+.video-thumb .kc-art{padding-bottom:66px;gap:10px}.video-thumb .kc-art img{width:54px;height:54px}.video-thumb .kc-art b{font-size:18px}.video-card:first-child .video-thumb .kc-art b{font-size:30px}
 .kc-more{display:flex;justify-content:center;margin-top:26px}
 .video-thumb:has(.kc-art) .play-button{display:none}
 .kl-thumb:has(.kc-art) .kl-play{top:auto;left:auto;bottom:12px;right:12px;transform:none;width:42px;height:42px;font-size:13px}
@@ -57,7 +57,7 @@
   var L=window.KG_CONTEUDOS||[],A=window.KG_AREA_INFO||{},bar=document.getElementById('klBar'),grid=document.getElementById('klGrid');
   var q=new URLSearchParams(location.search),st={area:q.get('area')||'',busca:''};
   var esc=function(s){return String(s||'').replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})};
-  L=L.slice().sort(function(a,b){return String(b.data||'').localeCompare(String(a.data||''))});var areas=Object.keys(A).filter(function(a){return L.some(function(x){return x.area===a})});if(L.some(function(x){return !x.area}))areas.push('');var lab=function(a){return a||'Outros temas'};
+  L=L.slice().sort(function(a,b){return String(b.data||'').localeCompare(String(a.data||''))});var areas=Object.keys(A).filter(function(a){return L.some(function(x){return x.area===a})});if(L.some(function(x){return !x.area}))areas.push('');var lab=function(a){return a||'Geral'};
   function drawBar(){bar.innerHTML='<button class="kl-chip '+(!st.area?'on':'')+'" type="button" data-a="">Todos ('+L.length+')</button>'+areas.map(function(a){var n=L.filter(function(x){return x.area===a}).length,k=a||'_';return '<button class="kl-chip '+(st.area===k?'on':'')+'" type="button" data-a="'+esc(k)+'">'+esc(lab(a))+' ('+n+')</button>'}).join('')+'<input class="kl-search" id="klQ" type="search" placeholder="Procurar assunto (ex.: aposentadoria, divórcio)" value="'+esc(st.busca)+'">';
     document.getElementById('klQ').addEventListener('input',function(e){st.busca=e.target.value;draw()})}
   function draw(){var b=st.busca.trim().toLowerCase();var list=L.filter(function(x){return (!st.area||x.area===st.area||(st.area==='_'&&!x.area))&&(!b||(window.kgTitulo(x)+' '+x.descricao+' '+lab(x.area)+' '+window.kgMes(x)+' '+(x.tags||'')).toLowerCase().indexOf(b)>=0)});
