@@ -43,9 +43,13 @@ async function callServer(params){
   finally{clearTimeout(timeout)}
 }
 function netError(err){return err&&err.message==='not_configured_url'?'Servidor de autenticação não configurado.':err&&err.name==='AbortError'?'O servidor demorou para responder. Tente novamente.':'Não foi possível conectar ao servidor de autenticação.'}
+// Quando outra pessoa entra neste aparelho, os dados guardados aqui da pessoa anterior são apagados (eles continuam na planilha).
+const OWNER_KEY='kaliny_data_owner',PER_USER_KEYS=['kaliny_v6_data','kaliny_sync_meta_v1','kaliny_office_profile_v1','kaliny_recent_clients','kaliny_last_sync','kaliny_online_seen_ids','kaliny_online_seen_initialized','kaliny_documents_v1','kaliny_docs_dirty_v1','kaliny_team_v1'];
+function switchOwner(email){try{const prev=localStorage.getItem(OWNER_KEY);if(prev&&prev!==email)PER_USER_KEYS.forEach(k=>localStorage.removeItem(k));localStorage.setItem(OWNER_KEY,email)}catch(e){}}
 function enter(j){
   if(j.deviceToken)saveDevice(j.deviceToken);
-  sessionStorage.setItem(AUTH_KEY,JSON.stringify({id:'usr_kaliny',name:j.user.name,email:j.user.email,role:j.user.role,loginAt:new Date().toISOString(),expiresAt:j.expiresAt,token:j.token,mode:'server'}));
+  switchOwner(String(j.user.email||'').toLowerCase());
+  sessionStorage.setItem(AUTH_KEY,JSON.stringify({id:j.user.role==='colaboradora'?'usr_'+String(j.user.email).replace(/\W/g,'_'):'usr_kaliny',name:j.user.name,email:j.user.email,role:j.user.role,loginAt:new Date().toISOString(),expiresAt:j.expiresAt,token:j.token,mode:'server'}));
   location.href='../dashboard.html';
 }
 function showCodeStep(j){
@@ -81,4 +85,20 @@ document.getElementById('resendCode').onclick=async e=>{
  catch(err){codeError.textContent=netError(err);}
 };
 document.getElementById('backToLogin').onclick=e=>{e.preventDefault();pending=null;codeForm.hidden=true;loginForm.hidden=false;};
+// Convite da equipe: a pessoa cria a própria senha (link enviado por e-mail).
+(function(){
+  const q=new URLSearchParams(location.search),invite=q.get('convite'),email=(q.get('email')||'').trim().toLowerCase();if(!invite||!email)return;
+  loginForm.hidden=true;
+  loginForm.insertAdjacentHTML('beforebegin',`<form id="inviteForm" style="animation:itemIn .3s ease-out both"><p style="margin:0 0 12px">Bem-vinda! Crie sua senha para acessar o painel com <b>${email.replace(/[<>&"]/g,'')}</b>.</p><div class="field"><label>Nova senha (mínimo 10 caracteres)</label><input name="pw" type="password" autocomplete="new-password" minlength="10" required></div><div class="field"><label>Repita a senha</label><input name="pw2" type="password" autocomplete="new-password" minlength="10" required></div><button class="btn primary" type="submit" style="width:100%">Criar senha →</button><p id="inviteMsg" class="login-error" aria-live="polite"></p></form>`);
+  const f=document.getElementById('inviteForm'),msg=document.getElementById('inviteMsg'),btn=f.querySelector('button');
+  f.onsubmit=async e=>{e.preventDefault();msg.textContent='';
+    if(f.pw.value.length<10){msg.textContent='Use pelo menos 10 caracteres.';return}
+    if(f.pw.value!==f.pw2.value){msg.textContent='As duas senhas não são iguais.';return}
+    btn.disabled=true;btn.textContent='Salvando…';
+    try{const j=await callServer({action:'teamSetPassword',email,invite,password:f.pw.value});
+      if(j.ok){f.remove();history.replaceState(null,'',location.pathname);loginForm.hidden=false;loginForm.email.value=email;loginForm.password.value='';loginError.style.color='#557a62';loginError.textContent='Senha criada! Agora entre com o seu e-mail e a senha nova.';loginForm.password.focus();return}
+      msg.textContent=j.error==='invalid_invite'?'Este convite expirou ou já foi usado. Peça um novo convite ao escritório.':j.error==='too_many_attempts'?'Muitas tentativas. Aguarde 15 minutos.':j.error==='weak_password'?'Use pelo menos 10 caracteres.':'Não foi possível salvar agora.';}
+    catch(err){msg.textContent=netError(err)}
+    finally{btn.disabled=false;btn.textContent='Criar senha →'}};
+})();
 </script></body></html>

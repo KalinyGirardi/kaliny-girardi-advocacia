@@ -109,3 +109,8 @@ HISTÓRICO
   abrindo no site. Lista única em assets/conteudos.js (um vídeo por linha; capas em
   assets/conteudos/). Capas desenhadas enquanto não houver a capa real (a imagem antiga
   do Instagram pedia login). Páginas de área levam aos vídeos da área.
+- V145.38: Equipe e tarefas. Configurações → Equipe: convite por e-mail (a pessoa cria a
+  própria senha em gestao/?convite=…), remover acesso. Contrato de honorários: advogada
+  parceira + %. Página Tarefas (designar, prazo, cliente, concluir, comentar). Colaboradora
+  vê só os casos dela; no Financeiro, só a parte dela e as despesas desses casos (pode
+  lançar/editar). Apps Script V145.27 faz o filtro e recusa o que ela não pode alterar.

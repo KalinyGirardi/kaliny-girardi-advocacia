@@ -306,13 +306,14 @@ function navigateTo(section){
   <nav id="mobileNav" class="dash-nav"></nav>
 </aside>
 
-<div class="dash-app"><aside class="dash-side"><a class="side-brand" href="index.html"><img src="assets/logo.jpg" alt="Logo"><span><strong>KALINY GIRARDI</strong><small>ADVOCACIA</small></span></a><nav class="dash-nav"><div class="label">Visão geral</div><button class="active" data-page="overview">◈ <span>Dashboard</span></button><div class="label">Escritório</div><button data-page="clients">♙ <span>Clientes</span></button><button data-page="agenda">▣ <span>Agenda</span></button><button data-page="finance">◫ <span>Financeiro</span></button><button data-page="processes">⚖ <span>Processos</span></button><div class="label">Ferramentas</div><button data-page="calculators">⌁ <span>Calculadoras</span></button><button data-page="documents">▤ <span>Documentos</span></button><div class="label">Sistema</div><button data-page="settings">⚙ <span>Configurações</span></button><button id="logoutBtn">↩ <span>Sair</span></button></nav></aside>
+<div class="dash-app"><aside class="dash-side"><a class="side-brand" href="index.html"><img src="assets/logo.jpg" alt="Logo"><span><strong>KALINY GIRARDI</strong><small>ADVOCACIA</small></span></a><nav class="dash-nav"><div class="label">Visão geral</div><button class="active" data-page="overview">◈ <span>Dashboard</span></button><div class="label">Escritório</div><button data-page="clients">♙ <span>Clientes</span></button><button data-page="agenda">▣ <span>Agenda</span></button><button data-page="finance">◫ <span>Financeiro</span></button><button data-page="processes">⚖ <span>Processos</span></button><button data-page="tasks">☑ <span>Tarefas</span></button><div class="label">Ferramentas</div><button data-page="calculators">⌁ <span>Calculadoras</span></button><button data-page="documents">▤ <span>Documentos</span></button><div class="label">Sistema</div><button data-page="settings">⚙ <span>Configurações</span></button><button id="logoutBtn">↩ <span>Sair</span></button></nav></aside>
 <main class="dash-main"><div class="dash-top"><div><p>22 de setembro de 2026</p><h1>Bom dia, Kaliny 👋</h1></div><div class="dash-user"><span id="syncStatus" class="sync-badge">Sincronizando…</span><span class="muted">Área do escritório</span><img src="assets/kaliny-smile.jpg" alt="Kaliny"></div></div>
 <section class="dash-page active" id="page-overview"><div class="overview-welcome"><div><span class="eyebrow">Visão geral do escritório</span><h2 id="overviewWelcomeTitle">Tudo organizado para começar o dia.</h2><p id="overviewWelcomeText">Acompanhe agenda, clientes, financeiro e processos em um único lugar.</p><div class="overview-status"><span id="overviewStatusDot" class="overview-dot"></span><span id="overviewStatusText">Atualizando informações…</span></div></div><div class="welcome-mark">KG</div></div><div class="dash-stats"><div class="d-card"><small>Clientes ativos</small><strong id="statClients">0</strong><span>cadastros</span></div><div class="d-card"><small>Compromissos hoje</small><strong id="statAgendaToday">0</strong><span>agenda + prazos</span></div><div class="d-card"><small>A receber</small><strong id="statReceivable">R$ 0</strong><span>receitas pendentes</span></div><div class="d-card"><small>Saldo</small><strong id="statBalance">R$ 0</strong><span>receitas − despesas</span></div><div class="d-card"><small>Processos</small><strong id="statProcesses">0</strong><span>cadastrados</span></div><div class="d-card"><small>Documentos</small><strong id="statDocuments">0</strong><span>salvos</span></div></div><div class="dash-grid2"><div class="d-panel"><div class="d-panel-head"><h2>Hoje no escritório</h2><button class="d-btn light" data-page-jump="agenda">Abrir agenda</button></div><div id="overviewAgenda"></div></div><div class="d-panel"><div class="d-panel-head"><h2>Acesso rápido</h2></div><div class="quick-grid"><button data-page-jump="clients"><b>+ Cliente</b>Novo cadastro</button><button data-page-jump="agenda"><b>+ Agenda</b>Novo compromisso</button><button data-page-jump="finance"><b>+ Financeiro</b>Novo lançamento</button><button data-page-jump="calculators"><b>🧮 Calculadoras</b>Nova simulação</button></div></div><div class="d-panel"><div class="d-panel-head"><h2>Pontos de atenção</h2><span class="eyebrow">Agora</span></div><div id="overviewAttention" class="overview-attention"></div></div><div class="d-panel"><div class="d-panel-head"><h2>Clientes acessados recentemente</h2><button class="d-btn light" data-page-jump="clients">Ver clientes</button></div><div id="overviewRecentClients"></div></div><div class="settings-card" style="grid-column:1/-1"><span class="eyebrow">Backup local</span><h3>Proteção e migração dos dados</h3><p class="muted">Exporte uma cópia dos cadastros, agenda, financeiro, processos, cálculos e anotações. Os arquivos de documentos ficam separados no armazenamento do navegador e, por isso, não entram neste JSON.</p><div class="form-actions"><button class="d-btn" id="exportBackup">Exportar backup</button><label class="d-btn light" style="cursor:pointer">Importar backup <input id="importBackup" type="file" accept="application/json" hidden></label></div><div class="mini-help">Use o backup como cópia de segurança e para migração. Esta versão é para testes locais. Não use dados reais de clientes até migrarmos para um ambiente com banco de dados, autenticação e armazenamento seguro.</div></div></div></section>
 <section class="dash-page" id="page-clients"><div class="d-panel"><div class="d-panel-head"><div><h2>Clientes</h2><div class="muted">Carteira de clientes com busca, filtros e acesso rápido à ficha.</div></div><button class="d-btn" id="newClient">+ Novo cliente</button></div><div class="client-filterbar"><div class="field"><label>Buscar</label><input id="clientSearch" placeholder="Nome, telefone ou CPF"></div><div class="field"><label>Área</label><select id="clientAreaFilter"><option value="">Todas as áreas</option><option>Cível</option><option>Família e Sucessões</option><option>Consumidor</option><option>Previdenciário</option><option>Imobiliário</option></select></div><div class="field"><label>Status</label><select id="clientStatusFilter"><option value="">Todos</option><option value="Ativo">Ativos</option><option value="Inativo">Inativos</option></select></div><button class="d-btn light" id="clearClientFilters" type="button">Limpar filtros</button></div><div id="clientSummary" class="client-summary"></div><div id="clientsTable"></div></div></section>
 <section class="dash-page" id="page-agenda"><div class="d-panel"><div class="d-panel-head"><div><h2>Agenda</h2><div class="muted">Visualização mensal de compromissos e prazos processuais.</div></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="d-btn light" id="agendaToday">Hoje</button><button class="d-btn light" id="agendaWeek">Semana</button><button class="d-btn light" id="enableNotifications">🔔 Ativar notificações</button><button class="d-btn light" id="syncOnlineAgenda">↻ Sincronizar online</button><button class="d-btn" id="newEvent">+ Novo compromisso</button></div></div><div class="calendar-toolbar"><button class="d-btn light" id="agendaPrev">←</button><h3 id="agendaMonthLabel"></h3><button class="d-btn light" id="agendaNext">→</button></div><div class="calendar-wrap"><div id="agendaCalendar"></div></div><div id="agendaSelectedDay" class="selected-day-panel" style="margin-top:16px"></div><div class="calendar-legend"><span><i class="legend-dot event"></i> Compromisso</span><span><i class="legend-dot deadline"></i> Prazo processual</span><span><i class="legend-dot today"></i> Hoje</span></div><div class="d-panel-head" style="margin-top:24px"><div><h2>Prazos processuais</h2><div class="muted">Prazos cadastrados nos processos aparecem automaticamente no calendário.</div></div></div><div id="processDeadlinesAgenda"></div></div></section>
 <section class="dash-page" id="page-finance"><div class="d-panel"><div class="d-panel-head"><h2>Financeiro</h2><button class="d-btn" id="newFinance">+ Novo lançamento</button></div><div class="dash-stats"><div class="d-card"><small>Receitas</small><strong id="finIncome">R$ 0</strong></div><div class="d-card"><small>Despesas</small><strong id="finExpense">R$ 0</strong></div><div class="d-card"><small>Saldo</small><strong id="finBalance" class="balance-value">R$ 0</strong></div><div class="d-card"><small>Pendente</small><strong id="finPending">R$ 0</strong></div></div><div id="financeTable"></div></div></section>
 <section class="dash-page" id="page-processes"><div class="d-panel"><div class="d-panel-head"><div><h2>Processos</h2><div class="muted">Controle interno dos processos vinculados aos clientes, com acompanhamento de prazos.</div></div><button class="d-btn" id="newProcess">+ Novo processo</button></div><div class="client-filterbar"><div class="field"><label>Buscar</label><input id="processSearch" placeholder="Número, cliente ou assunto"></div><div class="field"><label>Área</label><select id="processAreaFilter"><option value="">Todas as áreas</option><option>Cível</option><option>Família e Sucessões</option><option>Consumidor</option><option>Previdenciário</option><option>Imobiliário</option></select></div><div class="field"><label>Status</label><select id="processStatusFilter"><option value="">Todos</option><option>Em andamento</option><option>Aguardando prazo</option><option>Suspenso</option><option>Encerrado</option></select></div><button class="d-btn light" id="clearProcessFilters" type="button">Limpar filtros</button></div><div id="processSummary" class="client-summary"></div><div id="processesTable"></div></div></section>
+<section class="dash-page" id="page-tasks"><div class="d-panel"><div class="d-panel-head"><div><h2>Tarefas</h2><div class="muted">O que precisa ser feito e por quem.</div></div></div><div id="tasksApp"></div></div></section>
 <section class="dash-page" id="page-calculators"><div class="d-panel"><div class="d-panel-head"><div><h2>Calculadoras</h2><span class="muted">Uso interno • histórico salvo na planilha</span></div></div><div class="calc-grid"><div class="calc-card"><h3>Pensão alimentícia</h3><p class="muted">Simulação informativa com renda, dependentes e percentual.</p><button class="d-btn" onclick="openCalc('pension')">Abrir calculadora</button></div><div class="calc-card"><h3>Inventário</h3><p class="muted">Organize patrimônio, dívidas e estimativa de partilha.</p><button class="d-btn" onclick="openCalc('inventory')">Abrir calculadora</button></div><div class="calc-card"><h3>Aposentadoria</h3><p class="muted">Média salarial + percentual da regra geral, com triagem dos requisitos.</p><button class="d-btn" onclick="openCalc('retirement')">Abrir calculadora</button></div><div class="calc-card"><h3>Dossiê Previdenciário</h3><p class="muted">Centralize CNIS, holerites, CTPS e demais provas e monte a base salarial.</p><button class="d-btn" onclick="openDossieSelector()">Abrir dossiê</button></div></div></div><div class="d-panel"><div class="d-panel-head"><div><h2>Fluxo da análise previdenciária</h2><div class="muted">Documento → conferência → salários → atualização → média → cenário de benefício.</div></div></div><div class="dossier-help"><b>Importante:</b> o sistema não vai presumir que um valor extraído de holerite ou CNIS está correto. Cada competência fica marcada para conferência e a média corrigida só usa fator de atualização informado no dossiê. Sem os índices/fatores oficiais, o sistema mostra a média nominal e sinaliza que a atualização monetária ainda precisa ser preenchida.</div><div id="dossierOverview"></div></div></section>
 <section class="dash-page" id="page-documents"><div class="d-panel"><div class="d-panel-head"><div><h2>Documentos e relatórios</h2><div class="muted">Gere relatórios imprimíveis a partir do histórico das simulações.</div></div></div><div id="documentsTable"></div></div></section><section class="dash-page" id="page-settings"><div class="d-panel"><div class="d-panel-head"><div><h2>Configurações</h2><div class="muted">Sessão, usuários e segurança do protótipo.</div></div><button class="d-btn light" id="lockNow">Bloquear painel</button></div><div class="settings-grid"><div class="settings-card"><span class="eyebrow">Agendamento online</span><h3>Conexão com a agenda do site</h3><p class="muted">A chave administrativa fica somente neste navegador. Ela não é publicada no site público.</p><div class="field"><label>URL do Apps Script</label><input id="appointmentsApiUrl" type="url" placeholder="https://script.google.com/macros/s/.../exec"></div><div class="field" style="margin-top:10px"><label>Chave administrativa</label><input id="appointmentsAdminKey" type="password" placeholder="Cole a ADMIN_KEY aqui"></div><div class="form-actions"><button class="d-btn" id="saveAppointmentSettings">Salvar conexão</button><button class="d-btn light" id="testAppointmentConnection">Testar conexão</button></div><div id="appointmentConnectionStatus" class="mini-help">Configure a chave para sincronizar os agendamentos recebidos pelo site.</div></div><div class="settings-card"><span class="eyebrow">Horários de atendimento</span><h3>Disponibilidade para agendamento</h3><p class="muted">Defina os dias e horários que aparecem para clientes no botão “Agende uma consulta”. Os horários ocupados são retirados automaticamente.</p><div class="field"><label>Intervalo entre consultas</label><select id="scheduleInterval"><option value="30">30 minutos</option><option value="60">60 minutos</option><option value="90">90 minutos</option></select></div><div id="scheduleEditor" class="schedule-editor"></div><div class="form-actions"><button class="d-btn light" id="loadAppointmentSchedule">Carregar agenda</button><button class="d-btn" id="saveAppointmentSchedule">Salvar horários</button></div><div id="appointmentScheduleStatus" class="mini-help">Configure a conexão online primeiro.</div></div><div class="settings-card"><span class="eyebrow">Sessão atual</span><h3 id="currentUserName"></h3><p id="currentUserMeta" class="muted"></p><div class="notice"><b>Modo local:</b> a sessão expira após 30 minutos de inatividade. Esta versão funciona sem Node.js ou servidor e é destinada a testes. Antes de usar dados reais, será necessário migrar usuários, documentos e dados para um ambiente seguro com autenticação, banco de dados, criptografia, controle de acesso e backups.</div></div><div class="settings-card"><span class="eyebrow">Usuários</span><div id="usersList"></div><button class="d-btn" id="newUser">+ Novo usuário</button></div></div></div></section>
 </main></div><div class="modal" id="modal"><div class="modal-box"><div class="modal-head"><h2 id="modalTitle"></h2><button class="close" onclick="closeModal()">×</button></div><div id="modalBody"></div></div></div><div class="toast" id="toast"></div>
@@ -326,15 +327,16 @@ const API_BASE='';
 let onlineAppointmentsTimer=null;
 let serverMode=false;
 const ROLE_PAGES={
-  'Administradora':['overview','clients','agenda','finance','processes','calculators','documents','settings'],
-  'Advogada':['overview','clients','agenda','finance','processes','calculators','documents'],
+  'Administradora':['overview','clients','agenda','finance','processes','tasks','calculators','documents','settings'],
+  'Advogada':['overview','clients','agenda','finance','processes','tasks','calculators','documents'],
+  'colaboradora':['overview','clients','agenda','finance','processes','tasks','calculators','documents','settings'],
   'Assistente':['overview','clients','agenda','documents']
 };
 function can(page){return (ROLE_PAGES[session?.role]||ROLE_PAGES['Administradora']).includes(page)}
 function touchSession(){const raw=sessionStorage.getItem(AUTH_KEY);if(!raw)return false;try{const s=JSON.parse(raw);const age=Date.now()-new Date(s.loginAt).getTime();if(age>=SESSION_MS){sessionStorage.removeItem(AUTH_KEY);location.href='gestao/';return false}s.loginAt=new Date().toISOString();sessionStorage.setItem(AUTH_KEY,JSON.stringify(s));return true}catch(e){return false}}
 const session=JSON.parse(sessionStorage.getItem(AUTH_KEY)||'null');
 if(!session){location.href='gestao/';throw new Error('Sessão não encontrada');}
-const KEY='kaliny_v6_data';const RECENT_KEY='kaliny_recent_clients';const base={clients:[],agenda:[],finance:[],calcHistory:[],documents:[],processes:[],notes:[],previdenciario:[]};let storedData=null;try{storedData=JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){storedData=null}let data={...base,...(storedData&&typeof storedData==='object'?storedData:{})};Object.keys(base).forEach(k=>{if(!Array.isArray(data[k]))data[k]=[]});function ensureRecordIds(){let changed=false;const ensure=(arr,prefix)=>{const used=new Set();arr.forEach((item,i)=>{let id=String(item?.id||'').trim();if(!id||used.has(id)){id=prefix+Date.now()+'_'+i+'_'+Math.random().toString(36).slice(2,7);item.id=id;changed=true}used.add(id)})};ensure(data.agenda,'evt_');ensure(data.finance,'fin_');ensure(data.processes,'proc_');ensure(data.documents,'doc_');ensure(data.notes,'note_');ensure(data.calcHistory,'calc_');return changed}const idsChanged=ensureRecordIds();if(idsChanged){try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){console.error('Não foi possível normalizar IDs:',e)}}let syncTimer=null;function save(){try{Object.keys(base).forEach(k=>{if(!Array.isArray(data[k]))data[k]=[]});localStorage.setItem(KEY,JSON.stringify(data));}catch(err){console.error('Falha ao salvar:',err);toast('Não foi possível salvar os dados neste navegador. Verifique se o armazenamento local está disponível.');return false}try{renderAll();}catch(err){console.error('Falha ao atualizar a tela:',err)}if(serverMode){clearTimeout(syncTimer);syncTimer=setTimeout(syncToServer,250)}return true}
+const KEY='kaliny_v6_data';const RECENT_KEY='kaliny_recent_clients';const base={clients:[],agenda:[],finance:[],calcHistory:[],documents:[],processes:[],notes:[],previdenciario:[],tasks:[]};let storedData=null;try{storedData=JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){storedData=null}let data={...base,...(storedData&&typeof storedData==='object'?storedData:{})};Object.keys(base).forEach(k=>{if(!Array.isArray(data[k]))data[k]=[]});function ensureRecordIds(){let changed=false;const ensure=(arr,prefix)=>{const used=new Set();arr.forEach((item,i)=>{let id=String(item?.id||'').trim();if(!id||used.has(id)){id=prefix+Date.now()+'_'+i+'_'+Math.random().toString(36).slice(2,7);item.id=id;changed=true}used.add(id)})};ensure(data.agenda,'evt_');ensure(data.finance,'fin_');ensure(data.processes,'proc_');ensure(data.documents,'doc_');ensure(data.notes,'note_');ensure(data.calcHistory,'calc_');return changed}const idsChanged=ensureRecordIds();if(idsChanged){try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){console.error('Não foi possível normalizar IDs:',e)}}let syncTimer=null;function save(){try{Object.keys(base).forEach(k=>{if(!Array.isArray(data[k]))data[k]=[]});localStorage.setItem(KEY,JSON.stringify(data));}catch(err){console.error('Falha ao salvar:',err);toast('Não foi possível salvar os dados neste navegador. Verifique se o armazenamento local está disponível.');return false}try{renderAll();}catch(err){console.error('Falha ao atualizar a tela:',err)}if(serverMode){clearTimeout(syncTimer);syncTimer=setTimeout(syncToServer,250)}return true}
 async function api(path,options={}){const headers={...(options.headers||{}),'Content-Type':'application/json','Authorization':'Bearer '+session.token};const r=await fetch(API_BASE+path,{...options,headers});if(r.status===401){sessionStorage.removeItem(AUTH_KEY);location.href='gestao/';throw new Error('Não autenticado')}if(!r.ok)throw new Error('API '+r.status);return r.json()}
 
 function onlineConfig(){const url=String(localStorage.getItem('kaliny_appointments_api_url')||APPOINTMENTS_API_URL||'').trim();const token=String(session?.token||'').trim();return {url,token,key:token}}
@@ -1479,12 +1481,13 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
    Regras: vence a alteração mais recente (updatedAt); exclusões viram marcação (deletedAt);
    resposta vazia ou com erro do servidor nunca apaga dados deste navegador. */
 (function(){
-  const VERSION='V145.36';
+  const VERSION='V145.38';
   const META_KEY='kaliny_sync_meta_v1';
-  const COLLECTIONS=['processes','finance','notes','calcHistory','previdenciario','documents'];
+  const COLLECTIONS=['processes','finance','notes','calcHistory','previdenciario','documents','tasks'];
+  const IS_COLLAB=(typeof session!=='undefined'&&session&&session.role==='colaboradora'),COLLAB_PUSH=new Set(['finance','tasks']);let warnedForbidden=false;
   const BATCH=50;
-  const LABELS={processes:'processo',finance:'lançamento',notes:'anotação',calcHistory:'cálculo',previdenciario:'dossiê previdenciário',documents:'documento'};
-  const ID_PREFIX={processes:'proc_',finance:'fin_',notes:'note_',calcHistory:'calc_',previdenciario:'prev_',documents:'doc_'};
+  const LABELS={processes:'processo',finance:'lançamento',notes:'anotação',calcHistory:'cálculo',previdenciario:'dossiê previdenciário',documents:'documento',tasks:'tarefa'};
+  const ID_PREFIX={processes:'proc_',finance:'fin_',notes:'note_',calcHistory:'calc_',previdenciario:'prev_',documents:'doc_',tasks:'task_'};
   const unsupported=new Set(); // coleções que o Apps Script instalado ainda não conhece
   let meta=loadMeta(),busy=false,again=false,timer=null,lastState={kind:'',text:''},warnedLarge=false;
 
@@ -1581,6 +1584,9 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
         if(contentHash(l)!==contentHash(r)||String(l.updatedAt||'')!==ru){mergeRemote(col,l,r);changed=true}
         markSynced(col,l);
       }
+      if(IS_COLLAB){ // colaboradora: o servidor manda só o que ela pode ver — o resto sai deste aparelho
+        const before=list(col).length;data[col]=list(col).filter(x=>{const id=String(x&&x.id||'');return remoteIds.has(id)||(COLLAB_PUSH.has(col)&&isPending(col,id))});if(data[col].length!==before)changed=true;
+      }else
       // Itens daqui que a planilha não tem: reenviar (nunca apagar).
       list(col).forEach(x=>{const id=String(x&&x.id||'');if(id&&!remoteIds.has(id)&&meta[col][id])meta[col][id].s=''});
     }
@@ -1595,6 +1601,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
     let changed=false;
     for(const col of COLLECTIONS){
       if(unsupported.has(col))continue;
+      if(IS_COLLAB&&!COLLAB_PUSH.has(col))continue;
       const items=list(col).filter(x=>x&&x.id&&isPending(col,String(x.id))).map(x=>({item:trimForSync(col,x),c:meta[col][String(x.id)].c}));
       Object.entries(meta.tombs[col]).forEach(([id,at])=>items.push({item:{id,updatedAt:at,deletedAt:at},tomb:true}));
       for(let i=0;i<items.length;i+=BATCH){
@@ -1613,6 +1620,9 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
             if(srv.deletedAt){if(l){removeLocal(col,id);changed=true}}
             else if(l){mergeRemote(col,l,srv);markSynced(col,l);changed=true}
             else{list(col).push(srv);markSynced(col,srv);changed=true}
+          }else if(res.status==='forbidden'){
+            if(b.tomb)delete meta.tombs[col][id];else if(meta[col][id])meta[col][id].s=b.c;
+            if(!warnedForbidden){warnedForbidden=true;toast('Algumas alterações não foram salvas: seu acesso permite só despesas dos seus casos e o andamento das suas tarefas.')}
           }else if(res.status==='too_large'&&!warnedLarge){
             warnedLarge=true;toast('Um '+LABELS[col]+' é grande demais para a planilha (texto muito longo). Ele continua salvo neste navegador.');
           }
@@ -2673,7 +2683,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
   function row(f){
     const c=f.clientId?clientById(f.clientId):null,neg=!isIn(f),d=refDate(f);
     const wa=isIn(f)&&!isPaid(f)&&c&&waNumber(c.phone)?`<button class="fa-ic" type="button" data-fin-wa="${esc(String(f.id))}" title="${state(f)==='overdue'?'Cobrar':'Lembrar'} no WhatsApp">💬</button>`:'';
-    return `<div class="fa-row">${pill(f)}<span class="fa-date">${br(d)}</span><div class="fa-desc"><b title="${esc(f.desc||'')}">${esc(f.desc||'Lançamento')}</b><span>${[c?esc(c.name):'',esc(category(f)),f.paymentMethod||f.formaPagamento?esc(f.paymentMethod||f.formaPagamento):''].filter(Boolean).join(' · ')}</span></div><span class="fa-val" style="color:${neg?C.expense:C.received}">${neg?'−':'+'} ${money(f.value)}</span><div class="fa-act">${wa}${isIn(f)&&isPaid(f)&&c?`<button class="fa-ic" type="button" data-x-recibo="${esc(String(f.id))}" title="Gerar recibo">🧾</button>`:''}<button class="fa-ic" type="button" data-fa-edit="${esc(String(f.id))}" title="Editar">✎</button><button class="fa-ic" type="button" data-fa-dup="${esc(String(f.id))}" title="Duplicar">⧉</button><button class="fa-ic" type="button" data-fa-del="${esc(String(f.id))}" title="Excluir">🗑</button></div></div>`;
+    return `<div class="fa-row">${pill(f)}<span class="fa-date">${br(d)}</span><div class="fa-desc"><b title="${esc(f.desc||'')}">${esc(f.desc||'Lançamento')}</b><span>${[c?esc(c.name):'',esc(category(f)),f.paymentMethod||f.formaPagamento?esc(f.paymentMethod||f.formaPagamento):'',f.collab&&f.collab.pct?'👤 '+esc(String(f.collab.name||f.collab.email).split(' ')[0])+' '+esc(String(f.collab.pct))+'%':'',f.createdBy&&f.type==='despesa'?'lançada por '+esc(String(f.createdBy).split('@')[0]):''].filter(Boolean).join(' · ')}</span></div><span class="fa-val" style="color:${neg?C.expense:C.received}">${neg?'−':'+'} ${money(f.value)}</span><div class="fa-act">${wa}${isIn(f)&&isPaid(f)&&c?`<button class="fa-ic" type="button" data-x-recibo="${esc(String(f.id))}" title="Gerar recibo">🧾</button>`:''}<button class="fa-ic" type="button" data-fa-edit="${esc(String(f.id))}" title="Editar">✎</button><button class="fa-ic" type="button" data-fa-dup="${esc(String(f.id))}" title="Duplicar">⧉</button><button class="fa-ic" type="button" data-fa-del="${esc(String(f.id))}" title="Excluir">🗑</button></div></div>`;
   }
   function listView(list,{groupBy='month'}={}){
     if(!list.length)return '<div class="fa-empty">Nenhum lançamento aqui. Use <b>+ Novo lançamento</b> para começar.</div>';
@@ -4195,6 +4205,192 @@ ${SIGN}`}};
   window.kalinyChecklist={types:TYPES,state,
     attention(c){try{if(!rec(c.id)&&!(data.documents||[]).some(d=>d&&String(d.clientId)===String(c.id)))return null;const st=state(c);if(!st.missing.length)return null;
       return {lvl:'info',ic:'📋',t:`Faltam ${st.missing.length} documento${st.missing.length>1?'s':''} do caso (${st.t.n.split(' (')[0]})`,s:st.missing.slice(0,3).map(i=>i.t.split(' (')[0]).join(' · ')+(st.missing.length>3?'…':''),btns:'<button class="d-btn light" type="button" data-fc-tab="documents">Ver lista</button>'}}catch(e){return null}}};
+})();
+</script>
+<script>
+/* V145.38 — Equipe e tarefas.
+   Administradora: convida colaboradoras (Configurações → Equipe), escolhe a advogada parceira e a % no contrato de
+   honorários e designa tarefas. Colaboradora: vê só os casos dela (o servidor já entrega filtrado), o Financeiro com a
+   parte dela, lança/edita despesas dos casos dela e conclui/comenta as tarefas dela. Quem decide o que pode é o servidor. */
+(function(){
+  const S=(typeof session!=='undefined'&&session)||{};
+  const COLLAB=S.role==='colaboradora',ME=String(S.email||'').toLowerCase(),MY_NAME=S.name||'';
+  const TEAM_KEY='kaliny_team_v1';
+  const C={ok:'#557a62',bad:'#9a5a55',warn:'#a8741a',ink:'#3d2b20',mut:'#8d7767',acc:'#b06a1e'};
+  const pad=n=>String(n).padStart(2,'0'),todayIso=()=>{const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())};
+  const br=s=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(s||'');return m?m[3]+'/'+m[2]+'/'+m[1]:''};
+  const lower=v=>String(v||'').trim().toLowerCase();
+  const isPaid=f=>['pago','recebido'].includes(lower(f.status));
+  let team=[];try{team=JSON.parse(localStorage.getItem(TEAM_KEY)||'[]')||[]}catch(e){}
+  const saveTeamLocal=()=>{try{localStorage.setItem(TEAM_KEY,JSON.stringify(team))}catch(e){}};
+  async function call(action,params,post){
+    const cfg=onlineConfig();if(!cfg.url||!cfg.token)throw new Error('no_session');
+    const q=new URLSearchParams({action,...(params||{}),token:cfg.token});
+    const r=post?await fetch(cfg.url,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:q}):await fetch(cfg.url+'?'+q.toString(),{cache:'no-store'});
+    return r.json();
+  }
+  const people=()=>[{email:'',name:'Kaliny Girardi (eu)'}].concat(team.filter(u=>u.email).map(u=>({email:u.email,name:u.name})));
+  const nameOf=e=>{if(!e)return 'Kaliny Girardi';const u=team.find(x=>lower(x.email)===lower(e));return u?u.name:(lower(e)===ME?MY_NAME:e)};
+  const css=`.tm-card{border:1px solid #eaded2;border-radius:14px;background:#fff;padding:12px 14px;margin-bottom:8px}
+.tm-row{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:10px;align-items:start}.tm-row b{color:${C.ink};font-size:15px}.tm-row .tm-meta{font-size:12px;color:${C.mut};margin-top:3px}
+.tm-chk{width:22px;height:22px;border-radius:50%;border:2px solid #cdbcab;background:#fff;cursor:pointer;margin-top:1px;display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff}
+.tm-chk.on{background:${C.ok};border-color:${C.ok}}.tm-done b{text-decoration:line-through;color:${C.mut}}
+.tm-tag{font-size:11px;border-radius:999px;padding:2px 9px;background:#f4ece4;color:#6b5545;margin-right:4px;white-space:nowrap}.tm-late{background:#f3e4e2;color:${C.bad}}
+.tm-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:4px 0 14px}.tm-chip{border:1px solid #eaded2;background:#fff;border-radius:999px;padding:7px 13px;font-size:13px;cursor:pointer;color:${C.ink}}.tm-chip.on{background:#6b4a36;color:#fff;border-color:#6b4a36}
+.tm-com{margin:8px 0 0 38px;font-size:13px;color:#4d3a2e}.tm-com div{background:#faf5f0;border-radius:10px;padding:7px 10px;margin-top:5px}.tm-com small{color:${C.mut}}
+.tm-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:14px}.tm-kpi{border:1px solid #eaded2;border-radius:14px;background:#fff;padding:12px 14px}.tm-kpi small{display:block;color:${C.mut};font-size:12px}.tm-kpi strong{display:block;font:500 24px Georgia,serif;color:${C.ink};margin-top:3px}
+.tm-list .tm-l{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:10px 12px;border:1px solid #eaded2;border-radius:12px;background:#fff;margin-bottom:6px;align-items:center}
+.tm-l b{font-size:14px;color:${C.ink}}.tm-l .tm-meta{font-size:12px;color:${C.mut};margin-top:2px}.tm-l .tm-v{font-weight:600;white-space:nowrap}
+.tm-notice{background:#fbf6ee;border:1px solid #efe2cf;border-radius:12px;padding:10px 12px;font-size:13px;color:#6b5545;margin-bottom:12px}
+body.kg-collab .dash-user img,body.kg-collab #page-finance .d-panel > .d-panel-head,body.kg-collab #financeReportBtn,body.kg-collab #newClient,body.kg-collab #newProcess,body.kg-collab #newEvent,body.kg-collab #newFinance,body.kg-collab #newUser,body.kg-collab [data-k-new],body.kg-collab [data-a-new],body.kg-collab [data-a-confirm],body.kg-collab [data-a-cancel],body.kg-collab [data-k-done],
+body.kg-collab .client-actions .d-btn:not([href]),body.kg-collab #quickModels,body.kg-collab #docChecklist .ck-act,body.kg-collab #docChecklist input,body.kg-collab [data-cd-upload],body.kg-collab [data-cd-del],body.kg-collab [data-cd-edit-contract],body.kg-collab [data-cd-gen],
+body.kg-collab #systemStatusCard,body.kg-collab #officeProfileCard,body.kg-collab #teamCard,body.kg-collab #page-settings .settings-card:not(.tm-keep),body.kg-collab .fc-quick,body.kg-collab [data-fc-paid],body.kg-collab [data-fc-edit],body.kg-collab [data-fc-model],body.kg-collab [data-fc-contract],body.kg-collab [data-x-newclient],
+body.kg-collab [onclick^="openDocumentUpload"],body.kg-collab [onclick^="openProcessForm"],body.kg-collab [onclick^="openNoteForm"],body.kg-collab [onclick^="openEventForm"],body.kg-collab [onclick^="openFinanceForm"],body.kg-collab [onclick^="deleteClientNote"],body.kg-collab [onclick^="openCalcForClient"],body.kg-collab [onclick^="openContractEditor"],body.kg-collab [onclick^="deleteContract"],body.kg-collab [onclick^="deleteClientDocument"]{display:none!important}
+@media(max-width:700px){.tm-kpis{grid-template-columns:1fr}.tm-row{grid-template-columns:26px minmax(0,1fr)}.tm-row .tm-act{grid-column:2}}`;
+  function style(){if(!document.getElementById('tmCss')){const s=document.createElement('style');s.id='tmCss';s.textContent=css;document.head.appendChild(s)}}
+
+  /* ---------- equipe (administradora) ---------- */
+  async function refreshTeam(){try{const j=await call('teamList');if(j&&j.ok){team=j.users;saveTeamLocal();drawTeam()}}catch(e){}}
+  function drawTeam(){
+    const box=document.getElementById('teamList');if(!box)return;
+    box.innerHTML=team.length?team.map(u=>`<div class="tm-l"><div><b>${esc(u.name)}</b><div class="tm-meta">${esc(u.email)} · ${u.status==='ativa'?'✓ acesso ativo'+(u.lastLogin?' · último acesso '+br(u.lastLogin.slice(0,10)):''):'⏳ convite enviado — aguardando ela criar a senha'}</div></div><div style="display:flex;gap:6px;flex-wrap:wrap">${u.status!=='ativa'?`<button class="d-btn light" type="button" data-tm-reinvite="${esc(u.email)}" data-name="${esc(u.name)}">Reenviar convite</button>`:''}<button class="d-btn light" type="button" data-tm-remove="${esc(u.email)}">Remover acesso</button></div></div>`).join(''):'<div class="muted">Ninguém da equipe ainda.</div>';
+  }
+  function teamCard(){
+    if(COLLAB)return;const grid=document.querySelector('#page-settings .settings-grid');if(!grid||document.getElementById('teamCard'))return;style();
+    grid.insertAdjacentHTML('afterbegin',`<div class="settings-card" id="teamCard"><span class="eyebrow">Equipe</span><h3>Quem acessa o painel</h3><p class="muted">Colaboradoras veem só os casos delas: clientes, processos, tarefas, documentos e, no Financeiro, só a parte delas e as despesas desses casos.</p>
+<div class="tm-list" id="teamList"></div>
+<form id="teamForm" class="form-grid" style="margin-top:10px"><div class="field"><label>Nome</label><input name="name" required placeholder="Nome da colaboradora"></div><div class="field"><label>E-mail</label><input name="email" type="email" required placeholder="email@exemplo.com"></div><div class="form-actions" style="grid-column:1/-1"><button class="d-btn" type="submit">Enviar convite</button></div></form>
+<div class="mini-help" id="teamMsg">Ela recebe um e-mail para criar a própria senha. Você não precisa saber a senha dela.</div></div>`);
+    drawTeam();refreshTeam();
+    document.getElementById('teamForm').onsubmit=async e=>{e.preventDefault();const f=e.target,msg=document.getElementById('teamMsg');msg.textContent='Enviando convite…';
+      try{const j=await call('teamInvite',{name:f.name.value.trim(),email:f.email.value.trim()},true);
+        if(j.ok){msg.textContent='✓ Convite enviado para '+j.email+'.';f.reset();refreshTeam()}else msg.textContent=j.error==='is_admin'?'Esse é o e-mail da administradora.':j.error==='invalid_data'?'Confira o nome e o e-mail.':'Não foi possível enviar ('+(j.error||'erro')+').'}
+      catch(err){msg.textContent='Sem conexão com o servidor.'}};
+  }
+  document.addEventListener('click',async e=>{
+    const rm=e.target.closest&&e.target.closest('[data-tm-remove]');
+    if(rm){if(!confirm('Remover o acesso de '+rm.dataset.tmRemove+'? Ela sai do painel na hora.'))return;try{const j=await call('teamRemove',{email:rm.dataset.tmRemove},true);if(j.ok){toast('Acesso removido');refreshTeam()}else toast('Não foi possível remover')}catch(err){toast('Sem conexão')}return}
+    const ri=e.target.closest&&e.target.closest('[data-tm-reinvite]');
+    if(ri){try{const j=await call('teamInvite',{name:ri.dataset.name,email:ri.dataset.tmReinvite},true);toast(j.ok?'Convite reenviado':'Não foi possível reenviar')}catch(err){toast('Sem conexão')}}
+  });
+
+  /* ---------- contrato: advogada parceira e % ---------- */
+  if(!COLLAB&&typeof window.openContractEditor==='function'){
+    const oEd=window.openContractEditor;
+    window.openContractEditor=function(clientId,existingId){
+      const r=oEd.apply(this,arguments);
+      try{const box=document.querySelector('#contractForm #honorariosFields .form-grid');if(box&&!document.getElementById('ctCollab')){
+        const ex=existingId?(data.documents||[]).find(d=>d.id===existingId):null,cur=(ex&&ex.contractMeta&&ex.contractMeta.collab)||{};
+        box.insertAdjacentHTML('beforeend',`<div class="field"><label>Advogada parceira</label><select id="ctCollab"><option value="">Nenhuma</option>${team.map(u=>`<option value="${esc(u.email)}" ${lower(u.email)===lower(cur.email)?'selected':''}>${esc(u.name)}</option>`).join('')}</select><div class="mini-help">${team.length?'Ela verá este cliente e a parte dela nas parcelas.':'Convide a equipe em Configurações → Equipe.'}</div></div><div class="field"><label>% da parceira</label><input id="ctCollabPct" type="number" min="0" max="100" step="0.5" value="${cur.pct!=null?esc(String(cur.pct)):''}" placeholder="ex.: 30"></div>`);}}catch(e){console.warn(e)}
+      return r;
+    };
+  }
+  if(typeof window.syncContractFinance==='function'){
+    const oSync=window.syncContractFinance;
+    window.syncContractFinance=function(contractId,clientId,title,meta){
+      const sel=document.getElementById('ctCollab'),pctEl=document.getElementById('ctCollabPct');
+      if(sel&&meta){const em=sel.value,pct=Math.max(0,Math.min(100,Number(String(pctEl&&pctEl.value||'').replace(',','.'))||0));
+        if(em&&pct>0)meta.collab={email:em,name:nameOf(em),pct};else delete meta.collab;}
+      const r=oSync.apply(this,arguments);
+      const col=meta&&meta.collab;
+      (data.finance||[]).forEach(f=>{if(f&&f.contractId===contractId){if(col)f.collab={email:col.email,name:col.name,pct:col.pct};else delete f.collab;f.updatedAt=new Date().toISOString()}});
+      if(col){const c=clientById(clientId);if(c){c.team=Array.isArray(c.team)?c.team:[];if(!c.team.map(lower).includes(lower(col.email))){c.team.push(col.email);try{saveClientRemote&&saveClientRemote(c,true)}catch(e){}}}}
+      return r;
+    };
+  }
+
+  /* ---------- tarefas ---------- */
+  const T=()=>{data.tasks=Array.isArray(data.tasks)?data.tasks:[];return data.tasks};
+  let tui={f:COLLAB?'mine':'open'};
+  function taskRow(t){
+    const done=t.status==='feita',late=!done&&t.dueDate&&t.dueDate<todayIso(),c=t.clientId?clientById(t.clientId):null;
+    const coms=(t.comments||[]).slice(-3);
+    return `<div class="tm-card ${done?'tm-done':''}"><div class="tm-row"><button class="tm-chk ${done?'on':''}" type="button" data-tm-toggle="${esc(t.id)}" title="${done?'Reabrir':'Marcar como feita'}">${done?'✓':''}</button><div><b>${esc(t.title||'Tarefa')}</b><div class="tm-meta">${t.dueDate?`<span class="tm-tag ${late?'tm-late':''}">${late?'atrasada · ':''}${br(t.dueDate)}</span>`:''}<span class="tm-tag">👤 ${esc(nameOf(t.assignee))}</span>${c?`<span class="tm-tag">${esc(c.name)}</span>`:''}${t.status==='andamento'?'<span class="tm-tag">em andamento</span>':''}</div>${t.notes?`<div class="tm-meta" style="white-space:pre-wrap">${esc(t.notes)}</div>`:''}</div><div class="tm-act" style="display:flex;gap:6px;flex-wrap:wrap">${!done&&t.status!=='andamento'?`<button class="d-btn light" type="button" data-tm-start="${esc(t.id)}">Comecei</button>`:''}<button class="d-btn light" type="button" data-tm-comment="${esc(t.id)}">💬 Comentar</button>${COLLAB?'':`<button class="d-btn light" type="button" data-tm-edit="${esc(t.id)}">✎</button><button class="d-btn light" type="button" data-tm-del="${esc(t.id)}">🗑</button>`}</div></div>${coms.length?`<div class="tm-com">${coms.map(x=>`<div><small>${esc(x.by)} · ${esc(String(x.at||'').slice(0,10).split('-').reverse().join('/'))}</small><br>${esc(x.text)}</div>`).join('')}</div>`:''}</div>`;
+  }
+  function renderTasks(){
+    const el=document.getElementById('tasksApp');if(!el)return;style();
+    const all=T().filter(t=>t&&!t.deletedAt);
+    const mine=t=>COLLAB?lower(t.assignee)===ME:!t.assignee||lower(t.assignee)===ME;
+    const F={mine:t=>mine(t)&&t.status!=='feita',open:t=>t.status!=='feita',team:t=>t.assignee&&!mine(t)&&t.status!=='feita',done:t=>t.status==='feita'};
+    const list=all.filter(F[tui.f]||F.open).sort((a,b)=>String(a.dueDate||'9999').localeCompare(String(b.dueDate||'9999')));
+    const chips=COLLAB?[['mine','Minhas pendentes'],['done','Feitas']]:[['open','Pendentes'],['mine','Minhas'],['team','Da equipe'],['done','Feitas']];
+    el.innerHTML=`${COLLAB?'<div class="tm-notice">Estas são as tarefas que a Kaliny designou para você. Marque como feita e deixe um comentário quando concluir.</div>':''}<div class="tm-bar">${chips.map(([k,l])=>`<button class="tm-chip ${tui.f===k?'on':''}" type="button" data-tm-f="${k}">${l} (${all.filter(F[k]).length})</button>`).join('')}${COLLAB?'':'<button class="d-btn" type="button" data-tm-new style="margin-left:auto">+ Nova tarefa</button>'}</div>${list.length?list.map(taskRow).join(''):'<div class="k-empty" style="padding:28px;text-align:center;color:#8d7767;border:1px dashed #eaded2;border-radius:14px">Nenhuma tarefa aqui.</div>'}`;
+    const badge=document.querySelector('.dash-nav button[data-page="tasks"] .tm-badge'),n=all.filter(t=>mine(t)&&t.status!=='feita').length;
+    const nb=document.querySelector('.dash-nav button[data-page="tasks"]');if(nb){let b=nb.querySelector('.tm-badge');if(!b&&n){b=document.createElement('em');b.className='tm-badge';b.style.cssText='font-style:normal;margin-left:6px;background:#b06a1e;color:#fff;border-radius:999px;padding:0 7px;font-size:11px';nb.appendChild(b)}if(b){b.textContent=n;b.style.display=n?'':'none'}}
+  }
+  function taskForm(t){
+    t=t||{};const opts=people().map(p=>`<option value="${esc(p.email)}" ${lower(p.email)===lower(t.assignee||'')?'selected':''}>${esc(p.name)}</option>`).join('');
+    const cl=(data.clients||[]).slice().sort((a,b)=>String(a.name).localeCompare(String(b.name))).map(c=>`<option value="${esc(String(c.id))}" ${String(c.id)===String(t.clientId||'')?'selected':''}>${esc(c.name)}</option>`).join('');
+    openModal(t.id?'Editar tarefa':'Nova tarefa',`<form id="tmForm" class="form-grid"><div class="field full"><label>O que precisa ser feito</label><input name="title" required value="${esc(t.title||'')}" placeholder="Ex.: Protocolar a réplica no processo da Ana"></div>
+<div class="field"><label>Responsável</label><select name="assignee">${opts}</select></div><div class="field"><label>Prazo</label><input name="dueDate" type="date" value="${esc(t.dueDate||'')}"></div>
+<div class="field full"><label>Cliente (opcional)</label><select name="clientId"><option value="">Sem cliente</option>${cl}</select><div class="mini-help">Se escolher um cliente para uma colaboradora, ela passa a ver esse cliente.</div></div>
+<div class="field full"><label>Detalhes</label><textarea name="notes" rows="3">${esc(t.notes||'')}</textarea></div><div class="form-actions"><button class="d-btn" type="submit">Salvar tarefa</button></div></form>`);
+    document.getElementById('tmForm').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target),now=new Date().toISOString();
+      const v={title:String(f.get('title')).trim(),assignee:String(f.get('assignee')||''),dueDate:String(f.get('dueDate')||''),clientId:String(f.get('clientId')||''),notes:String(f.get('notes')||'').trim(),updatedAt:now};
+      if(t.id)Object.assign(T().find(x=>x.id===t.id)||{},v);else T().push({id:'task_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),status:'pendente',createdAt:now,createdBy:ME,comments:[],...v});
+      save();closeModal();renderTasks();toast(v.assignee?'Tarefa designada para '+nameOf(v.assignee):'Tarefa salva')};
+  }
+  function touch(t){t.updatedAt=new Date().toISOString();save();renderTasks();try{window.kalinySync&&window.kalinySync.syncNow()}catch(e){}}
+  document.addEventListener('click',e=>{
+    const g=k=>e.target.closest&&e.target.closest('['+k+']');let b;
+    if((b=g('data-tm-f'))){tui.f=b.dataset.tmF;return renderTasks()}
+    if(g('data-tm-new'))return taskForm();
+    if((b=g('data-tm-edit')))return taskForm(T().find(x=>x.id===b.dataset.tmEdit));
+    if((b=g('data-tm-del'))){if(!confirm('Excluir esta tarefa?'))return;data.tasks=T().filter(x=>x.id!==b.dataset.tmDel);save();return renderTasks()}
+    if((b=g('data-tm-toggle'))){const t=T().find(x=>x.id===b.dataset.tmToggle);if(!t)return;t.status=t.status==='feita'?'pendente':'feita';t.doneAt=t.status==='feita'?todayIso():'';toast(t.status==='feita'?'Tarefa concluída ✓':'Tarefa reaberta');return touch(t)}
+    if((b=g('data-tm-start'))){const t=T().find(x=>x.id===b.dataset.tmStart);if(t){t.status='andamento';touch(t)}return}
+    if((b=g('data-tm-comment'))){const t=T().find(x=>x.id===b.dataset.tmComment);if(!t)return;const txt=prompt('Comentário sobre "'+(t.title||'tarefa')+'":');if(!txt||!txt.trim())return;t.comments=Array.isArray(t.comments)?t.comments:[];t.comments.push({by:MY_NAME||'Kaliny',at:new Date().toISOString(),text:txt.trim().slice(0,1000)});return touch(t)}
+  });
+
+  /* ---------- financeiro da colaboradora ---------- */
+  function myClients(){return (data.clients||[]).slice().sort((a,b)=>String(a.name).localeCompare(String(b.name)))}
+  function renderCollabFinance(){
+    const el=document.getElementById('finApp')||document.querySelector('#page-finance .d-panel');if(!el)return;style();
+    const all=(data.finance||[]).filter(f=>f&&!f.deletedAt),rec=all.filter(f=>f.type!=='despesa'),desp=all.filter(f=>f.type==='despesa');
+    const sum=a=>a.reduce((s,f)=>s+Number(f.value||0),0),open=rec.filter(f=>!isPaid(f)),paid=rec.filter(isPaid);
+    const d=f=>f.dueDate||f.date||'',cn=f=>{const c=f.clientId?clientById(f.clientId):null;return c?c.name:''};
+    const L=(a,expense)=>a.length?a.slice().sort((x,y)=>String(d(y)).localeCompare(String(d(x)))).map(f=>`<div class="tm-l"><div><b>${esc(f.desc||'Lançamento')}</b><div class="tm-meta">${[cn(f),br(d(f)),isPaid(f)?(expense?'paga':'recebida'):(d(f)&&d(f)<todayIso()?'vencida':'a vencer'),f.share?('sua parte: '+f.share.pct+'%'):''].filter(Boolean).map(esc).join(' · ')}</div></div><div style="display:flex;gap:6px;align-items:center"><span class="tm-v" style="color:${expense?'#3f7fbf':C.acc}">${expense?'−':'+'} ${money(f.value)}</span>${expense?`<button class="d-btn light" type="button" data-tm-exp="${esc(f.id)}">✎</button>`:''}</div></div>`).join(''):'<div class="muted" style="padding:8px 2px">Nada por aqui.</div>';
+    el.innerHTML=`<div class="tm-myfin"><div class="d-panel-head"><h2>Meu financeiro</h2><button class="d-btn" type="button" data-tm-exp="">+ Nova despesa</button></div>
+<div class="tm-notice">Aqui aparece só a <b>sua parte</b> nos contratos em que você trabalha e as despesas dos seus casos.</div>
+<div class="tm-kpis"><div class="tm-kpi"><small>Minha parte a receber</small><strong>${money(sum(open))}</strong></div><div class="tm-kpi"><small>Minha parte já recebida</small><strong>${money(sum(paid))}</strong></div><div class="tm-kpi"><small>Despesas dos meus casos</small><strong>${money(sum(desp))}</strong></div></div>
+<h3 style="font:500 19px Georgia,serif;margin:6px 0 8px">Honorários (minha parte)</h3><div class="tm-list">${L(rec,false)}</div>
+<h3 style="font:500 19px Georgia,serif;margin:16px 0 8px">Despesas dos meus casos</h3><div class="tm-list">${L(desp,true)}</div></div>`;
+  }
+  function expenseForm(f){
+    f=f||{};const cl=myClients();
+    if(!cl.length){toast('Você ainda não tem casos no painel.');return}
+    openModal(f.id?'Editar despesa':'Nova despesa',`<form id="tmExpForm" class="form-grid"><div class="field full"><label>Cliente</label><select name="clientId" required>${cl.map(c=>`<option value="${esc(String(c.id))}" ${String(c.id)===String(f.clientId||'')?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div>
+<div class="field full"><label>Descrição</label><input name="desc" required value="${esc(f.desc||'')}" placeholder="Ex.: Custas iniciais, cópias, deslocamento"></div>
+<div class="field"><label>Valor</label><input name="value" class="money-input" required value="${f.value?esc(money(f.value)):''}" placeholder="R$ 0,00"></div><div class="field"><label>Data</label><input name="date" type="date" required value="${esc(f.dueDate||f.date||todayIso())}"></div>
+<div class="field"><label>Situação</label><select name="status"><option value="pago" ${f.status!=='pendente'?'selected':''}>Paga</option><option value="pendente" ${f.status==='pendente'?'selected':''}>A pagar</option></select></div>
+<div class="form-actions" style="grid-column:1/-1">${f.id?'<button class="d-btn light" type="button" id="tmExpDel">Excluir</button>':''}<button class="d-btn" type="submit">Salvar despesa</button></div></form>`);
+    const form=document.getElementById('tmExpForm');try{wireMoneyField(form.value)}catch(e){}
+    form.onsubmit=e=>{e.preventDefault();const v=Math.abs(parseMoneyBR(form.value.value)||0);if(!v){toast('Informe o valor');return}
+      const now=new Date().toISOString(),rec={clientId:form.clientId.value,desc:form.desc.value.trim(),type:'despesa',value:v,status:form.status.value,date:form.date.value,dueDate:form.date.value,paidAt:form.status.value==='pago'?form.date.value:'',updatedAt:now};
+      data.finance=Array.isArray(data.finance)?data.finance:[];
+      if(f.id)Object.assign(data.finance.find(x=>x.id===f.id)||{},rec);else data.finance.push({id:'fin_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),createdAt:now,...rec});
+      save();closeModal();renderCollabFinance();toast('Despesa salva');try{window.kalinySync&&window.kalinySync.syncNow()}catch(err){}};
+    const del=document.getElementById('tmExpDel');if(del)del.onclick=()=>{if(!confirm('Excluir esta despesa?'))return;data.finance=data.finance.filter(x=>x.id!==f.id);save();closeModal();renderCollabFinance();try{window.kalinySync&&window.kalinySync.syncNow()}catch(err){}};
+  }
+  document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-tm-exp]');if(!b||!COLLAB)return;e.preventDefault();e.stopPropagation();expenseForm(b.dataset.tmExp?(data.finance||[]).find(x=>x.id===b.dataset.tmExp):null)},true);
+
+  /* ---------- painel: ganchos ---------- */
+  if(COLLAB){
+    document.body.classList.add('kg-collab');style();
+    const keep=document.querySelector('#page-settings .settings-grid');
+    if(keep&&!document.getElementById('collabSettings'))keep.insertAdjacentHTML('afterbegin',`<div class="settings-card tm-keep" id="collabSettings"><span class="eyebrow">Minha conta</span><h3>${esc(MY_NAME)}</h3><p class="muted">${esc(ME)} · acesso de consulta aos seus casos. Para alterar algo do caso, fale com a Kaliny.</p><div class="form-actions"><button class="d-btn light" type="button" id="forgetDeviceBtn2">Esquecer este aparelho</button></div></div>`);
+    const fb=document.getElementById('forgetDeviceBtn2');if(fb)fb.onclick=()=>{try{localStorage.removeItem('kaliny_trusted_device')}catch(e){}toast('Este aparelho vai pedir o código no próximo acesso')};
+  }
+  const oRender=window.renderAll;
+  window.renderAll=function(){const r=oRender.apply(this,arguments);
+    try{const h=document.querySelector('.dash-top h1');if(h&&COLLAB&&MY_NAME)h.textContent=h.textContent.replace(/Kaliny(?= 👋)/,String(MY_NAME).split(' ')[0])}catch(e){}
+    try{renderTasks()}catch(e){console.warn('Tarefas:',e)}
+    try{if(COLLAB&&document.getElementById('page-finance').classList.contains('active'))renderCollabFinance()}catch(e){console.warn('Meu financeiro:',e)}
+    return r};
+  if(COLLAB){const oFin=window.renderFinance;window.renderFinance=function(){const r=typeof oFin==='function'?oFin.apply(this,arguments):undefined;try{renderCollabFinance()}catch(e){}return r}}
+  document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-page="settings"]');if(b)setTimeout(teamCard,90)});
+  setTimeout(()=>{try{renderTasks()}catch(e){}if(!COLLAB)refreshTeam()},1200);
+  window.kalinyTeam={renderTasks,renderCollabFinance,refreshTeam,isCollab:COLLAB};
 })();
 </script>
 </body></html>
