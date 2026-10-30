@@ -752,7 +752,7 @@ async function syncClientsFromServer(options={}){
     // A planilha é a fonte oficial dos clientes.
     // V145.15: uma lista vazia do servidor não apaga os clientes deste navegador.
     if(!j.clients.length&&(data.clients||[]).length){console.warn('clientList vazio; clientes locais mantidos');return false}
-    data.clients=j.clients;
+    data.clients=window.kalinyMergeClientExtras?window.kalinyMergeClientExtras(j.clients):j.clients;
     linkAppointmentsToClients();
     localStorage.setItem(KEY,JSON.stringify(data));
     renderAll();
@@ -1477,7 +1477,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
    Regras: vence a alteração mais recente (updatedAt); exclusões viram marcação (deletedAt);
    resposta vazia ou com erro do servidor nunca apaga dados deste navegador. */
 (function(){
-  const VERSION='V145.22';
+  const VERSION='V145.23';
   const META_KEY='kaliny_sync_meta_v1';
   const COLLECTIONS=['processes','finance','notes','calcHistory','previdenciario','documents'];
   const BATCH=50;
@@ -2369,6 +2369,198 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
   document.addEventListener('click',ev=>{const b=ev.target.closest&&ev.target.closest('[data-page="settings"]');if(b)setTimeout(()=>{install();refresh()},50)});
   window.kalinyStatus={refresh};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else setTimeout(install,0);
+})();
+</script>
+<script>
+/* V145.23 — Dados para documentos na ficha do cliente (RG, nacionalidade, gênero, representante legal),
+   edição do cliente enviada à planilha e modelos (procuração, hipossuficiência, residência) com a
+   concordância e o texto dos modelos do escritório. */
+(function(){
+  const MONTHS=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+  const RELATIONS=[['genitora','F'],['genitor','M'],['tutora','F'],['tutor','M'],['curadora','F'],['curador','M']];
+  const EXTRA_KEYS=['sex','rg','nationality','isMinor','representative','birthDate','profession','maritalStatus','source'];
+  const up=v=>String(v||'').trim().toUpperCase();
+  // Concordância: F, M ou desconhecido "(a)".
+  const g=(sex,f,m)=>sex==='F'?f:sex==='M'?m:m+'(a)';
+  const nat=(p)=>{const n=String(p.nationality||'').trim();if(n)return n.toLowerCase();return g(p.sex,'brasileira','brasileiro')};
+  function marital(p){
+    const v=String(p.maritalStatus||p.marital||'').trim();if(!v)return '';
+    if(/uni[ãa]o est[áa]vel/i.test(v))return 'em união estável';
+    const base=v.replace(/\(a\)/,'').trim().toLowerCase();
+    return p.sex==='F'?base.replace(/o$/,'a'):p.sex==='M'?base:v.toLowerCase();
+  }
+  function address(c){
+    const street=String(c.street||'').trim(),num=String(c.number||'').trim();
+    const l1=street?street+(num?', nº '+num.replace(/^n[ºo°]\s*/i,''):''):'';
+    const city=c.city&&c.state?`${c.city}/${c.state}`:(c.city||c.state||'');
+    return [l1,c.complement,c.neighborhood,city,c.cep&&`CEP ${c.cep}`].map(x=>String(x||'').trim()).filter(Boolean).join(', ')||'não informado';
+  }
+  // "brasileira, auxiliar de cozinha, [casada,] portadora do RG nº ..., inscrita no CPF sob nº ..."
+  function personBits(p,{withMarital=true,minor=false}={}){
+    return [nat(p),minor?'menor de idade':String(p.profession||'').trim().toLowerCase(),withMarital&&!minor?marital(p):'',
+      p.rg&&`${g(p.sex,'portadora','portador')} do RG nº ${String(p.rg).trim()}`,
+      p.cpf&&`${g(p.sex,'inscrita','inscrito')} no CPF sob nº ${String(p.cpf).trim()}`].filter(Boolean).join(', ');
+  }
+  function isMinor(c){return typeof isMinorClient==='function'?isMinorClient(c):!!c.isMinor}
+  function rep(c){const r=c.representative||{};const rel=RELATIONS.find(x=>x[0]===r.relation);return {...r,sex:r.sex||(rel?rel[1]:'')}}
+  // Menor/representado: "JÚLIA, brasileira, menor de idade, portadora do RG nº ..., neste ato representada por sua genitora MARIA, ..., ambas residentes e domiciliadas na ..."
+  function minorQual(c,{withMarital=true}={}){
+    const r=rep(c),both=(c.sex==='F'&&r.sex==='F')?'ambas residentes e domiciliadas':(c.sex&&r.sex)?'ambos residentes e domiciliados':'ambos(as) residentes e domiciliados(as)';
+    const relation=r.relation||'representante legal';
+    const relWord=r.sex==='F'?'sua':r.sex==='M'?'seu':'seu(sua)';
+    return `${up(c.name)||'OUTORGANTE'}, ${personBits(c,{minor:true})}, neste ato ${g(c.sex,'representada','representado')} por ${relWord} ${relation} ${up(r.name)||'_______________'}${r.name?', '+personBits(r,{withMarital}):''}, ${both} na ${address(c)}`;
+  }
+  function adultQual(c,{withMarital=true}={}){return `${up(c.name)||'CLIENTE'}, ${personBits(c,{withMarital})}, ${g(c.sex,'residente e domiciliada','residente e domiciliado')} na ${address(c)}`}
+  function qualNoAddress(c){
+    if(isMinor(c)){const r=rep(c);return `${up(c.name)}, ${personBits(c,{minor:true})}, neste ato ${g(c.sex,'representada','representado')} por ${r.sex==='F'?'sua':r.sex==='M'?'seu':'seu(sua)'} ${r.relation||'representante legal'} ${up(r.name)||'_______________'}${r.name?', '+personBits(r,{withMarital:false}):''}`}
+    return `${up(c.name)}, ${personBits(c,{withMarital:false})}`;
+  }
+  const longDate=d=>`${d.getDate()} de ${MONTHS[d.getMonth()]} de ${d.getFullYear()}`;
+
+  // Substitui as funções usadas pelos modelos (o gerador chama por nome).
+  window.contractAddress=address;
+  window.contractQualificacao=c=>(isMinor(c)?minorQual(c):adultQual(c))+`, doravante ${g(isMinor(c)?rep(c).sex:c.sex,'denominada','denominado')} Contratante;`;
+  window.contractQualificacaoCurta=c=>isMinor(c)?minorQual(c,{withMarital:false}):adultQual(c,{withMarital:false});
+  window.representativeQualificacao=c=>{const r=rep(c);return `${up(r.name)||'REPRESENTANTE LEGAL'}, ${personBits(r)}, ${g(r.sex,'residente e domiciliada','residente e domiciliado')} na ${r.address||address(c)}`};
+  window.contractOutorgante=c=>(isMinor(c)?minorQual(c):adultQual(c))+'.';
+  window.contractDeclarationText=c=>`Eu, ${isMinor(c)?minorQual(c,{withMarital:false}):adultQual(c,{withMarital:false})}, DECLARO, que não tenho condições de arcar com as despesas inerentes ao presente processo, sem prejuízo do meu sustento e de minha família, necessitando, portanto, da Gratuidade da Justiça, nos termos do art. 98 e seguintes da Lei 13.105/2015 (Código de Processo Civil).`;
+  if(typeof CONTRACT_TEMPLATES==='object'&&CONTRACT_TEMPLATES.residencia){
+    CONTRACT_TEMPLATES.residencia.content=CONTRACT_TEMPLATES.residencia.content
+      .replace('Eu, {{qualificacao_curta}}, DECLARO','Eu, {{qualificacao_sem_endereco}}, DECLARO')
+      .replace('que resido e sou domiciliado(a) na {{endereco_cliente}}','que {{resido_domiciliado}} na {{endereco_cliente}}');
+  }
+  const originalReplace=window.contractReplace;
+  if(typeof originalReplace==='function'){
+    window.contractReplace=function(text,c,opts={}){
+      const minor=isMinor(c),r=rep(c);
+      let t=String(text||'')
+        .split('{{qualificacao_sem_endereco}}').join(qualNoAddress(c))
+        .split('{{resido_domiciliado}}').join(minor?'residimos e somos domiciliad'+((c.sex==='F'&&r.sex==='F')?'as':'os'):'resido e sou '+g(c.sex,'domiciliada','domiciliado'));
+      if(!opts.cidadeData)t=t.split('{{cidade_data}}').join(`Cascavel – PR, ${longDate(new Date())}.`);
+      t=t.split('{{assinatura_nome}}').join(minor?up(r.name||c.name):up(c.name))
+         .split('{{assinatura_complemento}}').join(minor?`Representante ${g(c.sex,'da','do')} ${/DECLARAÇÃO/.test(t)?g(c.sex,'declarante','declarante'):'outorgante'}`:'');
+      return originalReplace.call(this,t,c,opts).replace(/\n{3,}/g,'\n\n').replace(/\n+$/,'');
+    };
+  }
+
+  // Ficha do cliente: campos para documentos + edição enviada à planilha.
+  function extraFieldsHtml(c){
+    const r=c.representative||{},sel=(v,x)=>v===x?'selected':'';
+    const minor=isMinor(c);
+    return `<div class="field full" style="margin-top:6px"><b>Dados para procurações e declarações</b><div class="mini-help" style="margin-top:4px">Usados para preencher os modelos com a concordância correta.</div></div>
+<div class="field"><label>Gênero (concordância)</label><select name="x_sex"><option value="">Não informado</option><option value="F" ${sel(c.sex,'F')}>Feminino (brasileira, portadora…)</option><option value="M" ${sel(c.sex,'M')}>Masculino (brasileiro, portador…)</option></select></div>
+<div class="field"><label>RG (com órgão emissor)</label><input name="x_rg" value="${esc(c.rg||'')}" placeholder="9.999.999-9 SSP/PR"></div>
+<div class="field"><label>Nacionalidade</label><input name="x_nationality" value="${esc(c.nationality||'')}" placeholder="brasileira / brasileiro"></div>
+<div class="field full"><label style="display:flex;gap:8px;align-items:center;text-transform:none;letter-spacing:0;font-size:14px"><input type="checkbox" name="x_isMinor" ${c.isMinor||minor?'checked':''} style="width:auto"> Menor de idade ou representado(a) por responsável legal</label></div>
+<div id="repFields" class="full" ${c.isMinor||minor?'':'hidden'}><div class="form-grid">
+<div class="field"><label>Nome do responsável</label><input name="r_name" value="${esc(r.name||'')}"></div>
+<div class="field"><label>Parentesco / função</label><select name="r_relation"><option value="">Selecione</option>${RELATIONS.map(([v])=>`<option ${sel(r.relation,v)}>${v}</option>`).join('')}</select></div>
+<div class="field"><label>Nacionalidade</label><input name="r_nationality" value="${esc(r.nationality||'')}" placeholder="brasileira / brasileiro"></div>
+<div class="field"><label>Profissão</label><input name="r_profession" value="${esc(r.profession||'')}"></div>
+<div class="field"><label>Estado civil</label><select name="r_maritalStatus"><option value="">Não informado</option>${['Solteiro(a)','Casado(a)','União estável','Divorciado(a)','Viúvo(a)'].map(v=>`<option ${sel(r.maritalStatus,v)}>${v}</option>`).join('')}</select></div>
+<div class="field"><label>RG (com órgão emissor)</label><input name="r_rg" value="${esc(r.rg||'')}" placeholder="9.999.999-9 SSP/PR"></div>
+<div class="field"><label>CPF</label><input name="r_cpf" value="${esc(r.cpf||'')}" placeholder="000.000.000-00"></div>
+</div></div>`;
+  }
+  function readExtras(form,c){
+    const f=new FormData(form),v=k=>String(f.get(k)||'').trim();
+    c.sex=v('x_sex');c.rg=v('x_rg');c.nationality=v('x_nationality');c.isMinor=!!f.get('x_isMinor');
+    if(c.isMinor){const rel=RELATIONS.find(x=>x[0]===v('r_relation'));c.representative={name:v('r_name'),relation:v('r_relation'),sex:rel?rel[1]:'',nationality:v('r_nationality'),profession:v('r_profession'),maritalStatus:v('r_maritalStatus'),rg:v('r_rg'),cpf:v('r_cpf')};}
+    else delete c.representative;
+  }
+  const originalEdit=window.openEditClient;
+  if(typeof originalEdit==='function'){
+    window.openEditClient=function(id){
+      const r=originalEdit.apply(this,arguments);
+      try{
+        const c=clientById(id),form=document.getElementById('editClientForm');if(!c||!form)return r;
+        const notes=form.querySelector('textarea[name="notes"]'),anchor=notes&&notes.closest('.field');
+        (anchor||form.querySelector('.form-grid')).insertAdjacentHTML(anchor?'beforebegin':'beforeend',extraFieldsHtml(c));
+        form.querySelector('[name="x_isMinor"]').addEventListener('change',e=>{form.querySelector('#repFields').hidden=!e.target.checked});
+        const originalSubmit=form.onsubmit;
+        form.onsubmit=async e=>{
+          readExtras(form,c);
+          originalSubmit.call(form,e); // grava neste navegador e atualiza a tela
+          if(typeof saveClientRemote==='function'){
+            const ok=await saveClientRemote(c,true);
+            if(!ok)toast('Atenção: a alteração ficou neste aparelho, mas não chegou à planilha. Confira a conexão.');
+          }
+        };
+      }catch(err){console.warn('Campos extras do cliente:',err)}
+      return r;
+    };
+  }
+  // A planilha ainda pode não guardar os campos novos: ao recarregar a lista, mantém os deste aparelho.
+  window.kalinyMergeClientExtras=function(remote){
+    const local=new Map((data.clients||[]).map(c=>[String(c.id),c]));
+    return remote.map(rc=>{const lc=local.get(String(rc.id));if(!lc)return rc;const out={...rc};
+      Object.keys(lc).forEach(k=>{if(out[k]===undefined||(EXTRA_KEYS.includes(k)&&(out[k]===''||out[k]==null)))out[k]=lc[k]});return out});
+  };
+
+  // Atalhos na aba Documentos da ficha.
+  function openModel(clientId,templateId){
+    window.openContractEditor(clientId);
+    const sel=document.getElementById('contractTemplate');
+    if(sel){sel.value=templateId;sel.dispatchEvent(new Event('change',{bubbles:true}));const t=document.querySelector('#contractForm input[name="title"]');if(t&&CONTRACT_TEMPLATES[templateId])t.value=CONTRACT_TEMPLATES[templateId].name.replace(/ — .*/,'')}
+  }
+  const originalDocs=window.renderClientDocuments;
+  if(typeof originalDocs==='function'){
+    window.renderClientDocuments=function(id){
+      const r=originalDocs.apply(this,arguments);
+      try{
+        const el=document.getElementById('clientDocsList');
+        if(el&&!el.querySelector('#quickModels'))el.insertAdjacentHTML('afterbegin',`<div class="contract-box" id="quickModels"><div class="d-panel-head"><div><h3 style="margin:0;color:#4b3425">Documentos rápidos</h3><div class="muted">Preenchidos com os dados da ficha. Confira antes de imprimir.</div></div></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="d-btn light" type="button" data-quick-model="procuracao" data-client="${esc(String(id))}">Procuração</button><button class="d-btn light" type="button" data-quick-model="hipossuficiencia" data-client="${esc(String(id))}">Declaração de hipossuficiência</button><button class="d-btn light" type="button" data-quick-model="residencia" data-client="${esc(String(id))}">Declaração de residência</button></div></div>`);
+      }catch(err){console.warn(err)}
+      return r;
+    };
+  }
+  document.addEventListener('click',ev=>{const b=ev.target.closest&&ev.target.closest('[data-quick-model]');if(!b)return;ev.preventDefault();openModel(b.getAttribute('data-client'),b.getAttribute('data-quick-model'))});
+  // Gerador Word dos documentos rápidos, no layout dos modelos do escritório (Calibri, logotipo, rodapé dourado).
+  const LEGAL_TEMPLATES=['procuracao','hipossuficiencia','residencia'];
+  const BOLD_PHRASES=['todos os atos judiciais','receber citação, confessar, reconhecer a procedência do pedido, transigir, desistir, renunciar ao direito sobre o qual se funda a ação, receber, dar quitação, firmar compromisso ou acordos e assinar declaração de hipossuficiência econômica, renunciar prazos ou desistir de recursos'];
+  const xe=v=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const run=(t,o={})=>`<w:r><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri"/><w:sz w:val="${o.size||22}"/>${o.bold?'<w:b/>':''}${o.u?'<w:u w:val="single"/>':''}<w:color w:val="${o.color||'222222'}"/></w:rPr><w:t xml:space="preserve">${xe(t)}</w:t></w:r>`;
+  function runsWithEmphasis(text){
+    // negrito no rótulo inicial (OUTORGANTE:, PODERES:...) e nas frases dos poderes especiais; e-mail sublinhado
+    const marks=[];const lab=text.match(/^(OUTORGANTE|OUTORGADA|OUTORGADO|PODERES):/);if(lab)marks.push([0,lab[0].length,'b']);
+    BOLD_PHRASES.forEach(ph=>{const i=text.indexOf(ph);if(i>=0)marks.push([i,i+ph.length,'b'])});
+    const em=text.indexOf('kalinygirardi.adv@gmail.com');if(em>=0)marks.push([em,em+27,'u']);
+    marks.sort((a,b)=>a[0]-b[0]);let out='',pos=0;
+    marks.forEach(([s,e,k])=>{if(s<pos)return;out+=run(text.slice(pos,s))+run(text.slice(s,e),k==='b'?{bold:true}:{u:true});pos=e});
+    return out+run(text.slice(pos));
+  }
+  const para=(inner,o={})=>`<w:p><w:pPr>${o.ind?`<w:ind w:left="${o.ind}"/>`:''}<w:jc w:val="${o.align||'both'}"/><w:spacing w:before="${o.before||0}" w:after="${o.after??200}" w:line="${o.line||360}" w:lineRule="auto"/></w:pPr>${inner}</w:p>`;
+  function legalDocxBlob(title,text){
+    const blocks=String(text||'').replace(/\r/g,'').split(/\n\s*\n/).map(x=>x.trim()).filter(Boolean);
+    let body='';
+    blocks.forEach((b,i)=>{
+      if(i===0&&b===b.toUpperCase()&&b.length<60){body+=para(run(b,{bold:true,size:24}),{align:'center',after:360});return}
+      if(/^Cascavel\s*[–-]\s*PR,/i.test(b)){body+=para(run(b),{align:'right',before:360,after:720});return}
+      if(/^_{5,}/.test(b)){b.split('\n').map(x=>x.trim()).filter(Boolean).forEach((ln,j)=>{body+=para(run(/^_+$/.test(ln)?'______________________________________':ln),{align:'center',ind:3600,after:0,line:276})});return}
+      body+=para(runsWithEmphasis(b.replace(/\n/g,' ')));
+    });
+    const NS='xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"';
+    const doc=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document ${NS}><w:body>${body}<w:sectPr><w:headerReference w:type="default" r:id="rId1"/><w:footerReference w:type="default" r:id="rId2"/><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1900" w:right="1600" w:bottom="1600" w:left="1700" w:header="500" w:footer="500" w:gutter="0"/></w:sectPr></w:body></w:document>`;
+    const logo=`<w:p><w:r><w:drawing><wp:inline><wp:extent cx="2700000" cy="465000"/><wp:docPr id="1" name="Logo"/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="0" name="logo.png"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="2700000" cy="465000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`;
+    const gold={color:'B39B5B',size:17};
+    const fp=t=>`<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:before="0" w:after="0"/></w:pPr>${t}</w:p>`;
+    const header=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:hdr ${NS}>${logo}</w:hdr>`;
+    const footer=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:ftr ${NS}>${fp(run('Rua Marechal Cândido Rondon, 954 CEP 85.802-130, Cascavel – PR.',gold))}${fp(run('(45) 99843-4981',gold))}${fp(run('kalinygirardi.adv@gmail.com',{...gold,u:true}))}</w:ftr>`;
+    const ct=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/><Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/></Types>`;
+    const rels=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`;
+    const drel=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/></Relationships>`;
+    const hrel=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/logo.png"/></Relationships>`;
+    return zipStore([{name:'[Content_Types].xml',data:ct},{name:'_rels/.rels',data:rels},{name:'word/document.xml',data:doc},{name:'word/_rels/document.xml.rels',data:drel},{name:'word/header1.xml',data:header},{name:'word/_rels/header1.xml.rels',data:hrel},{name:'word/footer1.xml',data:footer},{name:'word/media/logo.png',data:b64Bytes(CONTRACT_LOGO_B64)}]);
+  }
+  const originalContractFile=window.contractFile;
+  if(typeof originalContractFile==='function'){
+    window.contractFile=function(title,text,meta={}){
+      if(meta&&LEGAL_TEMPLATES.includes(meta.templateId)){try{return legalDocxBlob(title,text)}catch(e){console.warn('Gerador dos documentos rápidos:',e)}}
+      return originalContractFile.apply(this,arguments);
+    };
+  }
+  window.kalinyLegalDocx=legalDocxBlob;
+  window.kalinyModels={adultQual,minorQual,address};
 })();
 </script>
 </body></html>
