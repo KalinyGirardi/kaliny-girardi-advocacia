@@ -1481,7 +1481,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
    Regras: vence a alteração mais recente (updatedAt); exclusões viram marcação (deletedAt);
    resposta vazia ou com erro do servidor nunca apaga dados deste navegador. */
 (function(){
-  const VERSION='V145.40';
+  const VERSION='V145.41';
   const META_KEY='kaliny_sync_meta_v1';
   const COLLECTIONS=['processes','finance','notes','calcHistory','previdenciario','documents','tasks'];
   const IS_COLLAB=(typeof session!=='undefined'&&session&&session.role==='colaboradora'),COLLAB_PUSH=new Set(['finance','tasks']);let warnedForbidden=false;
@@ -4264,14 +4264,14 @@ body.kg-collab [onclick^="openDocumentUpload"],body.kg-collab [onclick^="openPro
     drawTeam();refreshTeam();
     document.getElementById('teamForm').onsubmit=async e=>{e.preventDefault();const f=e.target,msg=document.getElementById('teamMsg');msg.textContent='Enviando convite…';
       try{const j=await call('teamInvite',{name:f.name.value.trim(),email:f.email.value.trim()},true);
-        if(j.ok){msg.textContent='✓ Convite enviado para '+j.email+'.';f.reset();refreshTeam()}else msg.textContent=j.error==='is_admin'?'Esse é o e-mail da administradora.':j.error==='invalid_data'?'Confira o nome e o e-mail.':'Não foi possível enviar ('+(j.error||'erro')+').'}
+        if(j.ok){msg.textContent='✓ Convite enviado para '+j.email+'.';const nm=f.name.value.trim();f.reset();refreshTeam();if(window.kalinyInviteLink)kalinyInviteLink({...j,name:nm})}else msg.textContent=j.error==='is_admin'?'Esse é o e-mail da administradora.':j.error==='invalid_data'?'Confira o nome e o e-mail.':'Não foi possível enviar ('+(j.error||'erro')+').'}
       catch(err){msg.textContent='Sem conexão com o servidor.'}};
   }
   document.addEventListener('click',async e=>{
     const rm=e.target.closest&&e.target.closest('[data-tm-remove]');
     if(rm){if(!confirm('Remover o acesso de '+rm.dataset.tmRemove+'? Ela sai do painel na hora.'))return;try{const j=await call('teamRemove',{email:rm.dataset.tmRemove},true);if(j.ok){toast('Acesso removido');refreshTeam()}else toast('Não foi possível remover')}catch(err){toast('Sem conexão')}return}
     const ri=e.target.closest&&e.target.closest('[data-tm-reinvite]');
-    if(ri){try{const j=await call('teamInvite',{name:ri.dataset.name,email:ri.dataset.tmReinvite},true);toast(j.ok?'Convite reenviado':'Não foi possível reenviar')}catch(err){toast('Sem conexão')}}
+    if(ri){try{const j=await call('teamInvite',{name:ri.dataset.name,email:ri.dataset.tmReinvite},true);toast(j.ok?'Convite reenviado':'Não foi possível reenviar');if(j.ok&&window.kalinyInviteLink)kalinyInviteLink({...j,name:ri.dataset.name})}catch(err){toast('Sem conexão')}}
   });
 
   /* ---------- contrato: advogada parceira e % ---------- */
@@ -4531,6 +4531,21 @@ ${p.items.slice().sort((a,b)=>String(a.paidAt||a.dueDate||'').localeCompare(Stri
     if(wa){window.open(wa+(wa.includes('?')?'&':'?')+'text='+encodeURIComponent(txt),'_blank','noopener');return}
     try{await navigator.clipboard.writeText(txt);toast('Mensagem copiada — cole no e-mail ou na conversa com o cliente')}catch(err){prompt('Copie a mensagem:',txt)}});
   if(typeof window.viewClient==='function'){const ov=window.viewClient;window.viewClient=function(id){const r=ov.apply(this,arguments);try{addBtn(id)}catch(e){console.warn('Pedir avaliação:',e)}return r}}
+})();
+</script>
+<script>
+/* V145.41 — Convite da equipe também pelo WhatsApp: o servidor devolve o link do convite para a administradora,
+   que pode copiar ou mandar direto (o e-mail às vezes cai no spam). Cada novo envio troca o link e invalida o anterior. */
+(function(){
+  window.kalinyInviteLink=function(j){
+    if(!j||!j.link)return;const first=String(j.name||'').split(' ')[0];
+    const txt=`Olá${first?', '+first:''}! Aqui é a Kaliny. Este é o seu convite para o painel do escritório Kaliny Girardi Advocacia. Abra o link para criar a sua senha (vale por ${j.days||7} dias):\n${j.link}`;
+    openModal('Convite pronto',`<p class="muted" style="margin-top:0">Também enviei por e-mail para <b>${esc(j.email)}</b>. Se não chegar (confira o spam), mande este link para ela pelo WhatsApp:</p>
+<div class="field"><label>Link do convite</label><input id="invLink" readonly value="${esc(j.link)}" style="font-size:13px"></div>
+<div class="form-actions" style="flex-wrap:wrap;gap:8px"><button class="d-btn light" type="button" id="invCopy">Copiar mensagem com o link</button><a class="d-btn" id="invWa" href="https://wa.me/?text=${encodeURIComponent(txt)}" target="_blank" rel="noopener">Enviar pelo WhatsApp</a></div>
+<div class="mini-help">O link é pessoal: só serve para o e-mail ${esc(j.email)} criar a senha. Se você reenviar o convite, este link deixa de valer.</div>`);
+    document.getElementById('invCopy').onclick=async()=>{try{await navigator.clipboard.writeText(txt);toast('Mensagem copiada')}catch(e){const i=document.getElementById('invLink');i.select();document.execCommand&&document.execCommand('copy');toast('Link copiado')}};
+  };
 })();
 </script>
 </body></html>
