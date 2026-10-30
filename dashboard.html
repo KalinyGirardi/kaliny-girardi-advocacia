@@ -1477,7 +1477,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
    Regras: vence a alteração mais recente (updatedAt); exclusões viram marcação (deletedAt);
    resposta vazia ou com erro do servidor nunca apaga dados deste navegador. */
 (function(){
-  const VERSION='V145.25';
+  const VERSION='V145.26';
   const META_KEY='kaliny_sync_meta_v1';
   const COLLECTIONS=['processes','finance','notes','calcHistory','previdenciario','documents'];
   const BATCH=50;
@@ -3100,6 +3100,150 @@ ${incompleteTip}<div class="k-group"><span>${list.length} cliente${list.length==
   const oc=window.renderClients;window.renderClients=function(){const r=typeof oc==='function'?oc.apply(this,arguments):undefined;try{install()}catch(e){console.warn('Clientes:',e)}return r};
   const op=window.renderProcesses;window.renderProcesses=function(){const r=typeof op==='function'?op.apply(this,arguments):undefined;try{install()}catch(e){console.warn('Processos:',e)}return r};
   window.kalinyCP={renderClientsApp,renderProcsApp,pendingDeadlines,clientInfo};
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else setTimeout(install,0);
+})();
+</script>
+<script>
+/* V145.26 — Agenda (semana, próximos 30 dias, mês) e Dashboard "Comece por aqui". */
+(function(){
+  const C={ok:'#557a62',bad:'#9a5a55',warn:'#a8741a',ink:'#3d2b20',mut:'#8d7767',acc:'#b06a1e',blue:'#41658a'};
+  const WD=['dom','seg','ter','qua','qui','sex','sáb'],WDF=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+  const MF=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+  const pad=n=>String(n).padStart(2,'0'),iso=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+  const today=()=>{const t=new Date();t.setHours(0,0,0,0);return t};
+  const parseDay=v=>{const s=String(v||'').trim();let m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);if(m)return new Date(+m[1],m[2]-1,+m[3]);m=s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);return m?new Date(+m[3],m[2]-1,+m[1]):null};
+  const add=(d,n)=>new Date(d.getFullYear(),d.getMonth(),d.getDate()+n);
+  const days=d=>Math.round((d-today())/86400000);
+  const lower=v=>String(v||'').trim().toLowerCase();
+  const evStatus=e=>{const s=lower(e.status||'');return s==='confirmado'?'Confirmado':s==='cancelado'?'Cancelado':e.onlineId||lower(e.source)==='site'?'Pendente':''};
+  const dayLabel=d=>{const n=days(d);return n===0?'Hoje':n===1?'Amanhã':n===-1?'Ontem':`${WDF[d.getDay()]}, ${d.getDate()} de ${MF[d.getMonth()]}`};
+  const UI_KEY='kaliny_ag_ui_v1';let ui={view:'week',anchor:iso(today()),kpi:''};try{Object.assign(ui,JSON.parse(localStorage.getItem(UI_KEY)||'{}'))}catch(e){}
+  const saveUi=()=>{try{localStorage.setItem(UI_KEY,JSON.stringify(ui))}catch(e){}};
+  const deadlines=()=>window.kalinyCP?(data.processes||[]).filter(p=>p&&lower(p.status)!=='encerrado').flatMap(window.kalinyCP.pendingDeadlines):[];
+  const events=()=> (data.agenda||[]).filter(e=>e&&parseDay(e.date)&&evStatus(e)!=='Cancelado');
+  const pendingSite=()=>events().filter(e=>evStatus(e)==='Pendente'&&parseDay(e.date)>=today()).sort((a,b)=>(parseDay(a.date)-parseDay(b.date))||String(a.time).localeCompare(String(b.time)));
+  function itemsOn(d){
+    const k=iso(d);
+    const ev=events().filter(e=>iso(parseDay(e.date))===k).sort((a,b)=>String(a.time||'').localeCompare(String(b.time||'')));
+    const dl=deadlines().filter(x=>iso(x.date)===k);
+    return {ev,dl};
+  }
+  const css=`.ag .a-week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}
+.ag .a-day{background:#fff;border:1px solid #eaded2;border-radius:12px;min-height:150px;padding:8px}.ag .a-day.today{border-color:${C.acc};box-shadow:0 0 0 2px rgba(176,106,30,.15)}.ag .a-day.past{opacity:.65}
+.ag .a-day h5{margin:0 0 8px;font-size:12px;color:${C.mut};display:flex;justify-content:space-between;text-transform:uppercase;letter-spacing:.04em}.ag .a-day.today h5{color:${C.acc}}
+.ag .a-it{display:block;width:100%;text-align:left;border:0;border-left:3px solid #cdbcab;background:#faf5f0;border-radius:6px;padding:5px 7px;margin-bottom:5px;font-size:12px;cursor:pointer;color:${C.ink};line-height:1.35}
+.ag .a-it b{display:block;font-size:12px}.ag .a-it.dl{border-left-color:${C.bad};background:#fbefed}.ag .a-it.pend{border-left-color:${C.warn};background:#fdf4e7}.ag .a-it.conf{border-left-color:${C.ok};background:#eef5f0}
+.ag .a-add{border:1px dashed #dccbb9;background:none;border-radius:6px;width:100%;padding:4px;font-size:12px;color:${C.mut};cursor:pointer}
+.ag .a-pend{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px;margin-bottom:12px}.ag .a-pc{border:1px solid #efd9b9;background:#fdf8f0;border-radius:12px;padding:10px 12px;font-size:13px}
+.ag .a-pc b{font-size:14px}.ag .a-pc .k-act{justify-content:flex-start;margin-top:8px}
+.ov{margin:0 0 18px}.ov .o-grid{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:14px}
+.ov .o-box{background:#fffdfb;border:1px solid #eaded2;border-radius:16px;padding:16px 18px}.ov h3{font:500 21px Georgia,serif;margin:0 0 4px;color:${C.ink}}.ov .o-sub{color:${C.mut};font-size:13px;margin-bottom:10px}
+.ov .o-item{display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid #f0e6dc}.ov .o-item:last-child{border-bottom:0}
+.ov .o-ic{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px}.ov .o-t b{display:block;font-size:14px;color:${C.ink}}.ov .o-t span{font-size:12px;color:${C.mut}}
+.ov .o-tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-content:start}.ov .o-tile{border:1px solid #eaded2;border-radius:14px;background:#fff;padding:12px 14px;cursor:pointer;text-align:left}.ov .o-tile:hover{box-shadow:0 4px 14px rgba(61,43,32,.08)}
+.ov .o-tile small{color:${C.mut};font-size:12px;display:block}.ov .o-tile strong{font:500 22px Georgia,serif;display:block;margin:3px 0;color:${C.ink}}.ov .o-tile span{font-size:12px;color:${C.mut}}
+.ov .o-done{padding:18px;text-align:center;color:${C.ok};font-weight:600}
+@media(max-width:900px){.ag .a-week{grid-template-columns:1fr}.ag .a-day{min-height:auto}.ag .a-day.empty{display:none}.ov .o-grid{grid-template-columns:1fr}.ov .o-item{grid-template-columns:34px minmax(0,1fr)}.ov .o-item .k-act{grid-column:1/-1;justify-content:flex-start}}`;
+  const btn=(attrs,label,style)=>`<button class="k-ic" type="button" ${attrs} ${style?`style="${style}"`:''}>${label}</button>`;
+  function evChip(e){const st=evStatus(e),c=e.clientId?clientById(e.clientId):null;return `<button class="a-it ${st==='Pendente'?'pend':st==='Confirmado'?'conf':''}" type="button" data-a-ev="${esc(String(e.id))}"><b>${esc(e.time||'')}${e.time?' · ':''}${esc(e.title||'Compromisso')}</b>${esc(c?c.name:e.client||'')}${st==='Pendente'?' · aguardando':''}</button>`}
+  const dlChip=x=>`<button class="a-it dl" type="button" data-a-proc="${esc(String(x.p.id))}"><b>⚖ ${esc(x.title)}</b>${esc(x.p.number||'')}</button>`;
+  function pendingCards(){
+    const list=pendingSite();if(!list.length)return '';
+    return `<div class="k-group"><span>⏳ Pedidos do site aguardando confirmação</span><span>${list.length}</span></div><div class="a-pend">${list.map(e=>{const d=parseDay(e.date);return `<div class="a-pc"><b>${esc(e.client||e.title)}</b><div class="muted">${dayLabel(d)} às ${esc(e.time||'')} · ${esc(e.area||e.title||'')} · ${esc(e.mode||'')}</div><div class="k-act">${btn(`data-a-confirm="${esc(String(e.id))}"`,'✓ Confirmar',`color:${C.ok};font-weight:600`)}${btn(`data-a-cancel="${esc(String(e.id))}"`,'Cancelar')}${typeof whatsAppReminderButton==='function'?whatsAppReminderButton(e,e.clientId?clientById(e.clientId):null):''}</div></div>`}).join('')}</div>`;
+  }
+  function weekView(){
+    const a=parseDay(ui.anchor)||today(),start=add(a,-((a.getDay()+6)%7));
+    return `<div class="k-bar"><div class="a-nav" style="display:inline-flex;align-items:center;gap:4px;border:1px solid #eaded2;border-radius:999px;background:#fff;padding:2px"><button type="button" style="border:0;background:none;padding:6px 10px;cursor:pointer" data-a-shift="-7">◀</button><b style="font-size:13px;min-width:170px;text-align:center">${start.getDate()} de ${MF[start.getMonth()].slice(0,3)} – ${add(start,6).getDate()} de ${MF[add(start,6).getMonth()].slice(0,3)}</b><button type="button" style="border:0;background:none;padding:6px 10px;cursor:pointer" data-a-shift="7">▶</button></div><button class="k-chip" type="button" data-a-today>Hoje</button></div>
+<div class="a-week">${Array.from({length:7},(_,i)=>{const d=add(start,i),{ev,dl}=itemsOn(d),n=days(d);return `<div class="a-day ${n===0?'today':''} ${n<0?'past':''} ${!ev.length&&!dl.length&&n!==0?'empty':''}"><h5><span>${WD[d.getDay()]} ${pad(d.getDate())}/${pad(d.getMonth()+1)}</span><span>${n===0?'hoje':''}</span></h5>${dl.map(dlChip).join('')}${ev.map(evChip).join('')}${n>=0?`<button class="a-add" type="button" data-a-new="${iso(d)}">+ compromisso</button>`:''}</div>`}).join('')}</div>`;
+  }
+  function nextView(){
+    let html='',any=false;for(let i=0;i<=30;i++){const d=add(today(),i),{ev,dl}=itemsOn(d);if(!ev.length&&!dl.length)continue;any=true;
+      html+=`<div class="k-group"><span>${dayLabel(d)}</span><span>${ev.length?ev.length+' compromisso'+(ev.length>1?'s':''):''}${ev.length&&dl.length?' · ':''}${dl.length?dl.length+' prazo'+(dl.length>1?'s':''):''}</span></div>`+
+      dl.map(x=>`<div class="k-row"><div class="k-av" style="background:#fbefed;color:${C.bad}">⚖</div><div class="k-main"><b data-a-proc="${esc(String(x.p.id))}">${esc(x.title)}</b><div class="k-meta">${esc(x.p.number||'')}${x.p.clientId&&clientById(x.p.clientId)?' · '+esc(clientById(x.p.clientId).name):''}</div></div><div class="k-act">${btn(`data-a-proc="${esc(String(x.p.id))}"`,'Abrir')}</div></div>`).join('')+
+      ev.map(e=>{const st=evStatus(e),c=e.clientId?clientById(e.clientId):null;return `<div class="k-row"><div class="k-av" style="font-size:12px">${esc(e.time||'—')}</div><div class="k-main"><b data-a-ev="${esc(String(e.id))}">${esc(e.title||'Compromisso')}</b><div class="k-meta">${[c?esc(c.name):esc(e.client||''),esc(e.mode||'')].filter(Boolean).join(' · ')}</div>${st?`<div class="k-tags"><span class="k-tag" style="background:${st==='Pendente'?C.warn:C.ok}1a;color:${st==='Pendente'?C.warn:C.ok}">${st==='Pendente'?'⏳ aguardando confirmação':'✓ confirmado'}</span></div>`:''}</div><div class="k-act">${st==='Pendente'?btn(`data-a-confirm="${esc(String(e.id))}"`,'✓ Confirmar',`color:${C.ok};font-weight:600`):''}${typeof whatsAppReminderButton==='function'?whatsAppReminderButton(e,c):''}${btn(`data-a-ev="${esc(String(e.id))}"`,'✎')}</div></div>`}).join('')}
+    return any?html:'<div class="k-empty">Nada nos próximos 30 dias. Clique em <b>+ Novo compromisso</b> para agendar.</div>';
+  }
+  function setOldCalendar(show){document.querySelectorAll('#page-agenda .calendar-toolbar,#page-agenda .calendar-wrap,#page-agenda #agendaSelectedDay,#page-agenda .calendar-legend').forEach(el=>el.style.display=show?'':'none')}
+  function renderAgendaApp(){
+    const app=document.getElementById('agApp');if(!app)return;const t=today();
+    const weekEnd=add(t,7),evs=events(),dls=deadlines();
+    const todayN=evs.filter(e=>iso(parseDay(e.date))===iso(t)).length+dls.filter(x=>iso(x.date)===iso(t)).length;
+    const weekN=evs.filter(e=>{const d=parseDay(e.date);return d>=t&&d<weekEnd}).length;
+    const pend=pendingSite().length,dlWeek=dls.filter(x=>x.date>=add(t,-365)&&x.date<weekEnd).length;
+    const kpi=(k,l,v,s)=>`<button class="k-kpi" type="button" data-a-kpi="${k}"><small>${l}</small><strong>${v}</strong><span>${s||'&nbsp;'}</span></button>`;
+    app.innerHTML=`<style>${css}</style><div class="k-kpis">${kpi('today','Hoje',todayN,'compromissos + prazos')}${kpi('week','Próximos 7 dias',weekN,'compromissos')}${kpi('pend','Aguardando confirmação',pend,pend?'pedidos do site':'nenhum pedido')}${kpi('dl','Prazos até 7 dias',dlWeek,dls.some(x=>x.date<t)?'inclui vencidos':'')}${kpi('month','Ver o mês',MF[(parseDay(ui.anchor)||t).getMonth()],'calendário completo')}</div>
+${pendingCards()}
+<div class="k-tabs">${[['week','Semana'],['next','Próximos 30 dias'],['month','Mês']].map(([k,l])=>`<button class="k-tab ${ui.view===k?'on':''}" type="button" data-a-view="${k}">${l}</button>`).join('')}</div>
+<div id="agBody">${ui.view==='next'?nextView():ui.view==='month'?'<div class="k-tip">Clique em um dia do calendário abaixo para ver os detalhes.</div>':weekView()}</div>`;
+    setOldCalendar(ui.view==='month');
+    const panel=document.querySelector('#page-agenda .d-panel');const cal=panel&&panel.querySelector('.calendar-toolbar');if(cal&&app.nextElementSibling!==cal)cal.parentNode.insertBefore(app,cal);
+  }
+
+  // ---------- Dashboard ----------
+  function renderOverviewApp(){
+    const box=document.getElementById('ovApp');if(!box)return;const t=today();
+    const dls=deadlines(),evs=events(),fin=(data.finance||[]).filter(Boolean);
+    const items=[];
+    dls.filter(x=>days(x.date)<0).slice(0,4).forEach(x=>items.push({p:0,ic:'⚠',bg:'#fbefed',col:C.bad,t:`Prazo vencido: ${x.title}`,s:`${x.p.number||''} · venceu há ${-days(x.date)} dia(s)`,a:btn(`data-a-done="${esc(String(x.p.id))}" data-idx="${x.idx}" data-date="${iso(x.date)}"`,'✓ Concluir',`color:${C.ok};font-weight:600`)+btn(`data-a-proc="${esc(String(x.p.id))}"`,'Abrir')}));
+    dls.filter(x=>days(x.date)>=0&&days(x.date)<=1).forEach(x=>items.push({p:1,ic:'⚖',bg:'#fdf4e7',col:C.warn,t:`${days(x.date)===0?'Hoje':'Amanhã'}: ${x.title}`,s:x.p.number||'',a:btn(`data-a-done="${esc(String(x.p.id))}" data-idx="${x.idx}" data-date="${iso(x.date)}"`,'✓ Concluir',`color:${C.ok};font-weight:600`)+btn(`data-a-proc="${esc(String(x.p.id))}"`,'Abrir')}));
+    evs.filter(e=>iso(parseDay(e.date))===iso(t)).sort((a,b)=>String(a.time).localeCompare(String(b.time))).forEach(e=>{const c=e.clientId?clientById(e.clientId):null;items.push({p:2,ic:'📅',bg:'#eef5f0',col:C.ok,t:`${e.time||''} ${e.title||'Compromisso'}`,s:[c?c.name:e.client,e.mode].filter(Boolean).join(' · '),a:(typeof whatsAppReminderButton==='function'?whatsAppReminderButton(e,c):'')+btn(`data-a-ev="${esc(String(e.id))}"`,'Ver')})});
+    pendingSite().slice(0,4).forEach(e=>items.push({p:3,ic:'⏳',bg:'#fdf4e7',col:C.warn,t:`Confirmar consulta: ${e.client||e.title}`,s:`${dayLabel(parseDay(e.date))} às ${e.time||''}`,a:btn(`data-a-confirm="${esc(String(e.id))}"`,'✓ Confirmar',`color:${C.ok};font-weight:600`)+btn(`data-a-cancel="${esc(String(e.id))}"`,'Cancelar')}));
+    const overdue=fin.filter(f=>lower(f.type||'receita')!=='despesa'&&lower(f.status)==='pendente'&&parseDay(f.dueDate||f.date)&&parseDay(f.dueDate||f.date)<t).sort((a,b)=>parseDay(a.dueDate||a.date)-parseDay(b.dueDate||b.date));
+    overdue.slice(0,3).forEach(f=>{const c=f.clientId?clientById(f.clientId):null;items.push({p:4,ic:'💰',bg:'#fbefed',col:C.bad,t:`Parcela vencida: ${money(f.value)}`,s:[f.desc,c&&c.name].filter(Boolean).join(' · '),a:`<button class="k-ic" type="button" data-fin-wa="${esc(String(f.id))}">💬 Cobrar</button>`+btn(`data-fin-paid="${esc(String(f.id))}"`,'✓ Paga')})});
+    if(overdue.length>3)items.push({p:4,ic:'💰',bg:'#fbefed',col:C.bad,t:`Mais ${overdue.length-3} parcela(s) vencida(s)`,s:'',a:btn('data-a-go="finance"','Ver no financeiro')});
+    const month=fin.filter(f=>{const d=parseDay(f.dueDate||f.date);return d&&d.getMonth()===t.getMonth()&&d.getFullYear()===t.getFullYear()});
+    const rec=month.filter(f=>lower(f.type||'receita')!=='despesa'&&lower(f.status)!=='pendente').reduce((s,f)=>s+Number(f.value||0),0);
+    const toRec=month.filter(f=>lower(f.type||'receita')!=='despesa'&&lower(f.status)==='pendente').reduce((s,f)=>s+Number(f.value||0),0);
+    const clientsAct=(data.clients||[]).filter(c=>c&&(c.status||'Ativo')!=='Inativo');
+    const incompl=window.kalinyCP?clientsAct.filter(c=>window.kalinyCP.clientInfo(c).missing.length).length:0;
+    const todayEv=evs.filter(e=>iso(parseDay(e.date))===iso(t)),nextEv=todayEv.find(e=>String(e.time||'')>=pad(new Date().getHours())+':'+pad(new Date().getMinutes()));
+    const dlSoon=dls.filter(x=>days(x.date)<=7);
+    // saudação
+    const tt=document.getElementById('overviewWelcomeTitle'),tx=document.getElementById('overviewWelcomeText');
+    const parts=[todayEv.length?`${todayEv.length} compromisso${todayEv.length>1?'s':''}`:'',(n=>n?`${n} prazo${n>1?'s':''} vencendo hoje`:'')(dls.filter(x=>days(x.date)===0).length) ].filter(Boolean);
+    if(tt)tt.textContent=items.length?`Hoje: ${parts.length?parts.join(' e '):items.length+' coisa(s) para ver'}.`:'Tudo em dia por aqui. ✨';
+    if(tx)tx.textContent=items.length?'Comece pela lista abaixo — ela já está na ordem do que é mais urgente.':'Nenhum prazo vencido, nenhuma consulta pendente e nenhuma parcela atrasada.';
+    items.sort((a,b)=>a.p-b.p);
+    box.innerHTML=`<style>${css}</style><div class="o-grid"><div class="o-box"><h3>Comece por aqui</h3><div class="o-sub">${items.length?'O que pede atenção, do mais urgente para o menos urgente.':''}</div>${items.length?items.slice(0,9).map(i=>`<div class="o-item"><div class="o-ic" style="background:${i.bg};color:${i.col}">${i.ic}</div><div class="o-t"><b>${esc(i.t)}</b><span>${esc(i.s||'')}</span></div><div class="k-act">${i.a}</div></div>`).join(''):'<div class="o-done">✅ Tudo em dia! Nada urgente para hoje.</div>'}</div>
+<div class="o-tiles"><button class="o-tile" type="button" data-a-go="agenda"><small>📅 Agenda de hoje</small><strong>${todayEv.length}</strong><span>${nextEv?'próximo às '+esc(nextEv.time):todayEv.length?'sem mais compromissos hoje':'dia livre'}</span></button>
+<button class="o-tile" type="button" data-a-go="processes" data-a-pview="dl"><small>⚖ Prazos em 7 dias</small><strong>${dlSoon.length}</strong><span>${dls.filter(x=>days(x.date)<0).length?dls.filter(x=>days(x.date)<0).length+' vencido(s)':'nenhum vencido'}</span></button>
+<button class="o-tile" type="button" data-a-go="finance"><small>💰 Recebido no mês</small><strong style="font-size:19px">${money(rec)}</strong><span>a receber: ${money(toRec)}</span></button>
+<button class="o-tile" type="button" data-a-go="clients"><small>👥 Clientes ativos</small><strong>${clientsAct.length}</strong><span>${incompl?incompl+' com cadastro incompleto':'cadastros completos'}</span></button></div></div>`;
+  }
+
+  // ---------- ações ----------
+  const evById=id=>(data.agenda||[]).find(e=>String(e.id)===String(id));
+  document.addEventListener('click',async ev=>{
+    const t=ev.target.closest&&ev.target.closest('[data-a-view],[data-a-shift],[data-a-today],[data-a-kpi],[data-a-ev],[data-a-proc],[data-a-new],[data-a-confirm],[data-a-cancel],[data-a-go],[data-a-done]');if(!t)return;const d=t.dataset;ev.preventDefault();
+    if(d.aView)ui.view=d.aView;
+    else if(d.aShift)ui.anchor=iso(add(parseDay(ui.anchor)||today(),+d.aShift));
+    else if('aToday' in d){ui.anchor=iso(today());ui.view='week'}
+    else if(d.aKpi){if(d.aKpi==='month')ui.view='month';else if(d.aKpi==='pend'){document.querySelector('#agApp .a-pend')?.scrollIntoView({behavior:'smooth'});return}else if(d.aKpi==='dl'){showPage('processes');document.querySelector('[data-k-view="dl"]')?.click();return}else{ui.view=d.aKpi==='today'?'week':'next';ui.anchor=iso(today())}}
+    else if(d.aEv){const e=evById(d.aEv);if(e)return openEventForm(e.clientId||'',e.id);return}
+    else if(d.aProc)return openProcessDetail(d.aProc);
+    else if(d.aNew){openEventForm('');const f=document.querySelector('#eventForm input[name="date"]');if(f)f.value=d.aNew;return}
+    else if(d.aConfirm||d.aCancel){const e=evById(d.aConfirm||d.aCancel);if(!e)return;t.disabled=true;const wasOpen=document.getElementById('modal')?.classList.contains('show');const ok=await updateOnlineAppointmentStatus(e,d.aConfirm?'Confirmado':'Cancelado');if(!wasOpen&&/^Agenda/.test(document.getElementById('modalTitle')?.textContent||''))closeModal();if(ok!==false){renderAgendaApp();renderOverviewApp()}t.disabled=false;return}
+    else if(d.aGo){showPage(d.aGo);if(d.aPview)setTimeout(()=>document.querySelector(`[data-k-view="${d.aPview}"]`)?.click(),30);return}
+    else if(d.aDone){const p=(data.processes||[]).find(x=>String(x.id)===d.aDone);if(!p)return;p.deadlines=Array.isArray(p.deadlines)?p.deadlines:[];const before={dl:JSON.parse(JSON.stringify(p.deadlines)),d:p.deadline};const idx=+d.idx;if(idx>=0&&p.deadlines[idx])p.deadlines[idx].status='Concluído';else p.deadlines.push({id:'prd_'+Date.now(),date:d.date,title:'Próximo prazo',status:'Concluído'});const tk=iso(today()),pend=p.deadlines.filter(x=>x&&x.date&&!lower(x.status).startsWith('conclu')).map(x=>x.date).sort();p.deadline=pend.find(x=>x>=tk)||pend[pend.length-1]||'';save();if(typeof toast==='function')toast('Prazo concluído ✓');return}
+    saveUi();renderAgendaApp();
+  });
+
+  function install(){
+    const ap=document.querySelector('#page-agenda .d-panel');
+    if(ap&&!document.getElementById('agApp')){
+      const m=ap.querySelector('.d-panel-head .muted');if(m){m.textContent='Consultas e prazos juntos. Confirme os pedidos do site com um toque.';m.classList.add('kx-sub')}
+      ap.querySelector('#agendaWeek')?.remove();
+      const a=document.createElement('div');a.id='agApp';a.className='kx ag';ap.querySelector('.calendar-toolbar')?.before(a);
+      // a seção antiga "Prazos processuais" da agenda fica escondida: os prazos já aparecem na semana e na lista
+      const dh=ap.querySelector('#processDeadlinesAgenda');if(dh){dh.style.display='none';const h=dh.previousElementSibling;if(h&&h.classList.contains('d-panel-head'))h.style.display='none'}
+    }
+    const ov=document.getElementById('page-overview');
+    if(ov&&!document.getElementById('ovApp')){const w=ov.querySelector('.overview-welcome'),st=ov.querySelector(':scope > .dash-stats');if(st)st.style.display='none';const b=document.createElement('div');b.id='ovApp';b.className='kx ov';if(w)w.after(b);else ov.prepend(b)}
+    renderAgendaApp();renderOverviewApp();
+  }
+  const oa=window.renderAgenda;window.renderAgenda=function(){const r=typeof oa==='function'?oa.apply(this,arguments):undefined;try{install()}catch(e){console.warn('Agenda:',e)}return r};
+  const oo=window.renderOverviewExtras;window.renderOverviewExtras=function(){const r=typeof oo==='function'?oo.apply(this,arguments):undefined;try{install()}catch(e){console.warn('Dashboard:',e)}return r};
+  window.kalinyAgenda={renderAgendaApp,renderOverviewApp};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else setTimeout(install,0);
 })();
 </script>
