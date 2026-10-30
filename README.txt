@@ -1,5 +1,5 @@
 KALINY GIRARDI ADVOCACIA — site institucional + painel administrativo
-Versão: V145.26
+Versão: V145.27
 
 ESTRUTURA
 - index.html ............ site público (agendamento online, áreas, conteúdos, contato)
@@ -59,3 +59,6 @@ HISTÓRICO
 - V145.26: Agenda (semana com consultas e prazos, próximos 30 dias, mês; pedidos do
   site para confirmar em um toque) e Dashboard "Comece por aqui" com a lista do que
   fazer primeiro e atalhos com os números do momento.
+- V145.27: Calculadoras com cartões didáticos (para que serve / quando usar) e
+  últimos cálculos; Documentos como central (todos os arquivos, gerar documento
+  por cliente, relatórios de cálculo, anexar arquivo).

@@ -1477,7 +1477,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
    Regras: vence a alteração mais recente (updatedAt); exclusões viram marcação (deletedAt);
    resposta vazia ou com erro do servidor nunca apaga dados deste navegador. */
 (function(){
-  const VERSION='V145.26';
+  const VERSION='V145.27';
   const META_KEY='kaliny_sync_meta_v1';
   const COLLECTIONS=['processes','finance','notes','calcHistory','previdenciario','documents'];
   const BATCH=50;
@@ -3244,6 +3244,100 @@ ${pendingCards()}
   const oa=window.renderAgenda;window.renderAgenda=function(){const r=typeof oa==='function'?oa.apply(this,arguments):undefined;try{install()}catch(e){console.warn('Agenda:',e)}return r};
   const oo=window.renderOverviewExtras;window.renderOverviewExtras=function(){const r=typeof oo==='function'?oo.apply(this,arguments):undefined;try{install()}catch(e){console.warn('Dashboard:',e)}return r};
   window.kalinyAgenda={renderAgendaApp,renderOverviewApp};
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else setTimeout(install,0);
+})();
+</script>
+<script>
+/* V145.27 — Calculadoras (cartões didáticos + últimos cálculos) e Documentos (central de arquivos,
+   gerar documento e relatórios de cálculo). */
+(function(){
+  const C={ok:'#557a62',bad:'#9a5a55',warn:'#a8741a',ink:'#3d2b20',mut:'#8d7767',acc:'#b06a1e',blue:'#41658a'};
+  const lower=v=>String(v||'').trim().toLowerCase();
+  const UI_KEY='kaliny_cd_ui_v1';let ui={tab:'files',q:'',client:'',kind:'',calcQ:'',genClient:''};try{Object.assign(ui,JSON.parse(localStorage.getItem(UI_KEY)||'{}'))}catch(e){}
+  const saveUi=()=>{try{localStorage.setItem(UI_KEY,JSON.stringify(ui))}catch(e){}};
+  const TOOLS=[
+    {ic:'⏱',t:'Prazos processuais',what:'Calcula o vencimento em dias úteis (CPC), com feriados, recesso forense e prazo em dobro.',when:'Ao receber uma intimação ou publicação no DJe.',act:'data-cd-tool="prazos"',btn:'Calcular prazo'},
+    {ic:'👨‍👩‍👧',t:'Pensão alimentícia',what:'Simula o valor da pensão a partir da renda, do número de filhos e do percentual.',when:'Na primeira conversa com o cliente, para dar uma ideia do valor.',act:'data-cd-tool="pension"',btn:'Simular pensão'},
+    {ic:'🏠',t:'Inventário',what:'Organiza patrimônio, dívidas, meação, ITCMD e custos para estimar a partilha.',when:'Para explicar à família quanto e como cada herdeiro recebe.',act:'data-cd-tool="inventory"',btn:'Simular inventário'},
+    {ic:'👵',t:'Aposentadoria',what:'Estima o benefício pela regra geral e confere idade e tempo de contribuição.',when:'Na triagem do caso previdenciário, antes de montar o dossiê.',act:'data-cd-tool="retirement"',btn:'Simular aposentadoria'},
+    {ic:'📂',t:'Dossiê previdenciário',what:'Reúne CNIS, holerites e CTPS, e monta a base salarial conferida do cliente.',when:'Quando o caso previdenciário vai adiante e precisa de prova organizada.',act:'data-cd-tool="dossie"',btn:'Abrir dossiê'}];
+  const KIND_ICON={prazo:'⏱',pension:'👨‍👩‍👧',inventory:'🏠',retirement:'👵'};
+  const css=`.cd .c-tools{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;margin-bottom:18px}
+.cd .c-tool{border:1px solid #eaded2;border-radius:16px;background:#fff;padding:16px;display:flex;flex-direction:column;gap:6px}.cd .c-tool:hover{box-shadow:0 6px 18px rgba(61,43,32,.08)}
+.cd .c-ic{width:44px;height:44px;border-radius:12px;background:#f4ece4;display:flex;align-items:center;justify-content:center;font-size:22px}
+.cd .c-tool h4{margin:4px 0 0;font:500 19px Georgia,serif;color:${C.ink}}.cd .c-tool p{margin:0;font-size:13px;color:#5f4b3e;line-height:1.45}
+.cd .c-when{font-size:12px;color:${C.mut};background:#faf5f0;border-radius:8px;padding:6px 8px}.cd .c-tool .d-btn{margin-top:auto;align-self:flex-start}
+.cd .c-gen{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:10px}.cd .c-gen button{border:1px solid #eaded2;border-radius:14px;background:#fff;padding:14px;text-align:left;cursor:pointer}
+.cd .c-gen button:hover{border-color:${C.acc}}.cd .c-gen b{display:block;font-size:15px;color:${C.ink};margin-bottom:3px}.cd .c-gen span{font-size:12px;color:${C.mut}}.cd .c-gen button:disabled{opacity:.45;cursor:not-allowed}`;
+  const btn=(attrs,label,style)=>`<button class="k-ic" type="button" ${attrs} ${style?`style="${style}"`:''}>${label}</button>`;
+  function calcRows(limit){
+    const q=lower(ui.calcQ),list=(data.calcHistory||[]).map((h,i)=>({h,i})).filter(({h})=>h&&(!q||lower(h.label).includes(q)||lower(h.type).includes(q)||lower((clientById(h.clientId)||{}).name).includes(q)||lower(h.result).includes(q))).reverse();
+    if(!list.length)return `<div class="k-empty">${(data.calcHistory||[]).length?'Nenhum cálculo com essa busca.':'Os cálculos salvos aparecem aqui, prontos para virar relatório.'}</div>`;
+    return list.slice(0,limit||999).map(({h,i})=>{const c=h.clientId?clientById(h.clientId):null;return `<div class="k-row"><div class="k-av" style="font-size:18px">${KIND_ICON[h.type]||'🧮'}</div><div class="k-main"><b>${esc(h.label||h.type||'Cálculo')}</b><div class="k-meta">${esc(h.date||'')} · ${c?esc(c.name):'sem cliente'}</div><div class="k-meta" style="margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:720px">${esc(String(h.result||'').slice(0,160))}</div></div><div class="k-act">${btn(`data-cd-report="${i}"`,'📄 Relatório')}${c?btn(`data-cd-client="${esc(String(c.id))}"`,'Cliente'):''}</div></div>`}).join('');
+  }
+  function renderCalcApp(){
+    const app=document.getElementById('calcApp');if(!app)return;
+    app.innerHTML=`<style>${css}</style><div class="k-tip">💡 As calculadoras fazem <b>simulações de apoio</b>. Salve o resultado para gerar um relatório em PDF ou vinculá-lo ao cliente.</div>
+<div class="c-tools">${TOOLS.map(t=>`<div class="c-tool"><div class="c-ic">${t.ic}</div><h4>${t.t}</h4><p>${t.what}</p><div class="c-when"><b>Quando usar:</b> ${t.when}</div><button class="d-btn" type="button" ${t.act}>${t.btn}</button></div>`).join('')}</div>
+<div class="k-bar k-wrap"><h3 style="font:500 20px Georgia,serif;margin:0;flex:1">Últimos cálculos</h3><input class="k-search" id="cdCalcQ" placeholder="Buscar por tipo, cliente ou resultado" value="${esc(ui.calcQ)}" style="max-width:360px"></div>${calcRows(12)}`;
+    const s=app.querySelector('#cdCalcQ');s.addEventListener('input',()=>{ui.calcQ=s.value;saveUi();clearTimeout(renderCalcApp.t);renderCalcApp.t=setTimeout(()=>{renderCalcApp();const n=document.getElementById('cdCalcQ');n.focus();n.setSelectionRange(n.value.length,n.value.length)},250)});
+  }
+  function docKind(d){return d.contract?'contrato':d.previdenciario?'previdenciario':'arquivo'}
+  const KIND={contrato:['📄','Contrato / documento gerado'],previdenciario:['📂','Dossiê previdenciário'],arquivo:['📎','Arquivo anexado']};
+  function renderDocApp(){
+    const app=document.getElementById('docApp');if(!app)return;
+    const docs=(data.documents||[]).filter(Boolean),inDrive=docs.filter(d=>d.driveFileId).length,contracts=docs.filter(d=>d.contract).length,calcs=(data.calcHistory||[]).length;
+    const q=lower(ui.q),list=docs.filter(d=>(!ui.client||String(d.clientId)===ui.client)&&(!ui.kind||docKind(d)===ui.kind)&&(!q||[d.name,d.title,d.category,d.description,(clientById(d.clientId)||{}).name].some(v=>lower(v).includes(q)))).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+    const clients=(data.clients||[]).filter(Boolean).sort((a,b)=>String(a.name).localeCompare(String(b.name),'pt-BR'));
+    const kpi=(k,l,v,s,tab)=>`<button class="k-kpi ${(tab?ui.tab===tab:ui.kind===k)&&(tab||ui.tab==='files')?'on':''}" type="button" ${tab?`data-cd-tab="${tab}"`:`data-cd-kind="${k}"`}><small>${l}</small><strong>${v}</strong><span>${s||'&nbsp;'}</span></button>`;
+    const files=list.length?list.map(d=>{const c=d.clientId?clientById(d.clientId):null,[ic,kl]=KIND[docKind(d)];return `<div class="k-row"><div class="k-av" style="font-size:18px">${ic}</div><div class="k-main"><b>${esc(d.title||d.name||'Documento')}</b><div class="k-meta">${[c?esc(c.name):'sem cliente',esc(d.category||kl),esc(d.date||''),esc(d.sizeLabel||'')].filter(Boolean).join(' · ')}</div><div class="k-tags">${d.driveFileId?'<span class="k-tag" style="background:#eef5f0;color:#557a62">☁ no Google Drive</span>':'<span class="k-tag" style="background:#fdf4e7;color:#a8741a">⏳ ainda só neste aparelho</span>'}${d.contract&&d.version>1?`<span class="k-tag">versão ${esc(String(d.version))}</span>`:''}</div></div><div class="k-act">${btn(`data-cd-dl="${esc(String(d.id))}"`,'⬇ Baixar')}${c?btn(`data-cd-client="${esc(String(c.id))}"`,'Cliente'):''}${d.contract?btn(`data-cd-edit-contract="${esc(String(d.id))}" data-client="${esc(String(d.clientId||''))}"`,'✎ Editar'):''}${btn(`data-cd-del="${esc(String(d.id))}" data-client="${esc(String(d.clientId||''))}"`,'🗑')}</div></div>`}).join(''):`<div class="k-empty">${docs.length?'Nenhum documento com esses filtros.':'Nenhum documento ainda. Gere uma procuração na aba <b>Gerar documento</b> ou anexe um arquivo.'}</div>`;
+    const gc=ui.genClient&&clientById(ui.genClient);
+    const gen=`<div class="k-tip">1️⃣ Escolha o cliente · 2️⃣ toque no documento · 3️⃣ confira e baixe em Word ou PDF. Os dados vêm da ficha do cliente.</div>
+<select class="k-sel" id="cdGenClient" style="max-width:420px;width:100%"><option value="">Escolha o cliente…</option>${clients.map(c=>`<option value="${esc(String(c.id))}" ${ui.genClient===String(c.id)?'selected':''}>${esc(c.name)}</option>`).join('')}</select>
+${gc&&window.kalinyCP&&window.kalinyCP.clientInfo(gc).missing.length?`<div class="k-tip" style="margin-top:10px">📝 O cadastro de <b>${esc(gc.name)}</b> está sem ${esc(window.kalinyCP.clientInfo(gc).missing.join(', '))}. O documento sai com lacunas. ${btn(`data-cd-editclient="${esc(String(gc.id))}"`,'Completar cadastro')}</div>`:''}
+<div class="c-gen">${[['procuracao','Procuração','Ad judicia et extra, no modelo do escritório'],['hipossuficiencia','Declaração de hipossuficiência','Para pedir a justiça gratuita'],['residencia','Declaração de residência','Quando falta comprovante em nome do cliente'],['honorarios','Contrato de honorários','Com valor, entrada e parcelas (vai para o financeiro)']].map(([k,t,s])=>`<button type="button" data-cd-gen="${k}" ${gc?'':'disabled'}><b>${t}</b><span>${s}</span></button>`).join('')}</div>`;
+    app.innerHTML=`<style>${css}</style>
+<div class="k-kpis">${kpi('','Todos os arquivos',docs.length,'')}${kpi('contrato','Contratos e gerados',contracts,'')}${kpi('previdenciario','Dossiê previdenciário',docs.filter(d=>d.previdenciario).length,'')}${kpi('','No Google Drive',inDrive+' de '+docs.length,inDrive===docs.length?'tudo guardado':'enviando…','files-drive')}${kpi('','Relatórios de cálculo',calcs,'','calcs')}</div>
+<div class="k-tabs">${[['files','Arquivos'],['gen','Gerar documento'],['calcs','Relatórios de cálculo']].map(([k,l])=>`<button class="k-tab ${ui.tab===k||(k==='files'&&ui.tab==='files-drive')?'on':''}" type="button" data-cd-tab="${k}">${l}</button>`).join('')}</div>
+<div id="cdBody">${ui.tab==='gen'?gen:ui.tab==='calcs'?`<div class="k-bar k-wrap"><input class="k-search" id="cdCalcQ2" placeholder="Buscar por tipo, cliente ou resultado" value="${esc(ui.calcQ)}"></div>${calcRows()}`:`<div class="k-bar k-wrap"><input class="k-search" id="cdQ" placeholder="Buscar por nome do arquivo, categoria ou cliente" value="${esc(ui.q)}"><select class="k-sel" id="cdClient"><option value="">Todos os clientes</option>${clients.map(c=>`<option value="${esc(String(c.id))}" ${ui.client===String(c.id)?'selected':''}>${esc(c.name)}</option>`).join('')}</select><button class="d-btn" type="button" data-cd-upload>+ Anexar arquivo</button>${ui.q||ui.client||ui.kind?'<button class="k-chip" type="button" data-cd-clear>✕ Limpar</button>':''}</div><div class="k-tip">☁ Os arquivos ficam no Google Drive, na pasta <b>Documentos — Kaliny Girardi Advocacia</b>, com uma pasta por cliente.</div><div class="k-group"><span>${list.length} documento${list.length===1?'':'s'}</span><span></span></div>${files}`}</div>`;
+    const bind=(id,key,delay)=>{const el=app.querySelector(id);if(!el)return;el.addEventListener(delay?'input':'change',()=>{ui[key]=el.value;saveUi();const go=()=>{renderDocApp();if(delay){const n=document.querySelector(id);n.focus();n.setSelectionRange(n.value.length,n.value.length)}};if(delay){clearTimeout(renderDocApp.t);renderDocApp.t=setTimeout(go,250)}else go()})};
+    bind('#cdQ','q',true);bind('#cdCalcQ2','calcQ',true);bind('#cdClient','client');bind('#cdGenClient','genClient');
+  }
+  function openTemplate(clientId,tpl){
+    window.openContractEditor(clientId);
+    const sel=document.getElementById('contractTemplate');
+    if(sel&&tpl!=='honorarios'){sel.value=tpl;sel.dispatchEvent(new Event('change',{bubbles:true}));const t=document.querySelector('#contractForm input[name="title"]');if(t&&CONTRACT_TEMPLATES[tpl])t.value=CONTRACT_TEMPLATES[tpl].name.replace(/ — .*/,'')}
+  }
+  function pickClient(then){
+    const clients=(data.clients||[]).filter(Boolean).sort((a,b)=>String(a.name).localeCompare(String(b.name),'pt-BR'));
+    openModal('Anexar arquivo',`<div class="field"><label>De qual cliente é o arquivo?</label><select id="cdPick" style="width:100%"><option value="">Escolha…</option>${clients.map(c=>`<option value="${esc(String(c.id))}">${esc(c.name)}</option>`).join('')}</select></div><div class="form-actions"><button class="d-btn" type="button" id="cdPickGo">Continuar</button></div>`);
+    document.getElementById('cdPickGo').onclick=()=>{const v=document.getElementById('cdPick').value;if(!v){toast('Escolha o cliente');return}then(v)};
+  }
+  document.addEventListener('click',ev=>{
+    const t=ev.target.closest&&ev.target.closest('[data-cd-tool],[data-cd-report],[data-cd-client],[data-cd-tab],[data-cd-kind],[data-cd-dl],[data-cd-del],[data-cd-edit-contract],[data-cd-gen],[data-cd-upload],[data-cd-clear],[data-cd-editclient]');if(!t)return;const d=t.dataset;ev.preventDefault();
+    if(d.cdTool){const k=d.cdTool;if(k==='prazos')return window.kalinyPrazos&&window.kalinyPrazos.open('');if(k==='dossie')return openDossieSelector();return openCalc(k)}
+    if('cdReport' in d)return printCalcReport(+d.cdReport);
+    if(d.cdClient)return viewClient(d.cdClient);
+    if(d.cdEditclient)return openEditClient(d.cdEditclient);
+    if(d.cdTab){ui.tab=d.cdTab==='files-drive'?'files':d.cdTab;if(d.cdTab==='files-drive')ui.kind=''}
+    else if('cdKind' in d){ui.kind=ui.kind===d.cdKind?'':d.cdKind;ui.tab='files'}
+    else if(d.cdDl){const doc=(data.documents||[]).find(x=>String(x.id)===d.cdDl);if(!doc)return;return doc.contract?downloadContract(doc.id):downloadClientDocument(doc.id)}
+    else if(d.cdDel){const doc=(data.documents||[]).find(x=>String(x.id)===d.cdDel);if(!doc)return;const wasOpen=document.getElementById('modal')?.classList.contains('show');return Promise.resolve(doc.previdenciario?deletePrevidDoc(doc.id,d.client):deleteClientDocument(doc.id,d.client)).then(()=>{if(!wasOpen&&document.getElementById('page-documents')?.classList.contains('active'))closeModal();renderDocApp()})}
+    else if(d.cdEditContract)return window.openContractEditor(d.client,d.cdEditContract);
+    else if(d.cdGen){if(!ui.genClient)return toast('Escolha o cliente');return openTemplate(ui.genClient,d.cdGen)}
+    else if('cdUpload' in d)return pickClient(id=>{closeModal();window.openDocumentUpload(id)});
+    else if('cdClear' in d){ui.q='';ui.client='';ui.kind=''}
+    saveUi();renderDocApp();
+  });
+  function install(){
+    const cp=document.querySelector('#page-calculators .d-panel');
+    if(cp&&!document.getElementById('calcApp')){cp.querySelector('.calc-grid').style.display='none';const m=cp.querySelector('.d-panel-head .muted');if(m)m.textContent='Escolha a ferramenta. Cada uma explica para que serve e quando usar.';const a=document.createElement('div');a.id='calcApp';a.className='kx cd';cp.appendChild(a)}
+    const dp=document.querySelector('#page-documents .d-panel');
+    if(dp&&!document.getElementById('docApp')){const tb=dp.querySelector('#documentsTable');if(tb)tb.style.display='none';const h=dp.querySelector('.d-panel-head h2');if(h)h.textContent='Documentos';const m=dp.querySelector('.d-panel-head .muted');if(m)m.textContent='Todos os arquivos do escritório, documentos prontos para gerar e relatórios de cálculo.';const a=document.createElement('div');a.id='docApp';a.className='kx cd';dp.appendChild(a)}
+    renderCalcApp();renderDocApp();
+  }
+  const od=window.renderDocuments;window.renderDocuments=function(){const r=typeof od==='function'?od.apply(this,arguments):undefined;try{install()}catch(e){console.warn('Documentos:',e)}return r};
+  window.kalinyCD={renderCalcApp,renderDocApp};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else setTimeout(install,0);
 })();
 </script>
