@@ -1,5 +1,5 @@
 KALINY GIRARDI ADVOCACIA — site institucional + painel administrativo
-Versão: V145.32
+Versão: V145.33
 
 ESTRUTURA
 - index.html ............ site público (agendamento online, áreas, conteúdos, contato)
@@ -88,3 +88,10 @@ HISTÓRICO
   imagem de prévia 1200×630 para WhatsApp/Facebook (assets/og-image.jpg), fotos
   responsivas, textos pequenos mais legíveis e 404 com endereços absolutos.
   Lighthouse (celular): desempenho, acessibilidade e SEO 100.
+- V145.33: Modelos novos no papel timbrado — recibo de honorários (valor por
+  extenso; também pelo botão 🧾 de um pagamento recebido no Financeiro),
+  notificação extrajudicial, substabelecimento, termo de acordo extrajudicial
+  (com testemunhas) e declaração de comparecimento. Cada modelo tem campos próprios
+  no editor. Assinaturas espaçadas e mantidas juntas na mesma página.
+  Apps Script V145.24: encontra a agenda compartilhada da Kaliny mesmo com endereço
+  próprio (…@group.calendar.google.com); função diagnosticoAgenda.

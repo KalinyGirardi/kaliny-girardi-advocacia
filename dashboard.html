@@ -1479,7 +1479,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
    Regras: vence a alteração mais recente (updatedAt); exclusões viram marcação (deletedAt);
    resposta vazia ou com erro do servidor nunca apaga dados deste navegador. */
 (function(){
-  const VERSION='V145.32';
+  const VERSION='V145.33';
   const META_KEY='kaliny_sync_meta_v1';
   const COLLECTIONS=['processes','finance','notes','calcHistory','previdenciario','documents'];
   const BATCH=50;
@@ -2534,14 +2534,14 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
     marks.forEach(([s,e,k])=>{if(s<pos)return;out+=run(text.slice(pos,s))+run(text.slice(s,e),k==='b'?{bold:true}:{u:true});pos=e});
     return out+run(text.slice(pos));
   }
-  const para=(inner,o={})=>`<w:p><w:pPr>${o.ind?`<w:ind w:left="${o.ind}"/>`:''}<w:jc w:val="${o.align||'both'}"/><w:spacing w:before="${o.before||0}" w:after="${o.after??200}" w:line="${o.line||276}" w:lineRule="auto"/></w:pPr>${inner}</w:p>`;
+  const para=(inner,o={})=>`<w:p><w:pPr>${o.keep?'<w:keepNext/><w:keepLines/>':''}${o.ind?`<w:ind w:left="${o.ind}"/>`:''}<w:jc w:val="${o.align||'both'}"/><w:spacing w:before="${o.before||0}" w:after="${o.after??200}" w:line="${o.line||276}" w:lineRule="auto"/></w:pPr>${inner}</w:p>`;
   function legalDocxBlob(title,text){
     const blocks=String(text||'').replace(/\r/g,'').split(/\n\s*\n/).map(x=>x.trim()).filter(Boolean);
-    let body='';
+    let body='',sigs=0;const lastSig=blocks.map(x=>/^_{5,}/.test(x)).lastIndexOf(true);
     blocks.forEach((b,i)=>{
       if(i===0&&b===b.toUpperCase()&&b.length<60){body+=para(run(b,{bold:true,size:22}),{align:'center',after:360});return}
-      if(/^Cascavel\s*[–-]\s*PR,/i.test(b)){body+=para(run(b),{align:'right',before:360,after:720});return}
-      if(/^_{5,}/.test(b)){b.split('\n').map(x=>x.trim()).filter(Boolean).forEach((ln,j)=>{body+=para(run(/^_+$/.test(ln)?'______________________________________':ln),{align:'center',ind:3600,after:0,line:276})});return}
+      if(/^Cascavel\s*[–-]\s*PR,/i.test(b)){body+=para(run(b),{align:'right',before:360,after:720,keep:true});return}
+      if(/^_{5,}/.test(b)){const ls=b.split('\n').map(x=>x.trim()).filter(Boolean),first=sigs===0;sigs++;ls.forEach((ln,j)=>{body+=para(run(/^_+$/.test(ln)?'______________________________________':ln),{align:'center',ind:3600,after:0,line:276,before:(!first&&j===0)?640:0,keep:!(i===lastSig&&j===ls.length-1)})});return}
       body+=para(runsWithEmphasis(b.replace(/\n/g,' ')));
     });
     const NS='xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"';
@@ -2673,7 +2673,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
   function row(f){
     const c=f.clientId?clientById(f.clientId):null,neg=!isIn(f),d=refDate(f);
     const wa=isIn(f)&&!isPaid(f)&&c&&waNumber(c.phone)?`<button class="fa-ic" type="button" data-fin-wa="${esc(String(f.id))}" title="${state(f)==='overdue'?'Cobrar':'Lembrar'} no WhatsApp">💬</button>`:'';
-    return `<div class="fa-row">${pill(f)}<span class="fa-date">${br(d)}</span><div class="fa-desc"><b title="${esc(f.desc||'')}">${esc(f.desc||'Lançamento')}</b><span>${[c?esc(c.name):'',esc(category(f)),f.paymentMethod||f.formaPagamento?esc(f.paymentMethod||f.formaPagamento):''].filter(Boolean).join(' · ')}</span></div><span class="fa-val" style="color:${neg?C.expense:C.received}">${neg?'−':'+'} ${money(f.value)}</span><div class="fa-act">${wa}<button class="fa-ic" type="button" data-fa-edit="${esc(String(f.id))}" title="Editar">✎</button><button class="fa-ic" type="button" data-fa-dup="${esc(String(f.id))}" title="Duplicar">⧉</button><button class="fa-ic" type="button" data-fa-del="${esc(String(f.id))}" title="Excluir">🗑</button></div></div>`;
+    return `<div class="fa-row">${pill(f)}<span class="fa-date">${br(d)}</span><div class="fa-desc"><b title="${esc(f.desc||'')}">${esc(f.desc||'Lançamento')}</b><span>${[c?esc(c.name):'',esc(category(f)),f.paymentMethod||f.formaPagamento?esc(f.paymentMethod||f.formaPagamento):''].filter(Boolean).join(' · ')}</span></div><span class="fa-val" style="color:${neg?C.expense:C.received}">${neg?'−':'+'} ${money(f.value)}</span><div class="fa-act">${wa}${isIn(f)&&isPaid(f)&&c?`<button class="fa-ic" type="button" data-x-recibo="${esc(String(f.id))}" title="Gerar recibo">🧾</button>`:''}<button class="fa-ic" type="button" data-fa-edit="${esc(String(f.id))}" title="Editar">✎</button><button class="fa-ic" type="button" data-fa-dup="${esc(String(f.id))}" title="Duplicar">⧉</button><button class="fa-ic" type="button" data-fa-del="${esc(String(f.id))}" title="Excluir">🗑</button></div></div>`;
   }
   function listView(list,{groupBy='month'}={}){
     if(!list.length)return '<div class="fa-empty">Nenhum lançamento aqui. Use <b>+ Novo lançamento</b> para começar.</div>';
@@ -3795,6 +3795,202 @@ ${future.length?`<div class="fc-grp">Próximos</div><div class="fc-tl">${future.
     if(f.elements.notes&&!f.elements.notes.value)f.elements.notes.value='Primeiro contato pelo agendamento online do site ('+(e.date||'')+' '+(e.time||'')+').';
   };
   document.addEventListener('click',ev=>{const b=ev.target.closest&&ev.target.closest('[data-x-newclient]');if(!b)return;ev.preventDefault();window.kalinyNewClientFromEvent(b.getAttribute('data-x-newclient'))});
+})();
+</script>
+<script>
+/* V145.33 — Novos modelos no papel timbrado: recibo de honorários, notificação extrajudicial, substabelecimento,
+   termo de acordo extrajudicial e declaração de comparecimento. Cada modelo tem campos próprios no editor;
+   o recibo também sai direto de um pagamento recebido no Financeiro. */
+(function(){
+  if(typeof CONTRACT_TEMPLATES!=='object')return;
+  const MONTHS=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+  const longDate=s=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(s||'');return m?`${+m[3]} de ${MONTHS[+m[2]-1]} de ${m[1]}`:''};
+  const todayIso=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+  // valor por extenso (reais e centavos)
+  const U=['zero','um','dois','três','quatro','cinco','seis','sete','oito','nove','dez','onze','doze','treze','quatorze','quinze','dezesseis','dezessete','dezoito','dezenove'];
+  const D=['','','vinte','trinta','quarenta','cinquenta','sessenta','setenta','oitenta','noventa'];
+  const C=['','cento','duzentos','trezentos','quatrocentos','quinhentos','seiscentos','setecentos','oitocentos','novecentos'];
+  function ate999(n){if(n===100)return 'cem';const c=Math.floor(n/100),r=n%100,p=[];if(c)p.push(C[c]);if(r){if(r<20)p.push(U[r]);else{p.push(D[Math.floor(r/10)]+(r%10?' e '+U[r%10]:''))}}return p.join(' e ')}
+  function inteiro(n){if(n===0)return 'zero';const grupos=[[1e9,'bilhão','bilhões'],[1e6,'milhão','milhões'],[1e3,'mil','mil']];const parts=[];let r=n;
+    grupos.forEach(([v,s,pl])=>{const q=Math.floor(r/v);if(q){parts.push(v===1e3&&q===1?'mil':ate999(q)+' '+(q===1?s:pl));r%=v}});
+    if(r)parts.push(ate999(r));
+    if(parts.length>1){const last=r;return parts.slice(0,-1).join(' ')+((!last||last<100||last%100===0)?' e ':' ')+parts[parts.length-1]}return parts[0]}
+  function extenso(v){const n=Math.round(Number(v||0)*100),re=Math.floor(n/100),ce=n%100;if(!n)return 'zero real';
+    const big=re>=1e6&&re%1e6===0;const a=re?inteiro(re)+(big?' de':'')+(re===1?' real':' reais'):'';const b=ce?inteiro(ce)+(ce===1?' centavo':' centavos'):'';return a&&b?a+' e '+b:(a||b)}
+  window.kalinyExtenso=extenso;
+
+  const ADV='KALINY GIRARDI, brasileira, casada, advogada, regularmente inscrita na OAB-PR sob nº 118212, com endereço profissional na Rua Marechal Cândido Rondon, nº 954, CEP 85.802-130, Cascavel – Paraná, e endereço eletrônico kalinygirardi.adv@gmail.com';
+  const SIGN='________________________________________________\nKALINY GIRARDI\nOAB/PR 118212';
+  const T={
+    recibo:{name:'Recibo de Honorários',description:'Recibo de pagamento de honorários com valor por extenso. Também pode ser gerado pelo botão 🧾 de um pagamento recebido no Financeiro.',
+      basis:'Código Civil, arts. 319 e 320 (quitação).',review:'Confira valor, data e a descrição do serviço antes de entregar.',
+      fields:[['valor','Valor recebido','money'],['referente','Referente a','text','honorários advocatícios — '],['forma','Forma de pagamento','select',['PIX','Transferência bancária','Dinheiro','Cartão','Boleto bancário']],['data','Data do pagamento','date']],
+      content:`RECIBO DE HONORÁRIOS ADVOCATÍCIOS
+
+Eu, ${ADV}, DECLARO que recebi de {{qualificacao_sem_endereco}} a importância de {{f_valor}} ({{f_valor_extenso}}), referente a {{f_referente}}, paga por meio de {{f_forma}} em {{f_data}}.
+
+Pelo que dou plena e geral quitação do valor acima recebido.
+
+{{cidade_data}}
+
+${SIGN}`},
+    notificacao:{name:'Notificação Extrajudicial',description:'Notificação em nome do cliente, com fatos, pedido e prazo para resposta.',
+      basis:'Código Civil, art. 397, parágrafo único (constituição em mora); CPC, art. 726 (notificação, se judicial).',review:'Revise os fatos e o pedido; anexe a procuração ao enviar.',
+      fields:[['notificado','Notificado(a) — nome e qualificação','textarea','NOME, inscrito(a) no CPF/CNPJ sob nº ..., com endereço na ...'],['fatos','Fatos','textarea'],['pedido','O que se pede','textarea','efetue o pagamento do valor de R$ ..., ...'],['prazo','Prazo (dias)','number','10']],
+      content:`NOTIFICAÇÃO EXTRAJUDICIAL
+
+NOTIFICANTE: {{qualificacao_curta}}, por sua advogada que esta subscreve, ${ADV}, conforme procuração anexa.
+
+NOTIFICADO(A): {{f_notificado}}.
+
+Pela presente NOTIFICAÇÃO EXTRAJUDICIAL, o(a) Notificante vem, respeitosamente, expor e requerer o que segue.
+
+{{f_fatos}}
+
+Diante do exposto, fica Vossa Senhoria NOTIFICADA para que, no prazo de {{f_prazo}} ({{f_prazo_extenso}}) dias, contados do recebimento desta, {{f_pedido}}.
+
+O não atendimento no prazo indicado poderá ensejar a adoção das medidas judiciais cabíveis.
+
+Eventuais respostas e propostas poderão ser encaminhadas à advogada subscritora pelo e-mail kalinygirardi.adv@gmail.com ou pelo telefone (45) 99843-4981.
+
+{{cidade_data}}
+
+${SIGN}`},
+    substabelecimento:{name:'Substabelecimento',description:'Transfere a outro(a) advogado(a), com ou sem reserva, os poderes recebidos do cliente.',
+      basis:'CPC, art. 105; Código Civil, art. 667; Código de Ética da OAB, art. 26.',review:'Confira número do processo, OAB do(a) colega e se é com ou sem reserva de poderes.',
+      fields:[['advogado','Advogado(a) substabelecido(a) — nome','text'],['oab','Inscrição na OAB (ex.: PR 123456)','text'],['reserva','Reserva de poderes','select',['com reserva de iguais','sem reserva de']],['processo','Processo nº','text'],['finalidade','Finalidade','text','para a prática de todos os atos do processo']],
+      content:`SUBSTABELECIMENTO
+
+SUBSTABELECENTE: ${ADV}.
+
+SUBSTABELECIDO(A): {{f_advogado}}, advogado(a) inscrito(a) na OAB/{{f_oab}}.
+
+Pelo presente instrumento, SUBSTABELEÇO, {{f_reserva}} poderes, ao(à) advogado(a) acima qualificado(a), os poderes que me foram conferidos por {{qualificacao_sem_endereco}}, nos autos do processo nº {{f_processo}}, {{f_finalidade}}.
+
+{{cidade_data}}
+
+${SIGN}`},
+    acordo:{name:'Termo de Acordo Extrajudicial',description:'Acordo entre o cliente e a outra parte, com multa por descumprimento e quitação. Com duas testemunhas, vale como título executivo.',
+      basis:'Código Civil, arts. 840 a 850 (transação); CPC, art. 784, III (título executivo com duas testemunhas).',review:'Revise objeto, obrigações e valores; colha a assinatura de duas testemunhas.',
+      fields:[['outra','Outra parte — nome e qualificação','textarea','NOME, nacionalidade, estado civil, profissão, inscrito(a) no CPF sob nº ..., residente e domiciliado(a) na ...'],['objeto','Objeto do acordo','textarea'],['obrigacoes','Obrigações e pagamento','textarea','O(A) Segundo(a) Acordante pagará ao(à) Primeiro(a) Acordante o valor de R$ ..., em ... parcelas de R$ ..., vencendo a primeira em ..., por meio de ...'],['multa','Multa por descumprimento','text','20% (vinte por cento)']],
+      content:`TERMO DE ACORDO EXTRAJUDICIAL
+
+PRIMEIRO(A) ACORDANTE: {{qualificacao_curta}}.
+
+SEGUNDO(A) ACORDANTE: {{f_outra}}.
+
+As partes acima qualificadas celebram, de comum acordo, o presente TERMO DE ACORDO EXTRAJUDICIAL, nos termos dos arts. 840 e seguintes do Código Civil, mediante as cláusulas a seguir.
+
+CLÁUSULA PRIMEIRA — DO OBJETO: {{f_objeto}}
+
+CLÁUSULA SEGUNDA — DAS OBRIGAÇÕES E DO PAGAMENTO: {{f_obrigacoes}}
+
+CLÁUSULA TERCEIRA — DO DESCUMPRIMENTO: O descumprimento de qualquer obrigação deste termo implicará multa de {{f_multa}} sobre o valor em aberto, acrescida de correção monetária e juros legais, e o vencimento antecipado das parcelas restantes, podendo o presente termo ser executado judicialmente, por constituir título executivo extrajudicial (art. 784, III, do Código de Processo Civil).
+
+CLÁUSULA QUARTA — DA QUITAÇÃO: Cumpridas integralmente as obrigações aqui previstas, as partes dão-se mútua, plena e geral quitação quanto ao objeto deste acordo, para nada mais reclamarem a qualquer título.
+
+CLÁUSULA QUINTA — DO FORO: Fica eleito o foro da Comarca de Cascavel – PR para dirimir eventuais controvérsias oriundas deste termo.
+
+E, por estarem justas e acordadas, as partes assinam o presente termo em duas vias de igual teor e forma, na presença das testemunhas abaixo.
+
+{{cidade_data}}
+
+________________________________________________
+{{assinatura_nome}}
+Primeiro(a) Acordante
+
+________________________________________________
+{{f_outra_nome}}
+Segundo(a) Acordante
+
+________________________________________________
+Testemunha — nome e CPF
+
+________________________________________________
+Testemunha — nome e CPF`},
+    comparecimento:{name:'Declaração de Comparecimento',description:'Declara que o cliente esteve no escritório (por exemplo, para justificar ausência no trabalho), sem revelar o assunto.',
+      basis:'Documento simples; não revela o assunto do atendimento (sigilo profissional).',review:'Confira data e horário.',
+      fields:[['data','Data do atendimento','date'],['inicio','Das','time','14:00'],['fim','Às','time','15:00']],
+      content:`DECLARAÇÃO DE COMPARECIMENTO
+
+Declaro, para os devidos fins, que {{qualificacao_sem_endereco}} compareceu a este escritório de advocacia no dia {{f_data}}, das {{f_inicio}} às {{f_fim}}, para atendimento jurídico.
+
+{{cidade_data}}
+
+${SIGN}`}};
+  Object.keys(T).forEach(k=>{CONTRACT_TEMPLATES[k]={name:T[k].name,description:T[k].description,content:T[k].content};try{if(typeof CONTRACT_MODEL_INFO==='object')CONTRACT_MODEL_INFO[k]={basis:T[k].basis,review:T[k].review}}catch(e){}});
+  window.kalinyModelFields=T;
+
+  // Campos do modelo no editor
+  let vals={};
+  const read=()=>{const box=document.getElementById('mfFields');if(!box)return;box.querySelectorAll('[data-mf]').forEach(el=>{vals[el.dataset.mf]=el.classList.contains('money-input')?parseMoneyBR(el.value):el.value})};
+  function render(form,prefill){
+    let box=document.getElementById('mfFields');const id=form.templateId.value,t=T[id];
+    if(!box){const anchor=document.getElementById('honorariosFields');anchor.insertAdjacentHTML('beforebegin','<div id="mfFields" class="full" style="grid-column:1/-1;width:100%"></div>');box=document.getElementById('mfFields')}
+    if(!t){box.innerHTML='';box.style.display='none';return}
+    box.style.display='';const pf=prefill||{};vals={};setTimeout(()=>{const n=document.getElementById('modelNormNote');if(n&&T[form.templateId.value])n.textContent=T[form.templateId.value].review},0);
+    box.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px 14px;margin:4px 0 10px">'+t.fields.map(([k,label,type,def])=>{const v=pf[k]!=null?pf[k]:(type==='date'?todayIso():type==='select'?'':(def||''));
+      const full=(type==='textarea'||['referente','finalidade','advogado'].includes(k))?' full':'';const attr=`data-mf="${k}" name="mf_${k}"`;
+      const input=type==='textarea'?`<textarea ${attr} rows="3" placeholder="${esc(def||'')}">${pf[k]!=null?esc(pf[k]):''}</textarea>`:
+        type==='select'?`<select ${attr}>${def.map(o=>`<option ${o===v?'selected':''}>${esc(o)}</option>`).join('')}</select>`:
+        type==='money'?`<input ${attr} class="money-input" placeholder="R$ 0,00" value="${v?esc(money(v)):''}">`:
+        `<input ${attr} type="${type==='number'?'number':type==='date'?'date':type==='time'?'time':'text'}" value="${esc(String(v))}">`;
+      return `<div class="field" style="margin:0;${full?'grid-column:1/-1':''}"><label>${esc(label)}</label>${input}</div>`}).join('')+'</div>';
+    box.querySelectorAll('input,select,textarea').forEach(el=>{el.style.width='100%';el.style.boxSizing='border-box'});
+    box.querySelectorAll('.money-input').forEach(el=>{try{wireMoneyField(el)}catch(e){}});
+    read();
+  }
+  document.addEventListener('input',e=>{if(e.target.closest&&e.target.closest('#mfFields'))read()});
+  document.addEventListener('change',e=>{if(e.target.closest&&e.target.closest('#mfFields'))read()});
+  const oEditor=window.openContractEditor;
+  window.openContractEditor=function(clientId,existingId){
+    const r=oEditor.apply(this,arguments);
+    try{const form=document.getElementById('contractForm');if(form&&form.templateId){
+      const ex=existingId?(data.documents||[]).find(d=>d.id===existingId):null;
+      render(form,ex&&ex.contractMeta&&ex.contractMeta.fields);
+      form.templateId.addEventListener('change',()=>render(form));
+      // os campos ficam guardados no documento, para editar depois
+      form.addEventListener('submit',()=>{read();window.__mfLast={...vals}},true);
+    }}catch(e){console.warn('Campos do modelo:',e)}
+    return r;
+  };
+  // Substitui {{f_...}} nos modelos
+  const oReplace=window.contractReplace;
+  window.contractReplace=function(text,c,opts={}){
+    let t=String(text||'');
+    if(t.includes('{{f_')){read();const v=vals,blank='__________';
+      const fmt=(k)=>{const x=v[k];if(x==null||x==='')return blank;if(k==='valor')return money(x);if(k==='data')return longDate(x)||blank;return String(x).trim()};
+      t=t.split('{{f_valor_extenso}}').join(v.valor?extenso(v.valor):blank)
+         .split('{{f_prazo_extenso}}').join(v.prazo?inteiro(Math.round(+v.prazo)):blank)
+         .split('{{f_outra_nome}}').join(v.outra?String(v.outra).split(',')[0].trim().toUpperCase():'SEGUNDO(A) ACORDANTE');
+      t=t.replace(/\{\{f_(\w+)\}\}/g,(_,k)=>fmt(k));}
+    return oReplace.call(this,t,c,opts);
+  };
+  // Word no papel timbrado também para os modelos novos; guarda os campos no documento
+  const oFile=window.contractFile;
+  window.contractFile=function(title,text,meta={}){
+    if(meta&&T[meta.templateId]){read();meta.fields={...vals};if(window.kalinyLegalDocx){try{return window.kalinyLegalDocx(title,text)}catch(e){console.warn('Modelo novo:',e)}}}
+    return oFile.apply(this,arguments);
+  };
+  // Atalhos na aba Documentos da ficha
+  const oDocs=window.renderClientDocuments;
+  window.renderClientDocuments=function(id){
+    const r=oDocs.apply(this,arguments);
+    try{const box=document.querySelector('#clientDocsList #quickModels');if(box&&!box.querySelector('[data-quick-model="recibo"]')){const last=[...box.querySelectorAll('[data-quick-model]')].pop();
+      const html=Object.keys(T).map(k=>`<button class="d-btn light" type="button" data-quick-model="${k}" data-client="${esc(String(id))}">${esc(T[k].name.replace(' Extrajudicial','').replace('Declaração de ','Decl. de '))}</button>`).join('');
+      if(last)last.insertAdjacentHTML('afterend',html)}}catch(e){console.warn(e)}
+    return r;
+  };
+  // Recibo direto do Financeiro (pagamento recebido)
+  window.kalinyRecibo=function(finId){
+    const f=(data.finance||[]).find(x=>String(x.id)===String(finId));if(!f||!f.clientId){toast('Vincule o lançamento a um cliente para gerar o recibo');return}
+    window.openContractEditor(f.clientId);const form=document.getElementById('contractForm');if(!form)return;
+    form.templateId.value='recibo';form.templateId.dispatchEvent(new Event('change',{bubbles:true}));
+    const desc=String(f.desc||'').trim();
+    render(form,{valor:Number(f.value||0),referente:'honorários advocatícios'+(desc?' — '+desc:''),forma:f.formaPagamento||f.paymentMethod||'PIX',data:String(f.paidAt||f.date||f.dueDate||todayIso()).slice(0,10)});
+    const t=form.querySelector('input[name="title"]');if(t)t.value='Recibo — '+(desc||'honorários');
+  };
+  document.addEventListener('click',ev=>{const b=ev.target.closest&&ev.target.closest('[data-x-recibo]');if(!b)return;ev.preventDefault();ev.stopPropagation();window.kalinyRecibo(b.getAttribute('data-x-recibo'))},true);
 })();
 </script>
 </body></html>
