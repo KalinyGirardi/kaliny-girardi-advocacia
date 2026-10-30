@@ -1481,7 +1481,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
    Regras: vence a alteração mais recente (updatedAt); exclusões viram marcação (deletedAt);
    resposta vazia ou com erro do servidor nunca apaga dados deste navegador. */
 (function(){
-  const VERSION='V145.44';
+  const VERSION='V145.45';
   const META_KEY='kaliny_sync_meta_v1';
   const COLLECTIONS=['processes','finance','notes','calcHistory','previdenciario','documents','tasks'];
   const IS_COLLAB=(typeof session!=='undefined'&&session&&session.role==='colaboradora'),COLLAB_PUSH=new Set(['finance','tasks']);let warnedForbidden=false;
@@ -4669,6 +4669,68 @@ ${gs.length?gs.map(row).join(''):'<div class="muted" style="padding:20px;text-al
   if(COLLAB&&typeof window.renderCollabFinance==='function'){}
   const oF=window.renderFinance;if(typeof oF==='function')window.renderFinance=function(){const r=oF.apply(this,arguments);try{button();collabList()}catch(e){}return r};
   setTimeout(()=>{try{button();collabList()}catch(e){}},1400);
+})();
+</script>
+<script>
+/* V145.45 — Despesas fixas do escritório (Configurações). Ficam no servidor, só para a administradora.
+   Todo mês o painel lança cada uma no Financeiro como despesa a pagar (uma vez por mês, mesmo com vários aparelhos)
+   e calcula a sugestão de contribuição da parceira: despesas fixas ÷ receita média recebida. */
+(function(){
+  const S=(typeof session!=='undefined'&&session)||{};if(S.role==='colaboradora')return;
+  const LKEY='kaliny_fixed_v1',pad=n=>String(n).padStart(2,'0'),r2=v=>Math.round(v*100)/100;
+  const ym=d=>(d=d||new Date(),d.getFullYear()+'-'+pad(d.getMonth()+1));
+  let st={fixed:[],fixedAuto:true,fixedDone:[],server:false};
+  try{const l=JSON.parse(localStorage.getItem(LKEY)||'null');if(l)st={...st,...l}}catch(e){}
+  async function call(action,params,post){const cfg=onlineConfig();if(!cfg.url||!cfg.token)throw new Error('no_session');const q=new URLSearchParams({action,...(params||{}),token:cfg.token});
+    const r=post?await fetch(cfg.url,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:q}):await fetch(cfg.url+'?'+q.toString(),{cache:'no-store'});return r.json()}
+  const keep=()=>{try{localStorage.setItem(LKEY,JSON.stringify(st))}catch(e){}};
+  async function load(){try{const j=await call('officeProfile');if(j&&j.ok&&j.profile&&'fixed' in j.profile){st={fixed:j.profile.fixed||[],fixedAuto:j.profile.fixedAuto!==false,fixedDone:j.profile.fixedDone||[],server:true};keep()}}catch(e){}return st}
+  async function store(patch){Object.assign(st,patch);keep();try{const j=await call('officeProfileSave',{data:JSON.stringify(patch)},true);if(j&&j.ok&&j.profile&&'fixed' in j.profile){st.server=true;st.fixed=j.profile.fixed;st.fixedAuto=j.profile.fixedAuto!==false;st.fixedDone=j.profile.fixedDone||[];keep();return true}}catch(e){}return false}
+  const total=()=>r2(st.fixed.reduce((t,x)=>t+Number(x.value||0),0));
+  function avgIncome(){const now=new Date(),months=[];for(let i=1;i<=3;i++)months.push(ym(new Date(now.getFullYear(),now.getMonth()-i,1)));
+    const sum=(data.finance||[]).filter(f=>f&&!f.deletedAt&&f.type!=='despesa'&&['pago','recebido'].includes(String(f.status||'').toLowerCase())).filter(f=>months.includes(String(f.paidAt||f.dueDate||f.date||'').slice(0,7))).reduce((t,f)=>t+Number(f.value||0),0);
+    return {avg:r2(sum/3),months}}
+  window.kalinyFeeSuggestion=function(){const a=avgIncome().avg,t=total();if(!t||!a)return null;return Math.min(100,Math.round(t/a*200)/2)};
+  // lançamento do mês
+  function entryFor(x,m){const [y,mo]=m.split('-').map(Number),last=new Date(y,mo,0).getDate(),day=Math.min(Number(x.day)||5,last),due=m+'-'+pad(day);
+    return {id:'fix_'+x.id+'_'+m.replace('-',''),type:'despesa',category:'Despesas fixas',desc:x.name,value:Number(x.value),status:'pendente',date:due,dueDate:due,fixedId:x.id,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()}}
+  function launch(m,only){m=m||ym();data.finance=Array.isArray(data.finance)?data.finance:[];let n=0;
+    (only||st.fixed).forEach(x=>{const e=entryFor(x,m);if(!data.finance.some(f=>f&&f.id===e.id)){data.finance.push(e);n++}});if(n){save();try{window.kalinySync&&window.kalinySync.syncNow()}catch(e){}}return n}
+  async function auto(){await load();if(!st.fixedAuto||!st.fixed.length)return;const m=ym();if((st.fixedDone||[]).includes(m))return;
+    const ok=await store({fixedDone:(st.fixedDone||[]).concat(m).slice(-24)});if(!ok&&!st.server)return; // servidor antigo: só pelo botão
+    const n=launch(m);if(n)toast(n+' despesa'+(n>1?'s':'')+' fixa'+(n>1?'s':'')+' do mês lançada'+(n>1?'s':'')+' no Financeiro')}
+  // cartão em Configurações
+  function card(){
+    const grid=document.querySelector('#page-settings .settings-grid');if(!grid)return;let c=document.getElementById('fixedCard');
+    if(!c){grid.insertAdjacentHTML('beforeend','<div class="settings-card" id="fixedCard"></div>');c=document.getElementById('fixedCard')}
+    const sug=window.kalinyFeeSuggestion(),a=avgIncome(),m=ym(),missing=st.fixed.filter(x=>!(data.finance||[]).some(f=>f&&f.id===entryFor(x,m).id)).length;
+    c.innerHTML=`<span class="eyebrow">Financeiro</span><h3>Despesas fixas do escritório</h3><p class="muted">Aluguel, internet, contador, sistema… Todo mês elas entram sozinhas no Financeiro como contas a pagar, no dia do vencimento.</p>
+<div class="fx-list">${st.fixed.length?st.fixed.map(x=>`<div class="fx-row"><span><b>${esc(x.name)}</b><small>todo dia ${esc(String(x.day))}</small></span><b>${money(x.value)}</b><button class="d-btn light" type="button" data-fx-edit="${esc(x.id)}">✎</button><button class="d-btn light" type="button" data-fx-del="${esc(x.id)}">🗑</button></div>`).join(''):'<div class="muted" style="padding:6px 0">Nenhuma despesa fixa cadastrada.</div>'}</div>
+<form id="fxForm" class="form-grid" style="margin-top:10px"><input type="hidden" name="id"><div class="field"><label>Despesa</label><input name="name" required placeholder="Ex.: Aluguel da sala"></div><div class="field"><label>Valor por mês</label><input name="value" class="money-input" required placeholder="R$ 0,00"></div><div class="field"><label>Dia do vencimento</label><input name="day" type="number" min="1" max="31" value="5" required></div><div class="form-actions" style="grid-column:1/-1"><button class="d-btn" type="submit" id="fxSubmit">+ Adicionar</button></div></form>
+<div class="fx-sum"><div><span>Total por mês</span><b id="fxTotal">${money(total())}</b></div>
+<div><span>Receita média recebida (3 últimos meses)</span><b>${a.avg?money(a.avg):'—'}</b></div>
+<div class="fx-sug"><span>Sugestão de contribuição da parceira</span><b>${sug!=null?String(sug).replace('.',',')+'%':'—'}</b></div>
+<small class="muted">Conta: despesas fixas ÷ receita média. Com essa %, cada parceira cobre a mesma fração das despesas que ela representa no faturamento. ${sug==null?'Aparece quando houver despesas fixas e receitas recebidas nos últimos meses.':''}</small></div>
+<label style="display:flex;gap:8px;align-items:center;margin-top:10px;font-size:14px"><input type="checkbox" id="fxAuto" ${st.fixedAuto?'checked':''}> Lançar no Financeiro automaticamente todo mês</label>
+${st.fixed.length&&missing?`<div class="form-actions"><button class="d-btn light" type="button" id="fxNow">Lançar as ${missing} que faltam neste mês</button></div>`:''}
+<div class="mini-help">${st.server?'Ficam guardadas no servidor e só você vê.':'Guardadas neste aparelho até o servidor ser atualizado.'}</div>
+<style>.fx-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;gap:8px;align-items:center;padding:8px 10px;border:1px solid #eaded2;border-radius:12px;background:#fff;margin-bottom:6px}.fx-row small{display:block;color:#8d7767;font-size:12px}.fx-sum{margin-top:12px;display:grid;gap:5px;font-size:14px}.fx-sum>div{display:flex;justify-content:space-between;gap:10px}.fx-sug{border-top:1px solid #eaded2;padding-top:6px}.fx-sug b{color:#b06a1e;font-size:16px}</style>`;
+    const f=document.getElementById('fxForm');try{wireMoneyField(f.value)}catch(e){}
+    f.onsubmit=async e=>{e.preventDefault();const v=Math.abs(parseMoneyBR(f.value.value)||0);if(!v)return toast('Informe o valor');
+      const it={id:f.id.value||('fx'+Date.now().toString(36)),name:f.name.value.trim(),value:v,day:Math.max(1,Math.min(31,parseInt(f.day.value,10)||5))};
+      const list=st.fixed.filter(x=>x.id!==it.id).concat(it);const isNew=!f.id.value;await store({fixed:list});
+      if(isNew&&(st.fixedDone||[]).includes(ym()))launch(ym(),[it]);toast(isNew?'Despesa fixa adicionada':'Despesa fixa atualizada');card()};
+    document.getElementById('fxAuto').onchange=async e=>{await store({fixedAuto:e.target.checked});toast(e.target.checked?'Lançamento automático ligado':'Lançamento automático desligado')};
+    const now=document.getElementById('fxNow');if(now)now.onclick=async()=>{const n=launch(ym());if(!(st.fixedDone||[]).includes(ym()))await store({fixedDone:(st.fixedDone||[]).concat(ym()).slice(-24)});toast(n+' lançada'+(n>1?'s':'')+' no Financeiro');card()};
+  }
+  document.addEventListener('click',async e=>{const g=k=>e.target.closest&&e.target.closest('['+k+']');let b;
+    if((b=g('data-fx-del'))){const x=st.fixed.find(i=>i.id===b.dataset.fxDel);if(!x||!confirm('Tirar "'+x.name+'" das despesas fixas? (o que já foi lançado no Financeiro continua lá)'))return;await store({fixed:st.fixed.filter(i=>i.id!==x.id)});card();return}
+    if((b=g('data-fx-edit'))){const x=st.fixed.find(i=>i.id===b.dataset.fxEdit),f=document.getElementById('fxForm');if(!x||!f)return;f.id.value=x.id;f.name.value=x.name;f.value.value=money(x.value);f.day.value=x.day;document.getElementById('fxSubmit').textContent='Salvar alteração';f.name.focus();return}
+    if(g('data-page="settings"'))setTimeout(()=>{card();load().then(card)},120);
+    if((b=g('data-tm2-rep')))setTimeout(()=>{const fee=document.querySelector('#tm2RepForm [name=fee]'),s=window.kalinyFeeSuggestion();if(fee&&s!=null&&!document.getElementById('fxHint')){fee.insertAdjacentHTML('afterend',`<div class="mini-help" id="fxHint">Sugestão pelas despesas fixas: <a href="#" id="fxUse">${String(s).replace('.',',')}%</a></div>`);document.getElementById('fxUse').onclick=ev=>{ev.preventDefault();fee.value=s;fee.dispatchEvent(new Event('input',{bubbles:true}))}}},60);
+  });
+  setTimeout(()=>{auto().catch(()=>{})},2500);
+  window.kalinyFixed={load,launch,state:()=>st,card};
 })();
 </script>
 </body></html>
