@@ -132,8 +132,10 @@
   function openVideo(card){
     const area=card.dataset.area||'Conteúdo jurídico';
     const url=card.dataset.video||'';
-    title.textContent=area;
-    placeholderTitle.textContent=area;
+    const vid=(/\/(?:p|reel)\/([^/?#]+)/.exec(url)||[])[1],item=(window.KG_CONTEUDOS||[]).find(x=>x.id===vid);
+    title.textContent=item&&item.titulo?item.titulo:area;
+    placeholderTitle.textContent=title.textContent;
+    const eb=overlay.querySelector('.video-modal-copy .eyebrow');if(eb)eb.textContent=item&&item.area?item.area:'Conteúdo jurídico';
     if(externalLink){ externalLink.href=url||'https://www.instagram.com/kalinygirardiadvocacia/'; externalLink.style.display=url?'inline-block':'none'; }
     if(url){
       const embedUrl = /instagram\.com\/p\//.test(url) ? url.replace(/\/$/,'') + '/embed/' : url;
