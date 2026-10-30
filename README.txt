@@ -1,5 +1,5 @@
 KALINY GIRARDI ADVOCACIA — site institucional + painel administrativo
-Versão: V145.36
+Versão: V145.37
 
 ESTRUTURA
 - index.html ............ site público (agendamento online, áreas, conteúdos, contato)
@@ -105,3 +105,7 @@ HISTÓRICO
   aposentadoria, BPC/LOAS, incapacidade, divórcio, pensão, inventário, consumidor,
   cível e imobiliário. Marca sozinho o que foi anexado, guarda as marcações
   (sincroniza como anotação), "Pedir o que falta no WhatsApp" e aviso no Resumo.
+- V145.37: Biblioteca de conteúdos (conteudos.html) com filtro por área, busca e vídeo
+  abrindo no site. Lista única em assets/conteudos.js (um vídeo por linha; capas em
+  assets/conteudos/). Capas desenhadas enquanto não houver a capa real (a imagem antiga
+  do Instagram pedia login). Páginas de área levam aos vídeos da área.
