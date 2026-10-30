@@ -5,7 +5,7 @@
 <title>Política de Privacidade | Kaliny Girardi Advocacia</title>
 <meta name="description" content="Como a Kaliny Girardi Advocacia trata os dados pessoais enviados pelo site, conforme a Lei Geral de Proteção de Dados (LGPD).">
 <link rel="canonical" href="https://kalinygirardiadvocacia.com.br/privacidade.html">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Montserrat:wght@400;500;600;700&display=swap"><link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/style.css">
 <style>
 .privacy{max-width:820px;margin:0 auto;padding:56px 22px 80px;color:#3f3026;line-height:1.7}
 .privacy h1{font-family:'Cormorant Garamond',Georgia,serif;font-weight:500;font-size:clamp(34px,5vw,48px);margin:8px 0 6px}
@@ -16,11 +16,11 @@
 .privacy a{color:#7a5a43}
 .privacy .back{display:inline-block;margin-top:40px}
 </style>
-</head>
+<link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32.png"><link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png"><link rel="manifest" href="/site.webmanifest"><meta name="theme-color" content="#5a3b2b"><link rel="preload" href="assets/fonts/montserrat-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin><link rel="preload" href="assets/fonts/cormorant-garamond-latin-500-normal.woff2" as="font" type="font/woff2" crossorigin></head>
 <body>
 <header class="site-header"><div class="container nav">
 <a class="brand" href="index.html"><img src="assets/logo.jpg" alt="Logo Kaliny Girardi"><span class="brand-name"><strong>KALINY GIRARDI</strong><small>ADVOCACIA</small></span></a>
-<nav class="navlinks"><a href="index.html#escritorio">O Escritório</a><a href="index.html#atuacao">Áreas de Atuação</a><a href="index.html#agendamento">Agendamento</a><a href="index.html#contato">Contato</a></nav>
+<nav class="navlinks" id="siteNav"><a href="index.html#escritorio">O Escritório</a><a href="index.html#atuacao">Áreas de Atuação</a><a href="index.html#agendamento">Agendamento</a><a href="index.html#contato">Contato</a><a class="nav-cta" href="index.html?agendar=#agendamento">Agendar consulta</a></nav><button class="menu" type="button" aria-label="Abrir menu" aria-expanded="false" aria-controls="siteNav">☰</button>
 </div></header>
 <main class="privacy">
 <span class="eyebrow">LGPD · Lei nº 13.709/2018</span>
@@ -60,5 +60,13 @@
 
 <a class="btn primary back" href="index.html">← Voltar ao site</a>
 </main>
-</body>
+<script>
+/* V145.32 — menu do celular */
+(function(){var b=document.querySelector('.site-header .menu'),n=document.querySelector('.site-header .navlinks');if(!b||!n)return;
+function set(o){n.classList.toggle('open',o);b.setAttribute('aria-expanded',o?'true':'false');b.textContent=o?'✕':'☰';b.setAttribute('aria-label',o?'Fechar menu':'Abrir menu')}
+b.addEventListener('click',function(e){e.stopPropagation();set(!n.classList.contains('open'))});
+n.addEventListener('click',function(e){if(e.target.closest('a'))set(false)});
+document.addEventListener('click',function(e){if(n.classList.contains('open')&&!e.target.closest('.site-header'))set(false)});
+document.addEventListener('keydown',function(e){if(e.key==='Escape')set(false)});})();
+</script></body>
 </html>

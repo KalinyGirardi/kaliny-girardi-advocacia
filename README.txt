@@ -1,5 +1,5 @@
 KALINY GIRARDI ADVOCACIA — site institucional + painel administrativo
-Versão: V145.31
+Versão: V145.32
 
 ESTRUTURA
 - index.html ............ site público (agendamento online, áreas, conteúdos, contato)
@@ -83,3 +83,8 @@ HISTÓRICO
   "adicionar à agenda" (.ics) e WhatsApp; WhatsApp com mensagem por área e botão
   flutuante; 5 páginas de área (areas/*.html) com perguntas frequentes para o Google;
   fontes sem @import e fotos em WebP (carrega mais rápido no celular).
+- V145.32: Site — menu do celular funcionando (antes o ☰ não abria), fontes servidas
+  pelo próprio site (assets/fonts; sem Google Fonts), favicon/ícones e manifest,
+  imagem de prévia 1200×630 para WhatsApp/Facebook (assets/og-image.jpg), fotos
+  responsivas, textos pequenos mais legíveis e 404 com endereços absolutos.
+  Lighthouse (celular): desempenho, acessibilidade e SEO 100.

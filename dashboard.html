@@ -1,4 +1,4 @@
-<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Dashboard — Kaliny Girardi</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Montserrat:wght@400;500;600;700&display=swap"><link rel="stylesheet" href="css/style.css"><script src="assets/appointment-config.js">
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Dashboard — Kaliny Girardi</title><link rel="stylesheet" href="css/style.css"><script src="assets/appointment-config.js">
 function navigateTo(section){
   const navMap={finance:'financeiro',processes:'processos',clients:'clientes',agenda:'agenda',dashboard:'dashboard'};
   const target=navMap[String(section||'').toLowerCase()]||section;
@@ -289,7 +289,7 @@ function navigateTo(section){
     overflow-wrap:anywhere!important;
   }
 }
-</style></head><body>
+</style><link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32.png"><link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png"><link rel="manifest" href="/site.webmanifest"><meta name="theme-color" content="#5a3b2b"></head><body>
 <div class="mobile-header mobile-only">
   <div class="mobile-brand">
     <img src="assets/logo.jpg" alt="Logo">
@@ -1479,7 +1479,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
    Regras: vence a alteração mais recente (updatedAt); exclusões viram marcação (deletedAt);
    resposta vazia ou com erro do servidor nunca apaga dados deste navegador. */
 (function(){
-  const VERSION='V145.31';
+  const VERSION='V145.32';
   const META_KEY='kaliny_sync_meta_v1';
   const COLLECTIONS=['processes','finance','notes','calcHistory','previdenciario','documents'];
   const BATCH=50;
