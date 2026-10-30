@@ -1,5 +1,5 @@
 KALINY GIRARDI ADVOCACIA — site institucional + painel administrativo
-Versão: V145.28
+Versão: V145.29
 
 ESTRUTURA
 - index.html ............ site público (agendamento online, áreas, conteúdos, contato)
@@ -68,3 +68,7 @@ HISTÓRICO
   cenários 15–30%, 13º e férias, extras proporcionais) e Inventário (meação por
   regime, concorrência do cônjuge, reserva de 1/4, ascendentes, ITCMD por herdeiro,
   caminho cartório/judicial). Teto, mínimo, ITCMD e honorários ficam lembrados.
+- V145.29: Ficha do cliente com aba "Resumo": próxima consulta, próximo prazo,
+  em aberto e recebido; "Precisa de atenção" (prazos até 15 dias, parcelas
+  vencidas com cobrança no WhatsApp, cadastro incompleto, falta de procuração ou
+  contrato); ações rápidas; e linha do tempo com tudo do cliente, com filtros.

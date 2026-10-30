@@ -1477,7 +1477,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
    Regras: vence a alteração mais recente (updatedAt); exclusões viram marcação (deletedAt);
    resposta vazia ou com erro do servidor nunca apaga dados deste navegador. */
 (function(){
-  const VERSION='V145.28';
+  const VERSION='V145.29';
   const META_KEY='kaliny_sync_meta_v1';
   const COLLECTIONS=['processes','finance','notes','calcHistory','previdenciario','documents'];
   const BATCH=50;
@@ -3618,6 +3618,166 @@ ${chk('isNet','O valor acima já é líquido')}${chk('clt','Tem carteira assinad
   const om=window.openModal;window.openModal=function(){const b=document.querySelector('#modal .modal-box');if(b)b.classList.remove('kc-wide');return om.apply(this,arguments)};
   const oc=window.openCalc;window.openCalc=function(type,clientId){if(VIEWS[type])return open(type,clientId||'');return oc.apply(this,arguments)};
   window.kalinyCalc.open=open;
+})();
+</script>
+<script>
+/* V145.29 — Ficha do cliente: aba "Resumo" com o que precisa de atenção, ações rápidas e a linha do
+   tempo de tudo do cliente (consultas, prazos, andamentos, pagamentos, documentos, anotações e cálculos). */
+(function(){
+  const C={ok:'#557a62',bad:'#9a5a55',warn:'#a8741a',ink:'#3d2b20',mut:'#8d7767',acc:'#b06a1e',blue:'#41658a'};
+  const pad=n=>String(n).padStart(2,'0');
+  const parseDay=v=>{const s=String(v||'').trim();let m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);if(m)return new Date(+m[1],m[2]-1,+m[3]);m=s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);return m?new Date(+m[3],m[2]-1,+m[1]):null};
+  const today=()=>{const t=new Date();t.setHours(0,0,0,0);return t};
+  const days=d=>Math.round((d-today())/86400000);
+  const br=d=>d?pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear():'';
+  const lower=v=>String(v||'').trim().toLowerCase();
+  const MES=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+  const rel=d=>{const n=days(d);return n===0?'hoje':n===1?'amanhã':n===-1?'ontem':n>0?`em ${n} dias`:`há ${-n} dias`};
+  const isIn=f=>lower(f.type||'receita')!=='despesa';
+  const isPaid=f=>lower(f.status)==='pago'||lower(f.status)==='recebido';
+  const UI_KEY='kaliny_fc_ui_v1';let ui={filter:'all'};try{Object.assign(ui,JSON.parse(localStorage.getItem(UI_KEY)||'{}'))}catch(e){}
+  const saveUi=()=>{try{localStorage.setItem(UI_KEY,JSON.stringify(ui))}catch(e){}};
+  const KINDS={agenda:['📅','Consultas'],prazo:['⏱','Prazos'],mov:['⚖','Andamentos'],fin:['💰','Financeiro'],doc:['📄','Documentos'],note:['📝','Anotações'],calc:['🧮','Cálculos']};
+  const sid=v=>esc(String(v));
+
+  function pendDeadlines(p){
+    if(window.kalinyCP&&window.kalinyCP.pendingDeadlines)return window.kalinyCP.pendingDeadlines(p);
+    return (p.deadlines||[]).filter(d=>d&&!lower(d.status).startsWith('conclu')&&parseDay(d.date)).map(d=>({p,date:parseDay(d.date),title:d.title||'Prazo'}));
+  }
+
+  function collect(id){
+    const S=String(id),mine=a=>(a||[]).filter(x=>x&&String(x.clientId)===S),items=[];
+    mine(data.agenda).forEach(e=>{const d=parseDay(e.date);if(d)items.push({k:'agenda',d,time:e.time||'',t:e.title||'Compromisso',s:[e.time,e.mode,e.status].filter(Boolean).join(' · '),act:`data-fc-event="${sid(e.id)}"`,done:lower(e.status).includes('conclu')||lower(e.status).includes('realiz')})});
+    const procs=mine(data.processes);
+    procs.forEach(p=>{
+      const num=p.number||'Processo';
+      pendDeadlines(p).forEach(x=>items.push({k:'prazo',d:x.date,t:x.title,s:num,act:`data-fc-proc="${sid(p.id)}"`,pend:true}));
+      (p.deadlines||[]).filter(x=>x&&lower(x.status).startsWith('conclu')&&parseDay(x.date)).forEach(x=>items.push({k:'prazo',d:parseDay(x.date),t:(x.title||'Prazo')+' ✓',s:num+' · concluído',act:`data-fc-proc="${sid(p.id)}"`,done:true}));
+      (p.movements||[]).filter(m=>m&&parseDay(m.date)).forEach(m=>items.push({k:'mov',d:parseDay(m.date),t:m.title||m.text||'Andamento',s:num,act:`data-fc-proc="${sid(p.id)}"`}));
+    });
+    mine(data.finance).forEach(f=>{const d=parseDay(isPaid(f)&&f.paidAt?f.paidAt:(f.dueDate||f.date));if(!d)return;const paid=isPaid(f),late=!paid&&isIn(f)&&parseDay(f.dueDate||f.date)<today();
+      items.push({k:'fin',d,t:f.desc||'Lançamento',s:money(f.value)+' · '+(paid?(isIn(f)?'recebido':'pago'):late?'vencido':'a vencer'),act:`data-fc-fin="${sid(f.id)}"`,late,pend:!paid,done:paid,fin:f})});
+    mine(data.documents).forEach(x=>{const d=parseDay(x.createdAt)||parseDay(x.date);if(d)items.push({k:'doc',d,t:x.name||x.title||'Documento',s:x.contract?'Contrato':x.category||'Arquivo',act:`data-fc-tab="documents"`})});
+    mine(data.notes).forEach(n=>{const d=parseDay(n.date);if(d)items.push({k:'note',d,time:n.time||'',t:n.title||'Anotação',s:String(n.text||'').slice(0,90),act:`data-fc-tab="notes"`})});
+    (data.calcHistory||[]).forEach((h,i)=>{if(h&&String(h.clientId)===S){const d=parseDay(h.date);if(d)items.push({k:'calc',d,t:h.label||'Cálculo',s:String(h.result||'').split('\n')[0].slice(0,90),act:`data-fc-calc="${i}"`})}});
+    return {items,procs};
+  }
+
+  function attention(c,items){
+    const out=[],t0=today(),S=String(c.id);
+    items.filter(x=>x.k==='prazo'&&x.pend&&days(x.d)<=15).sort((a,b)=>a.d-b.d).forEach(x=>{const n=days(x.d);
+      out.push({lvl:n<0?'bad':n<=3?'warn':'info',ic:'⏱',t:`${x.t} — ${n<0?'venceu '+rel(x.d):'vence '+rel(x.d)} (${br(x.d)})`,s:x.s,btns:`<button class="d-btn light" type="button" ${x.act}>Abrir processo</button>`})});
+    const late=items.filter(x=>x.k==='fin'&&x.late);
+    if(late.length){const tot=late.reduce((s,x)=>s+Number(x.fin.value||0),0);
+      late.sort((a,b)=>a.d-b.d).forEach(x=>out.push({lvl:'bad',ic:'💰',t:`${x.t} — ${money(x.fin.value)} vencido ${rel(parseDay(x.fin.dueDate||x.fin.date))}`,s:late.length>1?`${late.length} parcelas vencidas, ${money(tot)} no total`:'',btns:`${c.phone?`<button class="d-btn light" type="button" data-fin-wa="${sid(x.fin.id)}">Cobrar no WhatsApp</button>`:''}<button class="d-btn light" type="button" data-fc-paid="${sid(x.fin.id)}">Marcar como recebido</button>`}))}
+    const next=items.filter(x=>x.k==='agenda'&&!x.done&&x.d>=t0).sort((a,b)=>a.d-b.d||String(a.time).localeCompare(String(b.time)))[0];
+    if(next&&days(next.d)<=2)out.push({lvl:'info',ic:'📅',t:`${next.t} ${rel(next.d)}${next.time?' às '+next.time:''}`,s:'Consulta marcada',btns:c.phone?`<a class="d-btn light" href="${whatsappHref(c.phone)}" target="_blank" rel="noopener">Confirmar no WhatsApp</a>`:''});
+    const missing=[];if(!c.cpf)missing.push('CPF');if(!c.rg)missing.push('RG');if(!c.street||!c.city)missing.push('endereço');if(!c.phone)missing.push('telefone');if(!c.maritalStatus)missing.push('estado civil');if(!c.profession)missing.push('profissão');
+    if(missing.length)out.push({lvl:'info',ic:'🪪',t:`Cadastro incompleto: falta ${missing.join(', ')}`,s:'Esses dados entram na procuração e no contrato.',btns:`<button class="d-btn light" type="button" data-fc-edit="1">Completar cadastro</button>`});
+    const docs=(data.documents||[]).filter(d=>d&&String(d.clientId)===S),has=re=>docs.some(d=>re.test(lower(d.name)+' '+lower(d.category)+' '+lower(d.title)));
+    if(!has(/procura/))out.push({lvl:'info',ic:'📄',t:'Nenhuma procuração na ficha',s:'Gere pelo modelo, já com os dados do cliente.',btns:`<button class="d-btn light" type="button" data-fc-model="procuracao">Gerar procuração</button>`});
+    if(!docs.some(d=>d.contract)&&!has(/contrato/))out.push({lvl:'info',ic:'✍',t:'Sem contrato de honorários',s:'O contrato também cria as parcelas no Financeiro.',btns:`<button class="d-btn light" type="button" data-fc-contract="1">Fazer contrato</button>`});
+    return out;
+  }
+
+  const css=`#modal .client-tabs{flex-wrap:wrap}@media(max-width:700px){#modal .client-tab{padding:8px 10px;font-size:13px}}
+.fc{display:flex;flex-direction:column;gap:14px}
+.fc .fc-tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.fc .fc-tile{border:1px solid #eaded2;border-radius:14px;background:#fff;padding:11px 13px;text-align:left;cursor:pointer;font:inherit}.fc .fc-tile:hover{box-shadow:0 4px 14px rgba(61,43,32,.08)}
+.fc .fc-tile small{display:block;font-size:12px;color:${C.mut}}.fc .fc-tile strong{display:block;font:500 19px Georgia,serif;color:${C.ink};margin:3px 0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.fc .fc-tile span{font-size:12px;color:${C.mut}}
+.fc h3{margin:0 0 8px;font:500 18px Georgia,serif;color:${C.ink}}
+.fc .fc-att{display:flex;flex-direction:column;gap:7px}
+.fc .fc-a{display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:10px;align-items:center;border:1px solid #eaded2;border-left:4px solid #c9b6a4;border-radius:12px;background:#fff;padding:9px 11px}
+.fc .fc-a.bad{border-left-color:${C.bad};background:#fdf7f6}.fc .fc-a.warn{border-left-color:${C.warn};background:#fffaf2}
+.fc .fc-a b{font-size:14px;color:${C.ink}}.fc .fc-a small{display:block;font-size:12px;color:${C.mut};margin-top:2px}.fc .fc-a .fc-b{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.fc .fc-a .d-btn{padding:7px 11px;font-size:13px}
+.fc .fc-ok{border:1px dashed #cfdcd2;background:#f5faf6;color:${C.ok};border-radius:12px;padding:12px;font-size:14px}
+.fc .fc-quick{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.fc .fc-q{border:1px solid #eaded2;border-radius:12px;background:#fff;padding:10px;cursor:pointer;text-align:left;font:inherit;font-size:13px;color:${C.ink};text-decoration:none;display:flex;gap:8px;align-items:center}
+.fc .fc-q:hover{border-color:${C.acc}}.fc .fc-q i{font-style:normal;font-size:18px}
+.fc .fc-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}.fc .fc-chip{border:1px solid #eaded2;background:#fff;border-radius:999px;padding:5px 11px;font-size:12px;cursor:pointer;color:${C.ink}}
+.fc .fc-chip.on{background:#6b4a36;color:#fff;border-color:#6b4a36}
+.fc .fc-grp{margin:12px 0 4px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:${C.mut}}
+.fc .fc-tl{position:relative;padding-left:22px}.fc .fc-tl:before{content:'';position:absolute;left:8px;top:4px;bottom:4px;width:2px;background:#eee3d8}
+.fc .fc-it{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;padding:7px 9px;border-radius:10px;cursor:pointer}.fc .fc-it:hover{background:#faf5f0}
+.fc .fc-it:before{content:attr(data-ic);position:absolute;left:-24px;top:6px;width:22px;height:22px;border-radius:50%;background:#fff;border:1px solid #eaded2;font-size:11px;display:flex;align-items:center;justify-content:center}
+.fc .fc-it b{font-size:14px;color:${C.ink};font-weight:600}.fc .fc-it small{display:block;font-size:12px;color:${C.mut};margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fc .fc-it .fc-d{font-size:12px;color:${C.mut};white-space:nowrap;text-align:right}.fc .fc-it.late b{color:${C.bad}}.fc .fc-it.done{opacity:.75}
+.fc .fc-more{margin-top:6px}
+@media(max-width:700px){.fc .fc-tiles,.fc .fc-quick{grid-template-columns:repeat(2,minmax(0,1fr))}.fc .fc-a{grid-template-columns:26px minmax(0,1fr)}.fc .fc-a .fc-b{grid-column:1/-1;justify-content:flex-start}}`;
+
+  function tile(label,val,sub,act){return `<button class="fc-tile" type="button" ${act}><small>${label}</small><strong>${val}</strong><span>${sub||'&nbsp;'}</span></button>`}
+
+  function render(id,limit){
+    const el=document.querySelector('#modal [data-panel="resumo"]'),c=clientById(id);if(!el||!c)return;
+    const {items,procs}=collect(id),t0=today();
+    const att=attention(c,items);
+    const nextEv=items.filter(x=>x.k==='agenda'&&!x.done&&x.d>=t0).sort((a,b)=>a.d-b.d)[0];
+    const nextDl=items.filter(x=>x.k==='prazo'&&x.pend).sort((a,b)=>a.d-b.d)[0];
+    const fin=items.filter(x=>x.k==='fin'&&isIn(x.fin));
+    const open=fin.filter(x=>x.pend).reduce((s,x)=>s+Number(x.fin.value||0),0),late=fin.filter(x=>x.late).reduce((s,x)=>s+Number(x.fin.value||0),0),recv=fin.filter(x=>x.done).reduce((s,x)=>s+Number(x.fin.value||0),0);
+    const act=procs.filter(p=>lower(p.status)!=='encerrado').length;
+    const tiles=tile('Próxima consulta',nextEv?br(nextEv.d):'—',nextEv?rel(nextEv.d)+(nextEv.time?' · '+nextEv.time:''):'nada marcado','data-fc-tab="agenda"')+
+      tile('Próximo prazo',nextDl?br(nextDl.d):'—',nextDl?rel(nextDl.d):act?'sem prazo pendente':'sem processo ativo','data-fc-tab="processos"')+
+      tile('Em aberto',money(open),late?`<span style="color:${C.bad}">${money(late)} vencido</span>`:'nada vencido','data-fc-tab="finance"')+
+      tile('Já recebido',money(recv),`${procs.length} processo${procs.length===1?'':'s'} · ${(data.documents||[]).filter(d=>d&&String(d.clientId)===String(id)).length} doc.`,'data-fc-tab="finance"');
+    const attHtml=att.length?att.map(a=>`<div class="fc-a ${a.lvl}"><div style="font-size:20px">${a.ic}</div><div><b>${esc(a.t)}</b>${a.s?`<small>${esc(a.s)}</small>`:''}</div><div class="fc-b">${a.btns}</div></div>`).join(''):`<div class="fc-ok">✓ Tudo em dia com ${esc(String(c.name).split(' ')[0])}: sem prazo perto, nada vencido e cadastro completo.</div>`;
+    const Q=(ic,label,attrs,tag)=>tag==='a'?`<a class="fc-q" ${attrs}><i>${ic}</i>${label}</a>`:`<button class="fc-q" type="button" ${attrs}><i>${ic}</i>${label}</button>`;
+    const quick=(c.phone?Q('💬','WhatsApp',`href="${whatsappHref(c.phone)}" target="_blank" rel="noopener"`,'a'):Q('💬','WhatsApp','data-fc-edit="1" title="Cadastre o telefone"'))+
+      Q('📅','Agendar consulta','data-fc-new="event"')+Q('💰','Nova cobrança','data-fc-new="fin"')+Q('⚖','Novo processo','data-fc-new="proc"')+
+      Q('📝','Anotar atendimento','data-fc-new="note"')+Q('📄','Gerar documento','data-fc-tab="documents"')+Q('🧮','Nova simulação','data-fc-new="calc"')+Q('📊','Dossiê previdenciário','data-fc-new="dossie"');
+    const f=ui.filter,list=items.filter(x=>f==='all'||x.k===f||(f==='prazo'&&x.k==='mov'));
+    const future=list.filter(x=>x.d>=t0&&!x.done).sort((a,b)=>a.d-b.d||String(a.time||'').localeCompare(String(b.time||'')));
+    const past=list.filter(x=>!(x.d>=t0&&!x.done)).sort((a,b)=>b.d-a.d||String(b.time||'').localeCompare(String(a.time||'')));
+    const it=x=>`<div class="fc-it ${x.late?'late':''} ${x.done?'done':''}" data-ic="${KINDS[x.k][0]}" ${x.act} role="button" tabindex="0"><div><b>${esc(x.t)}</b>${x.s?`<small>${esc(x.s)}</small>`:''}</div><div class="fc-d">${br(x.d)}${x.time?'<br>'+esc(x.time):''}<br>${rel(x.d)}</div></div>`;
+    const lim=limit||25;let lastM='';
+    const pastHtml=past.slice(0,lim).map(x=>{const m=MES[x.d.getMonth()]+' de '+x.d.getFullYear();const h=m!==lastM?`<div class="fc-grp">${m}</div>`:'';lastM=m;return h+it(x)}).join('');
+    const counts={};items.forEach(x=>{const k=x.k==='mov'?'prazo':x.k;counts[k]=(counts[k]||0)+1});
+    const chips=`<div class="fc-chips"><button class="fc-chip ${f==='all'?'on':''}" type="button" data-fc-filter="all">Tudo (${items.length})</button>${['agenda','prazo','fin','doc','note','calc'].filter(k=>counts[k]).map(k=>`<button class="fc-chip ${f===k?'on':''}" type="button" data-fc-filter="${k}">${KINDS[k][0]} ${k==='prazo'?'Processos':KINDS[k][1]} (${counts[k]})</button>`).join('')}</div>`;
+    el.innerHTML=`<style>${css}</style><div class="fc" data-fc-client="${sid(id)}"><div class="fc-tiles">${tiles}</div>
+<div><h3>Precisa de atenção</h3><div class="fc-att">${attHtml}</div></div>
+<div><h3>Ações rápidas</h3><div class="fc-quick">${quick}</div></div>
+<div><h3>Linha do tempo</h3>${items.length?chips:''}${!list.length?`<div class="fc-ok" style="color:${C.mut};border-color:#eaded2;background:#fff">${items.length?'Nada nesse filtro.':'Ainda não há nada registrado para este cliente. Use as ações rápidas acima.'}</div>`:''}
+${future.length?`<div class="fc-grp">Próximos</div><div class="fc-tl">${future.map(it).join('')}</div>`:''}${past.length?`<div class="fc-tl">${pastHtml}</div>${past.length>lim?`<button class="d-btn light fc-more" type="button" data-fc-more="${lim+25}">Ver mais ${Math.min(25,past.length-lim)} de ${past.length-lim}</button>`:''}`:''}</div></div>`;
+  }
+
+  function enhance(id){
+    const body=document.getElementById('modalBody'),tabs=body&&body.querySelector('.client-tabs');if(!tabs||tabs.querySelector('[data-tab="resumo"]'))return;
+    const box=document.querySelector('#modal .modal-box');if(box)box.classList.add('kc-wide');
+    const top=body.querySelector('.d-panel > .client-mini-grid');if(top)top.style.display='none';
+    tabs.insertAdjacentHTML('afterbegin',`<button class="client-tab" data-tab="resumo" onclick="openClientTab('${sid(id)}','resumo')">Resumo</button>`);
+    const first=body.querySelector('.client-tab-panel');first.insertAdjacentHTML('beforebegin','<div class="client-tab-panel" data-panel="resumo"></div>');
+    render(id);openClientTab(id,'resumo');
+  }
+
+  const ov=window.viewClient;
+  window.viewClient=function(id){const r=ov.apply(this,arguments);try{enhance(id)}catch(e){console.warn('Ficha do cliente:',e)}return r};
+  // Depois de salvar algo, atualiza o resumo se a ficha estiver aberta.
+  const osave=window.save;
+  window.save=function(){const r=osave.apply(this,arguments);try{const w=document.querySelector('#modal.show [data-fc-client]');if(w)render(w.getAttribute('data-fc-client'))}catch(e){}return r};
+
+  document.addEventListener('click',ev=>{
+    const t=ev.target.closest&&ev.target.closest('[data-fc-tab],[data-fc-new],[data-fc-proc],[data-fc-event],[data-fc-fin],[data-fc-calc],[data-fc-paid],[data-fc-edit],[data-fc-model],[data-fc-contract],[data-fc-filter],[data-fc-more]');
+    if(!t||!t.closest('#modal'))return;const w=t.closest('[data-fc-client]');if(!w)return;const id=w.getAttribute('data-fc-client'),d=t.dataset;
+    if(t.tagName==='A')return;ev.preventDefault();
+    if(d.fcFilter){ui.filter=d.fcFilter;saveUi();return render(id)}
+    if(d.fcMore)return render(id,+d.fcMore);
+    if(d.fcTab)return openClientTab(id,d.fcTab);
+    if(d.fcProc)return openProcessDetail(d.fcProc);
+    if(d.fcEvent)return openEventForm(id,d.fcEvent);
+    if(d.fcFin)return openFinanceForm(id,d.fcFin);
+    if(d.fcCalc)return printCalcReport(+d.fcCalc);
+    if(d.fcEdit)return openEditClient(id);
+    if(d.fcContract)return openContractEditor(id);
+    if(d.fcModel){openClientTab(id,'documents');return setTimeout(()=>{const b=document.querySelector(`#modal [data-quick-model="${d.fcModel}"]`);if(b)b.click();else toast('Abra "Documentos" para gerar o modelo')},60)}
+    if(d.fcPaid){const f=(data.finance||[]).find(x=>String(x.id)===d.fcPaid);if(!f)return;f.status='pago';f.paidAt=new Date().toISOString().slice(0,10);save();toast('Marcado como recebido');return}
+    if(d.fcNew){const k=d.fcNew;
+      if(k==='event')return openEventForm(id);if(k==='fin')return openFinanceForm(id);if(k==='proc')return openProcessForm(id);if(k==='note')return openNoteForm(id);if(k==='dossie')return openDossie(id);
+      if(k==='calc')return openModal('Nova simulação',`<div class="fc" data-fc-client="${sid(id)}"><div class="fc-quick" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr))">${[['retirement','👵','Aposentadoria'],['pension','👨‍👩‍👧','Pensão alimentícia'],['inventory','🏠','Inventário']].map(x=>`<button class="fc-q" type="button" data-fc-calcnew="${x[0]}"><i>${x[1]}</i>${x[2]}</button>`).join('')}</div></div><style>${css}</style>`)}
+  });
+  document.addEventListener('click',ev=>{const t=ev.target.closest&&ev.target.closest('[data-fc-calcnew]');if(!t)return;const w=t.closest('[data-fc-client]');openCalc(t.dataset.fcCalcnew,w?w.getAttribute('data-fc-client'):'')});
+  document.addEventListener('keydown',ev=>{if(ev.key==='Enter'&&ev.target.classList&&ev.target.classList.contains('fc-it'))ev.target.click()});
+  window.kalinyFicha={render,collect,attention};
 })();
 </script>
 </body></html>
