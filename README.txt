@@ -1,5 +1,5 @@
 KALINY GIRARDI ADVOCACIA — site institucional + painel administrativo
-Versão: V145.33
+Versão: V145.34
 
 ESTRUTURA
 - index.html ............ site público (agendamento online, áreas, conteúdos, contato)
@@ -95,3 +95,6 @@ HISTÓRICO
   no editor. Assinaturas espaçadas e mantidas juntas na mesma página.
   Apps Script V145.24: encontra a agenda compartilhada da Kaliny mesmo com endereço
   próprio (…@group.calendar.google.com); função diagnosticoAgenda.
+- V145.34: Guia do painel — "❓ Como usar" (menu lateral e topo) com 15 tarefas do dia
+  a dia em passos curtos, busca e "Me leve lá" (abre a tela e destaca o botão);
+  aviso de boas-vindas no primeiro acesso.

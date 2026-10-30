@@ -1479,7 +1479,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
    Regras: vence a alteração mais recente (updatedAt); exclusões viram marcação (deletedAt);
    resposta vazia ou com erro do servidor nunca apaga dados deste navegador. */
 (function(){
-  const VERSION='V145.33';
+  const VERSION='V145.34';
   const META_KEY='kaliny_sync_meta_v1';
   const COLLECTIONS=['processes','finance','notes','calcHistory','previdenciario','documents'];
   const BATCH=50;
@@ -3991,6 +3991,97 @@ ${SIGN}`}};
     const t=form.querySelector('input[name="title"]');if(t)t.value='Recibo — '+(desc||'honorários');
   };
   document.addEventListener('click',ev=>{const b=ev.target.closest&&ev.target.closest('[data-x-recibo]');if(!b)return;ev.preventDefault();ev.stopPropagation();window.kalinyRecibo(b.getAttribute('data-x-recibo'))},true);
+})();
+</script>
+<script>
+/* V145.34 — Guia do painel: "❓ Como usar" com as tarefas do dia a dia em passos curtos e o botão
+   "Me leve lá", que abre a tela certa e destaca onde clicar. Aviso de boas-vindas no primeiro acesso. */
+(function(){
+  const SEEN='kaliny_guide_seen_v1';
+  const G=[
+    {g:'Atendimento',ic:'📅',t:'Confirmar uma consulta marcada pelo site',page:'agenda',spot:['.a-pc [data-a-confirm]','[data-a-confirm]','#page-agenda h1, #page-agenda h2'],tip:'Os pedidos do site aparecem aqui. Toque em ✓ Confirmar.',
+      steps:['Abra a <b>Agenda</b>. Os pedidos novos ficam em "Aguardando confirmação".','Toque em <b>✓ Confirmar</b>. A pessoa recebe o e-mail de confirmação.','Se for cliente novo, toque em <b>＋ Cadastrar cliente</b>: os dados já vêm preenchidos.']},
+    {g:'Atendimento',ic:'🗓',t:'Marcar uma consulta ou compromisso',page:'agenda',spot:['#newEvent','[data-a-new]'],tip:'Toque aqui para marcar um compromisso.',
+      steps:['Na <b>Agenda</b>, toque em <b>+ Novo compromisso</b> (ou no "+" de um dia).','Escolha o cliente, a data, o horário e salve.','Ele aparece na Agenda, na ficha do cliente e no Google Agenda.']},
+    {g:'Clientes',ic:'👤',t:'Cadastrar um cliente',page:'clients',spot:['#newClient'],tip:'Toque aqui para cadastrar.',
+      steps:['Em <b>Clientes</b>, toque em <b>+ Novo cliente</b>.','Preencha nome, telefone e e-mail. CPF, RG e endereço podem vir depois.','Para procurações, abra a ficha → <b>Editar</b> e complete gênero, RG e estado civil.']},
+    {g:'Clientes',ic:'📋',t:'Ver tudo de um cliente',page:'clients',spot:['#cliApp .k-row b','#cliApp .k-row','#clientsTable tr'],tip:'Toque no nome do cliente para abrir a ficha.',
+      steps:['Em <b>Clientes</b>, toque no nome.','A aba <b>Resumo</b> mostra o que precisa de atenção, ações rápidas e a linha do tempo.','As outras abas (Documentos, Financeiro…) têm os detalhes.']},
+    {g:'Documentos',ic:'📄',t:'Gerar procuração, declaração, recibo ou notificação',page:'clients',spot:['#cliApp .k-row b','#cliApp .k-row'],tip:'Abra a ficha do cliente → Documentos.',
+      steps:['Abra a ficha do cliente e vá em <b>Documentos</b>.','Em <b>Documentos rápidos</b>, escolha o modelo.','Preencha os campos que aparecerem, toque em <b>Pré-visualizar</b> e depois em <b>Gerar e salvar</b>. Sai em Word no papel timbrado.']},
+    {g:'Documentos',ic:'✍',t:'Fazer o contrato de honorários (e as parcelas)',page:'clients',spot:['#cliApp .k-row b','#cliApp .k-row'],tip:'Abra a ficha do cliente → Resumo → Fazer contrato.',
+      steps:['Na ficha do cliente, toque em <b>Fazer contrato</b> (ou Documentos → Novo documento).','Escreva o objeto, o valor, a entrada e as parcelas.','Ao salvar, as parcelas entram sozinhas no <b>Financeiro</b>.']},
+    {g:'Documentos',ic:'📎',t:'Guardar um arquivo do cliente (RG, CNIS, comprovante)',page:'documents',spot:['[data-cd-upload]'],tip:'Toque aqui para anexar.',
+      steps:['Em <b>Documentos</b>, toque em <b>Anexar arquivo</b> (ou na ficha → Documentos).','Escolha o cliente, a categoria e o arquivo.','O arquivo vai para a pasta do cliente no Google Drive e abre também no celular.']},
+    {g:'Financeiro',ic:'💰',t:'Lançar honorários ou uma despesa',page:'finance',spot:['#newFinance'],tip:'Toque aqui para lançar.',
+      steps:['No <b>Financeiro</b>, toque em <b>+ Novo lançamento</b>.','Escolha entrada ou saída, valor, vencimento e cliente.','Para parcelar, marque o parcelamento: o painel cria todas as parcelas.']},
+    {g:'Financeiro',ic:'💬',t:'Cobrar uma parcela pelo WhatsApp',page:'finance',spot:['[data-fin-wa]','#newFinance'],tip:'O 💬 abre o WhatsApp com a mensagem pronta.',
+      steps:['No <b>Financeiro</b>, ache a parcela (vencidas ficam em vermelho).','Toque em <b>💬</b>: abre o WhatsApp do cliente com a mensagem pronta.','Quando pagar, toque na bolinha da parcela para marcar como <b>recebido</b>.']},
+    {g:'Financeiro',ic:'🧾',t:'Dar recibo de um pagamento',page:'finance',spot:['[data-x-recibo]','#newFinance'],tip:'O 🧾 aparece nos pagamentos recebidos.',
+      steps:['No <b>Financeiro</b>, ache o pagamento já recebido.','Toque em <b>🧾</b>: o recibo abre com valor por extenso, data e forma de pagamento.','Confira e toque em <b>Gerar e salvar</b>.']},
+    {g:'Processos',ic:'⚖',t:'Cadastrar um processo e o prazo',page:'processes',spot:['#newProcess'],tip:'Toque aqui para cadastrar o processo.',
+      steps:['Em <b>Processos</b>, toque em <b>+ Novo processo</b>.','Informe número, cliente e o próximo prazo.','O prazo aparece no Dashboard, na Agenda, no resumo diário por e-mail e no Google Agenda.']},
+    {g:'Processos',ic:'⏱',t:'Calcular um prazo em dias úteis',page:'calculators',spot:['[data-cd-tool="prazos"]'],tip:'Calculadora de prazos (CPC, feriados e recesso).',
+      steps:['Em <b>Calculadoras</b>, toque em <b>Calcular prazo</b>.','Informe a data da intimação e o número de dias.','Confira o vencimento e salve no processo.']},
+    {g:'Calculadoras',ic:'🧮',t:'Simular aposentadoria, pensão ou inventário',page:'calculators',spot:['[data-cd-tool="retirement"]','[data-cd-tool="pension"]'],tip:'O resultado aparece enquanto você digita.',
+      steps:['Em <b>Calculadoras</b>, escolha a simulação.','Preencha os campos: o resultado e a explicação passo a passo aparecem na hora.','Toque em <b>Salvar no histórico</b> para vincular ao cliente e gerar o relatório.']},
+    {g:'Sistema',ic:'📱',t:'Usar no celular como aplicativo',page:'',spot:[],
+      steps:['No iPhone, abra o painel no <b>Safari</b>.','Toque em <b>Compartilhar</b> (quadrado com seta) → <b>Adicionar à Tela de Início</b>.','Os dados são os mesmos do computador: tudo sincroniza sozinho.']},
+    {g:'Sistema',ic:'🛡',t:'Segurança e cópia dos dados',page:'settings',spot:['#exportBackupBtn','#forgetDeviceBtn'],tip:'Aqui ficam o backup e a segurança.',
+      steps:['A planilha faz backup sozinha todos os dias.','Em <b>Configurações</b> você baixa uma cópia e vê o status do sistema.','Em aparelho emprestado, use <b>Esquecer este aparelho</b> ao sair.']}];
+  const css=`.gd-list{display:flex;flex-direction:column;gap:8px}.gd-grp{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:#8d7767;margin:10px 0 2px}
+.gd-it{border:1px solid #eaded2;border-radius:14px;background:#fff}.gd-it summary{list-style:none;cursor:pointer;padding:12px 14px;display:flex;gap:10px;align-items:center;font-weight:600;color:#3d2b20;font-size:15px}
+.gd-it summary::-webkit-details-marker{display:none}.gd-it summary:after{content:'›';margin-left:auto;color:#8d7767;font-size:20px;transition:transform .2s}.gd-it[open] summary:after{transform:rotate(90deg)}
+.gd-it ol{margin:0 14px 10px 40px;padding:0;color:#4d3a2e;line-height:1.55;font-size:14px}.gd-it .gd-go{margin:0 14px 14px 40px}
+.gd-search{width:100%;box-sizing:border-box;border:1px solid #eaded2;border-radius:999px;padding:10px 16px;font:inherit;margin-bottom:6px}
+.gd-spot{position:relative;z-index:30;outline:3px solid #b06a1e!important;outline-offset:3px;border-radius:10px;animation:gdPulse 1.2s ease-in-out 4}
+@keyframes gdPulse{0%,100%{box-shadow:0 0 0 0 rgba(176,106,30,.45)}50%{box-shadow:0 0 0 12px rgba(176,106,30,0)}}
+.gd-tip{position:fixed;z-index:10000;max-width:260px;background:#3d2b20;color:#fff;border-radius:12px;padding:10px 12px;font-size:14px;line-height:1.4;box-shadow:0 10px 28px rgba(0,0,0,.25)}
+.gd-tip button{background:none;border:0;color:#f0c38e;font-weight:700;cursor:pointer;padding:0;margin-left:6px}
+.gd-hello{display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:#fbf6ee;border:1px solid #efe2cf;border-radius:14px;padding:12px 14px;margin:0 0 14px;color:#5f4b3e;font-size:14px}
+.gd-hello b{color:#3d2b20}.gd-hello .gd-sp{flex:1;min-width:200px}
+.gd-help-btn{border:1px solid #eaded2;background:#fff;border-radius:999px;padding:6px 12px;font-size:13px;cursor:pointer;color:#3d2b20}`;
+  const style=()=>{if(!document.getElementById('gdCss')){const s=document.createElement('style');s.id='gdCss';s.textContent=css;document.head.appendChild(s)}};
+  function open(q){
+    style();try{localStorage.setItem(SEEN,'1')}catch(e){}document.querySelectorAll('.gd-hello').forEach(e=>e.remove());
+    const groups=[...new Set(G.map(x=>x.g))];
+    openModal('Como usar o painel',`<input class="gd-search" id="gdQ" placeholder="O que você quer fazer? (ex.: recibo, prazo, cobrar)" value="${esc(q||'')}"><div class="gd-list" id="gdList">${groups.map(g=>`<div class="gd-grp" data-g="${esc(g)}">${esc(g)}</div>`+G.map((x,i)=>x.g!==g?'':`<details class="gd-it" data-i="${i}" data-g="${esc(g)}"><summary><span style="font-size:20px">${x.ic}</span>${esc(x.t)}</summary><ol>${x.steps.map(s=>`<li>${s}</li>`).join('')}</ol>${x.page?`<button class="d-btn gd-go" type="button" data-gd-go="${i}">Me leve lá →</button>`:''}</details>`).join('')).join('')}</div><p class="mini-help" style="margin-top:12px">Dica: em qualquer tela, o botão <b>❓ Como usar</b> abre este guia.</p>`);
+    const inp=document.getElementById('gdQ');const flt=()=>{const v=inp.value.trim().toLowerCase();document.querySelectorAll('#gdList .gd-it').forEach(d=>{const x=G[+d.dataset.i];const hit=!v||(x.t+' '+x.steps.join(' ')+' '+x.g).toLowerCase().includes(v);d.style.display=hit?'':'none';if(v&&hit)d.open=true});
+      document.querySelectorAll('#gdList .gd-grp').forEach(h=>{h.style.display=[...document.querySelectorAll(`#gdList .gd-it[data-g="${CSS.escape(h.dataset.g)}"]`)].some(d=>d.style.display!=='none')?'':'none'})};
+    inp.addEventListener('input',flt);flt();setTimeout(()=>inp.focus(),50);
+  }
+  function clearSpot(){document.querySelectorAll('.gd-spot').forEach(e=>e.classList.remove('gd-spot'));document.querySelectorAll('.gd-tip').forEach(e=>e.remove())}
+  let run=0;
+  function go(i){
+    const x=G[i];if(!x)return;closeModal();clearSpot();const me=++run;
+    const nav=[...document.querySelectorAll(`[data-page="${x.page}"]`)].find(b=>b.offsetParent)||document.querySelector(`[data-page="${x.page}"]`);if(nav)nav.click();
+    let tries=0;const find=()=>{if(me!==run)return;const el=x.spot.map(s=>[...document.querySelectorAll(s)].find(e=>e.offsetParent)).find(Boolean);
+      if(!el){if(++tries<12)return setTimeout(find,150);return}
+      el.scrollIntoView({behavior:'smooth',block:'center'});el.classList.add('gd-spot');
+      setTimeout(()=>{if(me!==run)return;const r=el.getBoundingClientRect(),tip=document.createElement('div');tip.className='gd-tip';tip.innerHTML=`${esc(x.tip||'')}<button type="button">OK</button>`;document.body.appendChild(tip);
+        const w=tip.offsetWidth,h=tip.offsetHeight;let top=r.bottom+10;if(top+h>innerHeight-10)top=Math.max(10,r.top-h-10);
+        tip.style.top=top+'px';tip.style.left=Math.max(10,Math.min(innerWidth-w-10,r.left+r.width/2-w/2))+'px';tip.querySelector('button').onclick=clearSpot},400);
+      setTimeout(()=>{if(me===run)clearSpot()},9000)};
+    setTimeout(find,250);
+  }
+  function install(){
+    style();
+    document.querySelectorAll('[data-page="settings"]').forEach(b=>{if(b.nextElementSibling&&b.nextElementSibling.matches('[data-guide-open]'))return;
+      const n=document.createElement(b.tagName==='A'?'a':'button');n.className=b.className;n.setAttribute('data-guide-open','');if(n.tagName==='BUTTON')n.type='button';else n.href='#';n.textContent='❓ Como usar';b.insertAdjacentElement('afterend',n)});
+    const top=document.querySelector('.dash-user');if(top&&!top.querySelector('.gd-help-btn'))top.insertAdjacentHTML('afterbegin','<button class="gd-help-btn" type="button" data-guide-open>❓ Como usar</button>');
+    let seen=false;try{seen=!!localStorage.getItem(SEEN)}catch(e){}
+    const ov=document.getElementById('page-overview');
+    if(!seen&&ov&&!document.querySelector('.gd-hello')){const box=document.createElement('div');box.className='gd-hello';box.innerHTML='<span style="font-size:24px">👋</span><span class="gd-sp"><b>Novo por aqui?</b> O guia mostra, em passos curtos, como confirmar consultas, gerar documentos, cobrar e dar recibo.</span><button class="d-btn" type="button" data-guide-open>Abrir o guia</button><button class="d-btn light" type="button" data-guide-skip>Agora não</button>';
+      const anchor=ov.querySelector('.dash-top');if(anchor)anchor.insertAdjacentElement('afterend',box);else ov.prepend(box)}
+  }
+  document.addEventListener('click',e=>{
+    const o=e.target.closest&&e.target.closest('[data-guide-open]');if(o){e.preventDefault();return open('')}
+    const s=e.target.closest&&e.target.closest('[data-guide-skip]');if(s){try{localStorage.setItem(SEEN,'1')}catch(x){}return s.closest('.gd-hello').remove()}
+    const g=e.target.closest&&e.target.closest('[data-gd-go]');if(g){e.preventDefault();return go(+g.dataset.gdGo)}
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')clearSpot()});
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,0));else setTimeout(install,0);
+  window.kalinyGuide={open,go,list:G};
 })();
 </script>
 </body></html>
