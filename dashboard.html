@@ -1481,7 +1481,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
    Regras: vence a alteração mais recente (updatedAt); exclusões viram marcação (deletedAt);
    resposta vazia ou com erro do servidor nunca apaga dados deste navegador. */
 (function(){
-  const VERSION='V145.45';
+  const VERSION='V145.46';
   const META_KEY='kaliny_sync_meta_v1';
   const COLLECTIONS=['processes','finance','notes','calcHistory','previdenciario','documents','tasks'];
   const IS_COLLAB=(typeof session!=='undefined'&&session&&session.role==='colaboradora'),COLLAB_PUSH=new Set(['finance','tasks']);let warnedForbidden=false;
@@ -4731,6 +4731,96 @@ ${st.fixed.length&&missing?`<div class="form-actions"><button class="d-btn light
   });
   setTimeout(()=>{auto().catch(()=>{})},2500);
   window.kalinyFixed={load,launch,state:()=>st,card};
+})();
+</script>
+<script>
+/* V145.46 — Importar clientes de uma planilha (.xlsx, .xls ou .csv). O arquivo é lido aqui no navegador
+   (SheetJS em assets/vendor) e cada cliente vai direto para a planilha do escritório. Acerta as colunas pelo nome
+   (inclusive a planilha "Controle de Clientes": área, assunto, nº do processo, situação, nomeação, última movimentação),
+   mostra uma prévia editável, não duplica quem já está cadastrado e cria os processos com número. */
+(function(){
+  const S=(typeof session!=='undefined'&&session)||{};if(S.role==='colaboradora')return;
+  const pad=n=>String(n).padStart(2,'0'),low=v=>String(v==null?'':v).trim().toLowerCase();
+  const norm=s=>low(s).normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+  const AREAS=['Cível','Família e Sucessões','Consumidor','Previdenciário','Imobiliário'];
+  function mapArea(a){const n=norm(a);if(/famil|sucess|inventar|divorc|aliment|guarda/.test(n))return 'Família e Sucessões';if(/previd|inss|bpc|loas|aposent/.test(n))return 'Previdenciário';if(/consum/.test(n))return 'Consumidor';if(/imobil|contrat|usucap|locac|aluguel/.test(n))return 'Imobiliário';return 'Cível'}
+  const ACTIVE=s=>{const n=norm(s);return !n||/^ativo|pouca movimentacao/.test(n)};
+  const SUBJ=/^(bpc|loas|inss|aposentadoria|auxilio.*|pensao|pensao por morte|divorcio|inventario|alimentos|guarda|fgts|usucapiao|revisao|execucao|cobranca|curatela|interdicao|alvara|consumidor|trabalhista|acordo)( .*)?$/;
+  function cleanName(s){s=String(s||'').replace(/\s+/g,' ').trim();const i=s.indexOf(' - ');if(i>0&&SUBJ.test(norm(s.slice(i+3))))return {name:s.slice(0,i).trim(),extra:s.slice(i+3).trim()};return {name:s,extra:''}}
+  const COLS={name:/^(cliente|nome)/,area:/^area$/,areaDetail:/detalhe da area/,subject:/assunto|demanda/,process:/processo/,nomeacao:/nomeacao|dativ|curador/,lastMove:/ultima movimentacao/,status:/situacao sugerida|^situacao$|^status$/,confirmed:/situacao confirmada/,closing:/indicio de encerramento/,notes:/observac/,next:/proximo passo/,phone:/telefone|celular|whats/,cpf:/^cpf/,email:/e mail|email/,birth:/nascimento/,profession:/profiss/,marital:/estado civil/,address:/endereco|rua/,city:/cidade/,cep:/^cep/};
+  function loadLib(){return window.XLSX?Promise.resolve():new Promise((res,rej)=>{const s=document.createElement('script');s.src='assets/vendor/xlsx-0.18.5.full.min.js';s.onload=res;s.onerror=()=>rej(new Error('lib'));document.head.appendChild(s)})}
+  const dateIso=v=>{if(v instanceof Date&&!isNaN(v))return v.getFullYear()+'-'+pad(v.getMonth()+1)+'-'+pad(v.getDate());const m=/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/.exec(String(v||''));if(m){const y=m[3].length===2?'20'+m[3]:m[3];return y+'-'+pad(m[2])+'-'+pad(m[1])}const m2=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(v||''));return m2?m2[0]:''};
+  const br=s=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(s||'');return m?m[3]+'/'+m[2]+'/'+m[1]:''};
+  function parseSheet(wb){
+    let best=null;
+    wb.SheetNames.forEach(n=>{const rows=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:''});
+      for(let i=0;i<Math.min(15,rows.length);i++){const h=rows[i].map(norm);const col={};Object.entries(COLS).forEach(([k,re])=>{const j=h.findIndex((x,jj)=>x&&re.test(x)&&!Object.values(col).includes(jj));if(j>=0)col[k]=j});
+        if(col.name!=null){const data=rows.slice(i+1).filter(r=>String(r[col.name]||'').trim());if(!best||data.length>best.data.length)best={sheet:n,col,data,headers:rows[i]};break}}});
+    return best;
+  }
+  function build(p){
+    const existing=new Set((data.clients||[]).map(c=>norm(c.name)));const seen=new Set();
+    return p.data.map((r,i)=>{const g=k=>p.col[k]!=null?r[p.col[k]]:'';const nm=cleanName(g('name'));const key=norm(nm.name);
+      const procs=String(g('process')||'').split(/[;\n]+/).map(x=>x.trim()).filter(Boolean);
+      const sit=String(g('confirmed')||g('status')||'').trim();
+      const dup=existing.has(key)||seen.has(key);seen.add(key);
+      return {i,on:!dup&&!!key,dup,name:nm.name,extra:nm.extra,area:mapArea([g('area'),g('areaDetail'),nm.extra].join(' ')),areaRaw:[g('area'),g('areaDetail')].filter(Boolean).join(' — '),subject:String(g('subject')||'').trim(),procs,
+        nomeacao:String(g('nomeacao')||'').trim(),lastMove:dateIso(g('lastMove')),sit,status:ACTIVE(sit)?'Ativo':'Inativo',closing:String(g('closing')||'').trim(),obs:String(g('notes')||'').trim(),next:String(g('next')||'').trim(),
+        phone:String(g('phone')||'').trim(),cpf:String(g('cpf')||'').trim(),email:String(g('email')||'').trim().toLowerCase(),birth:dateIso(g('birth')),profession:String(g('profession')||'').trim(),marital:String(g('marital')||'').trim(),street:String(g('address')||'').trim(),city:String(g('city')||'').trim(),cep:String(g('cep')||'').trim()}});
+  }
+  let rows=[],src='',ui={sit:{}};
+  function sits(){const c={};rows.forEach(r=>{const k=r.sit||'Sem situação';c[k]=(c[k]||0)+1});return c}
+  function draw(){
+    const b=document.getElementById('impBody');if(!b)return;const on=rows.filter(r=>r.on),np=on.reduce((t,r)=>t+r.procs.length,0),dups=rows.filter(r=>r.dup).length;
+    b.innerHTML=`<div class="imp-bar">${Object.entries(sits()).map(([k,n])=>`<label class="imp-chip"><input type="checkbox" data-imp-sit="${esc(k)}" ${ui.sit[k]!==false?'checked':''}> ${esc(k)} (${n})</label>`).join('')}</div>
+<div class="imp-sum"><b>${on.length}</b> clientes e <b>${np}</b> processos serão importados${dups?` · ${dups} já cadastrado${dups>1?'s':''} (desmarcado${dups>1?'s':''})`:''}</div>
+<div class="imp-wrap"><table class="imp-t"><thead><tr><th></th><th>Nome</th><th>Área no painel</th><th>Situação</th><th>Processos</th></tr></thead><tbody>${rows.map(r=>`<tr class="${r.on?'':'off'}"><td><input type="checkbox" data-imp-on="${r.i}" ${r.on?'checked':''}></td><td><input class="imp-name" data-imp-name="${r.i}" value="${esc(r.name)}">${r.dup?'<small class="imp-dup">já cadastrado</small>':''}${r.extra?`<small>assunto: ${esc(r.extra)}</small>`:''}<small>${esc(r.areaRaw)}${r.subject?' · '+esc(r.subject.slice(0,70)):''}</small></td><td><select data-imp-area="${r.i}">${AREAS.map(a=>`<option ${a===r.area?'selected':''}>${a}</option>`).join('')}</select></td><td><select data-imp-st="${r.i}"><option ${r.status==='Ativo'?'selected':''}>Ativo</option><option ${r.status==='Inativo'?'selected':''}>Inativo</option></select><small>${esc(r.sit)}</small></td><td>${r.procs.length||'—'}</td></tr>`).join('')}</tbody></table></div>
+<div class="imp-act"><button class="d-btn" type="button" id="impGo" ${on.length?'':'disabled'}>Importar ${on.length} cliente${on.length===1?'':'s'}</button></div><div class="mini-help">O nome, a área e a situação podem ser ajustados acima. Os dados da planilha (assunto, situação, nomeação, última movimentação, observações) vão para as observações de cada cliente. O telefone e o CPF você completa depois na ficha.</div>`;
+  }
+  function notes(r){return ['Importado de '+src+' em '+br(new Date().toISOString().slice(0,10))+'.',r.areaRaw&&'Área na planilha: '+r.areaRaw,r.extra&&'Assunto (nome da pasta): '+r.extra,r.subject&&'Assunto: '+r.subject,r.procs.length&&'Processo(s): '+r.procs.join('; '),r.nomeacao&&'Nomeação: '+r.nomeacao,r.sit&&'Situação no levantamento: '+r.sit,r.closing&&'Indício de encerramento: '+r.closing,r.lastMove&&'Última movimentação na pasta: '+br(r.lastMove),r.obs&&'Observações: '+r.obs,r.next&&'Próximo passo: '+r.next].filter(Boolean).join('\n')}
+  async function run(){
+    const list=rows.filter(r=>r.on&&String(r.name).trim());if(!list.length)return;const btn=document.getElementById('impGo');btn.disabled=true;
+    const b=document.getElementById('impBody');b.insertAdjacentHTML('afterbegin','<div class="imp-prog"><div class="imp-bar2"><i id="impFill"></i></div><span id="impTxt"></span></div>');
+    let ok=0,fail=0,np=0,nt=0;const now=()=>new Date().toISOString();data.processes=Array.isArray(data.processes)?data.processes:[];data.tasks=Array.isArray(data.tasks)?data.tasks:[];
+    for(const [k,r] of list.entries()){
+      const c={id:'cli_'+Date.now()+'_'+Math.random().toString(36).slice(2,8),name:String(r.name).trim(),area:r.area,status:r.status,phone:r.phone,cpf:r.cpf,email:r.email,birthDate:r.birth,profession:r.profession,maritalStatus:r.marital,street:r.street,city:r.city,cep:r.cep,source:'Planilha de clientes',notes:notes(r),createdAt:now()};
+      Object.keys(c).forEach(x=>{if(c[x]==='')delete c[x]});
+      let saved=false;for(let t=0;t<3&&!saved;t++){saved=await saveClientRemote(c,true);if(!saved)await new Promise(z=>setTimeout(z,1200))}
+      if(!saved){fail++;continue}
+      data.clients.push(c);ok++;
+      r.procs.forEach(n=>{data.processes.push({id:'proc_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),clientId:c.id,number:n,area:r.area,subject:r.subject||r.extra||'',status:/encerr|senten|acordo|desist/i.test(r.closing+' '+r.sit)?'Encerrado':'Em andamento',court:'',updated:r.lastMove||now().slice(0,10),date:new Date().toLocaleDateString('pt-BR'),deadlines:[],movements:[],updatedAt:now()});np++});
+      if(r.next){data.tasks.push({id:'task_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),title:r.next.slice(0,160),assignee:'',clientId:c.id,status:'pendente',createdAt:now(),createdBy:S.email||'',comments:[],updatedAt:now()});nt++}
+      r.on=false;r.dup=true;
+      if(k%10===9)save();
+      const f=document.getElementById('impFill'),tx=document.getElementById('impTxt');if(f)f.style.width=Math.round((k+1)/list.length*100)+'%';if(tx)tx.textContent=`Importando ${k+1} de ${list.length}… (não feche esta janela)`;
+    }
+    save();try{window.kalinySync&&window.kalinySync.syncNow()}catch(e){}
+    const tx=document.getElementById('impTxt');if(tx)tx.textContent=`✓ ${ok} cliente${ok===1?'':'s'} e ${np} processo${np===1?'':'s'} importados${nt?' · '+nt+' tarefa'+(nt>1?'s':''):''}${fail?` · ${fail} não foram salvos (abra de novo e importe o mesmo arquivo: só os que faltam vêm marcados)`:''}`;
+    toast(ok+' clientes importados');try{renderAll()}catch(e){}
+  }
+  function open(){
+    openModal('Importar clientes',`<style>.imp-bar{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px}.imp-chip{border:1px solid #eaded2;border-radius:999px;padding:5px 11px;font-size:12px;background:#fff;display:flex;gap:6px;align-items:center;cursor:pointer;text-transform:none;letter-spacing:0}
+.imp-sum{font-size:14px;margin-bottom:8px}.imp-wrap{max-height:52vh;overflow:auto;border:1px solid #eaded2;border-radius:12px}.imp-t{width:100%;border-collapse:collapse;font-size:13px}.imp-t th{position:sticky;top:0;background:#fbf6f0;text-align:left;padding:7px;font-size:12px;color:#8d7767;z-index:1}.imp-t td{padding:6px 7px;border-top:1px solid #f3ebe3;vertical-align:top}.imp-t tr.off{opacity:.45}
+.imp-t small{display:block;color:#8d7767;font-size:11px;margin-top:2px}.imp-t .imp-dup{color:#a8741a;font-weight:600}.imp-name{width:100%;min-width:150px;border:1px solid #eaded2;border-radius:8px;padding:5px 7px;font:inherit}.imp-t select{border:1px solid #eaded2;border-radius:8px;padding:4px;font-size:12px;max-width:150px}
+.imp-act{margin-top:12px;display:flex;justify-content:flex-end}.imp-prog{margin:0 0 10px;font-size:13px}.imp-bar2{height:8px;border-radius:99px;background:#f1e8df;overflow:hidden;margin-bottom:5px}.imp-bar2 i{display:block;height:100%;width:0;background:#557a62;transition:width .3s}
+@media(max-width:700px){.imp-t th:nth-child(5),.imp-t td:nth-child(5){display:none}}</style>
+<div id="impBody"><p class="muted" style="margin-top:0">Escolha a planilha de clientes (Excel ou CSV). O arquivo é lido aqui no seu aparelho; nada é enviado antes de você confirmar.</p><label class="d-btn" style="cursor:pointer">Escolher arquivo <input id="impFile" type="file" accept=".xlsx,.xls,.csv,text/csv" hidden></label><div class="mini-help">A primeira linha precisa ter os nomes das colunas. Reconheço: Nome/Cliente, Área, Assunto, Nº do processo, Situação, Telefone, CPF, E-mail, Nascimento, Profissão, Estado civil, Endereço, Cidade, CEP, Observações.</div></div>`);
+    document.getElementById('impFile').onchange=async e=>{const file=e.target.files[0];if(!file)return;const b=document.getElementById('impBody');b.innerHTML='<p class="muted">Lendo a planilha…</p>';
+      try{await loadLib();const buf=await file.arrayBuffer();const wb=XLSX.read(buf,{type:'array',cellDates:true});const p=parseSheet(wb);
+        if(!p||!p.data.length){b.innerHTML='<p>Não encontrei uma coluna de nome (Nome ou Cliente) com dados. Confira a primeira linha da planilha.</p>';return}
+        src='"'+file.name.replace(/\.[^.]+$/,'')+'"'+(wb.SheetNames.length>1?' (aba '+p.sheet+')':'');rows=build(p);ui.sit={};draw()}
+      catch(err){console.warn(err);b.innerHTML='<p>Não consegui ler este arquivo. Salve como .xlsx ou .csv e tente de novo.</p>'}};
+  }
+  document.addEventListener('change',e=>{const t=e.target;if(!t||!t.closest||!t.closest('#impBody'))return;
+    if(t.dataset.impOn!=null){rows[+t.dataset.impOn].on=t.checked;return draw()}
+    if(t.dataset.impSit!=null){ui.sit[t.dataset.impSit]=t.checked;rows.forEach(r=>{if((r.sit||'Sem situação')===t.dataset.impSit&&!r.dup)r.on=t.checked});return draw()}
+    if(t.dataset.impArea!=null)rows[+t.dataset.impArea].area=t.value;
+    if(t.dataset.impSt!=null)rows[+t.dataset.impSt].status=t.value;
+    if(t.dataset.impName!=null)rows[+t.dataset.impName].name=t.value;});
+  document.addEventListener('click',e=>{if(e.target&&e.target.id==='impGo')run();if(e.target&&e.target.id==='impOpen')open()});
+  function button(){const nb=document.getElementById('newClient');if(!nb||document.getElementById('impOpen'))return;nb.insertAdjacentHTML('beforebegin','<button class="d-btn light" type="button" id="impOpen" style="margin-right:8px">⬆ Importar clientes</button>')}
+  const oR=window.renderAll;window.renderAll=function(){const r=oR.apply(this,arguments);try{button()}catch(e){}return r};setTimeout(button,1200);
+  window.kalinyImport={open,parse:p=>build(p)};
 })();
 </script>
 </body></html>
