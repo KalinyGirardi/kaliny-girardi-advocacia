@@ -211,9 +211,10 @@ footer .footer-bottom span:last-child{letter-spacing:.03em}
 .kl-thumb:has(.kc-art) .kl-play{top:auto;left:auto;bottom:12px;right:12px;transform:none;width:42px;height:42px;font-size:13px}
 
 /* V145.38 — player do vídeo na vertical, sem rolagem */
-.video-modal{width:auto!important;max-width:calc(100vw - 16px)!important;max-height:none!important;overflow:visible!important;padding:12px!important;display:flex;flex-direction:column}
-.video-frame-wrap{height:auto!important;min-height:0!important;background:#000!important;display:block!important;border-radius:6px;overflow:hidden}
+.video-modal{max-width:calc(100vw - 16px)!important;max-height:none!important;overflow:visible!important;padding:12px!important;display:flex;flex-direction:column}
+.video-frame-wrap{height:auto!important;min-height:0!important;background:transparent!important;display:block!important;border-radius:6px;overflow:hidden;align-self:center}
 .video-frame-wrap iframe{display:block;width:360px;height:694px;max-width:100%;border:0}
-.video-modal-copy{padding:10px 4px 2px!important;max-width:440px}.video-modal-copy h2{font-size:24px!important;margin:2px 0 4px!important}
+.video-modal-copy{padding:10px 4px 2px!important;max-width:100%}.video-modal-copy h2{font-size:24px!important;margin:2px 0 4px!important}
 .video-close{top:-14px!important;right:-14px!important;box-shadow:0 4px 12px rgba(0,0,0,.25)}
 @media(max-width:640px){.video-close{top:6px!important;right:6px!important}}
+@media(max-width:640px){.video-overlay{padding:10px!important}}
