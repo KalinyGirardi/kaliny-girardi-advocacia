@@ -1481,13 +1481,13 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
    Regras: vence a alteração mais recente (updatedAt); exclusões viram marcação (deletedAt);
    resposta vazia ou com erro do servidor nunca apaga dados deste navegador. */
 (function(){
-  const VERSION='V145.46';
+  const VERSION='V145.47';
   const META_KEY='kaliny_sync_meta_v1';
-  const COLLECTIONS=['processes','finance','notes','calcHistory','previdenciario','documents','tasks'];
+  const COLLECTIONS=['processes','finance','notes','calcHistory','previdenciario','documents','tasks','agenda'];
   const IS_COLLAB=(typeof session!=='undefined'&&session&&session.role==='colaboradora'),COLLAB_PUSH=new Set(['finance','tasks']);let warnedForbidden=false;
   const BATCH=50;
-  const LABELS={processes:'processo',finance:'lançamento',notes:'anotação',calcHistory:'cálculo',previdenciario:'dossiê previdenciário',documents:'documento',tasks:'tarefa'};
-  const ID_PREFIX={processes:'proc_',finance:'fin_',notes:'note_',calcHistory:'calc_',previdenciario:'prev_',documents:'doc_',tasks:'task_'};
+  const LABELS={processes:'processo',finance:'lançamento',notes:'anotação',calcHistory:'cálculo',previdenciario:'dossiê previdenciário',documents:'documento',tasks:'tarefa',agenda:'compromisso'};
+  const ID_PREFIX={processes:'proc_',finance:'fin_',notes:'note_',calcHistory:'calc_',previdenciario:'prev_',documents:'doc_',tasks:'task_',agenda:'evt_'};
   const unsupported=new Set(); // coleções que o Apps Script instalado ainda não conhece
   let meta=loadMeta(),busy=false,again=false,timer=null,lastState={kind:'',text:''},warnedLarge=false;
 
@@ -1515,6 +1515,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
       const seen=new Set();
       list(col).forEach(item=>{
         if(!item||typeof item!=='object')return;
+        if(col==='agenda'&&(item.onlineId||String(item.source||'').toLowerCase()==='site'))return;
         let id=String(item.id||'').trim();
         if(!id){id=ID_PREFIX[col]+Date.now()+'_'+Math.random().toString(36).slice(2,7);item.id=id;touched=true}
         seen.add(id);
@@ -1602,7 +1603,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
     for(const col of COLLECTIONS){
       if(unsupported.has(col))continue;
       if(IS_COLLAB&&!COLLAB_PUSH.has(col))continue;
-      const items=list(col).filter(x=>x&&x.id&&isPending(col,String(x.id))).map(x=>({item:trimForSync(col,x),c:meta[col][String(x.id)].c}));
+      const items=list(col).filter(x=>x&&x.id&&!(col==='agenda'&&x.onlineId)&&isPending(col,String(x.id))).map(x=>({item:trimForSync(col,x),c:meta[col][String(x.id)].c}));
       Object.entries(meta.tombs[col]).forEach(([id,at])=>items.push({item:{id,updatedAt:at,deletedAt:at},tomb:true}));
       for(let i=0;i<items.length;i+=BATCH){
         const batch=items.slice(i,i+BATCH);
@@ -3132,7 +3133,7 @@ ${incompleteTip}<div class="k-group"><span>${list.length} cliente${list.length==
   const UI_KEY='kaliny_ag_ui_v1';let ui={view:'week',anchor:iso(today()),kpi:''};try{Object.assign(ui,JSON.parse(localStorage.getItem(UI_KEY)||'{}'))}catch(e){}
   const saveUi=()=>{try{localStorage.setItem(UI_KEY,JSON.stringify(ui))}catch(e){}};
   const deadlines=()=>window.kalinyCP?(data.processes||[]).filter(p=>p&&lower(p.status)!=='encerrado').flatMap(window.kalinyCP.pendingDeadlines):[];
-  const events=()=> (data.agenda||[]).filter(e=>e&&parseDay(e.date)&&evStatus(e)!=='Cancelado');
+  const events=()=> (data.agenda||[]).concat(window.kalinyGEvents?window.kalinyGEvents():[]).filter(e=>e&&parseDay(e.date)&&evStatus(e)!=='Cancelado');
   const pendingSite=()=>events().filter(e=>evStatus(e)==='Pendente'&&parseDay(e.date)>=today()).sort((a,b)=>(parseDay(a.date)-parseDay(b.date))||String(a.time).localeCompare(String(b.time)));
   function itemsOn(d){
     const k=iso(d);
@@ -3157,7 +3158,7 @@ ${incompleteTip}<div class="k-group"><span>${list.length} cliente${list.length==
 .ov .o-done{padding:18px;text-align:center;color:${C.ok};font-weight:600}
 @media(max-width:900px){.ag .a-week{grid-template-columns:1fr}.ag .a-day{min-height:auto}.ag .a-day.empty{display:none}.ov .o-grid{grid-template-columns:1fr}.ov .o-item{grid-template-columns:34px minmax(0,1fr)}.ov .o-item .k-act{grid-column:1/-1;justify-content:flex-start}}`;
   const btn=(attrs,label,style)=>`<button class="k-ic" type="button" ${attrs} ${style?`style="${style}"`:''}>${label}</button>`;
-  function evChip(e){const st=evStatus(e),c=e.clientId?clientById(e.clientId):null;return `<button class="a-it ${st==='Pendente'?'pend':st==='Confirmado'?'conf':''}" type="button" data-a-ev="${esc(String(e.id))}"><b>${esc(e.time||'')}${e.time?' · ':''}${esc(e.title||'Compromisso')}</b>${esc(c?c.name:e.client||'')}${st==='Pendente'?' · aguardando':''}</button>`}
+  function evChip(e){if(e.google)return `<div class="a-it gc" title="Evento da Google Agenda"><b>${esc(e.time||'Dia todo')}${e.time&&e.end?'–'+esc(e.end):''} · ${esc(e.title)}</b>${esc(e.location||'')}</div>`;const st=evStatus(e),c=e.clientId?clientById(e.clientId):null;return `<button class="a-it ${st==='Pendente'?'pend':st==='Confirmado'?'conf':''}" type="button" data-a-ev="${esc(String(e.id))}"><b>${esc(e.time||'')}${e.time?' · ':''}${esc(e.title||'Compromisso')}</b>${esc(c?c.name:e.client||'')}${st==='Pendente'?' · aguardando':''}</button>`}
   const dlChip=x=>`<button class="a-it dl" type="button" data-a-proc="${esc(String(x.p.id))}"><b>⚖ ${esc(x.title)}</b>${esc(x.p.number||'')}</button>`;
   function pendingCards(){
     const list=pendingSite();if(!list.length)return '';
@@ -3172,7 +3173,7 @@ ${incompleteTip}<div class="k-group"><span>${list.length} cliente${list.length==
     let html='',any=false;for(let i=0;i<=30;i++){const d=add(today(),i),{ev,dl}=itemsOn(d);if(!ev.length&&!dl.length)continue;any=true;
       html+=`<div class="k-group"><span>${dayLabel(d)}</span><span>${ev.length?ev.length+' compromisso'+(ev.length>1?'s':''):''}${ev.length&&dl.length?' · ':''}${dl.length?dl.length+' prazo'+(dl.length>1?'s':''):''}</span></div>`+
       dl.map(x=>`<div class="k-row"><div class="k-av" style="background:#fbefed;color:${C.bad}">⚖</div><div class="k-main"><b data-a-proc="${esc(String(x.p.id))}">${esc(x.title)}</b><div class="k-meta">${esc(x.p.number||'')}${x.p.clientId&&clientById(x.p.clientId)?' · '+esc(clientById(x.p.clientId).name):''}</div></div><div class="k-act">${btn(`data-a-proc="${esc(String(x.p.id))}"`,'Abrir')}</div></div>`).join('')+
-      ev.map(e=>{const st=evStatus(e),c=e.clientId?clientById(e.clientId):null;return `<div class="k-row"><div class="k-av" style="font-size:12px">${esc(e.time||'—')}</div><div class="k-main"><b data-a-ev="${esc(String(e.id))}">${esc(e.title||'Compromisso')}</b><div class="k-meta">${[c?esc(c.name):esc(e.client||''),esc(e.mode||'')].filter(Boolean).join(' · ')}</div>${st?`<div class="k-tags"><span class="k-tag" style="background:${st==='Pendente'?C.warn:C.ok}1a;color:${st==='Pendente'?C.warn:C.ok}">${st==='Pendente'?'⏳ aguardando confirmação':'✓ confirmado'}</span></div>`:''}</div><div class="k-act">${st==='Pendente'?btn(`data-a-confirm="${esc(String(e.id))}"`,'✓ Confirmar',`color:${C.ok};font-weight:600`):''}${typeof whatsAppReminderButton==='function'?whatsAppReminderButton(e,c):''}${!e.clientId&&(e.onlineId||String(e.source||'').toLowerCase()==='site')?btn(`data-x-newclient="${esc(String(e.id))}"`,'＋ Cadastrar cliente'):''}${btn(`data-a-ev="${esc(String(e.id))}"`,'✎')}</div></div>`}).join('')}
+      ev.map(e=>{if(e.google)return `<div class="k-row"><div class="k-av" style="font-size:12px;background:#eef3f8;color:#41658a">${esc(e.time||'dia')}</div><div class="k-main"><b>📅 ${esc(e.title)}</b><div class="k-meta">Google Agenda${e.end?' · até '+esc(e.end):''}${e.location?' · '+esc(e.location):''}</div></div></div>`;const st=evStatus(e),c=e.clientId?clientById(e.clientId):null;return `<div class="k-row"><div class="k-av" style="font-size:12px">${esc(e.time||'—')}</div><div class="k-main"><b data-a-ev="${esc(String(e.id))}">${esc(e.title||'Compromisso')}</b><div class="k-meta">${[c?esc(c.name):esc(e.client||''),esc(e.mode||'')].filter(Boolean).join(' · ')}</div>${st?`<div class="k-tags"><span class="k-tag" style="background:${st==='Pendente'?C.warn:C.ok}1a;color:${st==='Pendente'?C.warn:C.ok}">${st==='Pendente'?'⏳ aguardando confirmação':'✓ confirmado'}</span></div>`:''}</div><div class="k-act">${st==='Pendente'?btn(`data-a-confirm="${esc(String(e.id))}"`,'✓ Confirmar',`color:${C.ok};font-weight:600`):''}${typeof whatsAppReminderButton==='function'?whatsAppReminderButton(e,c):''}${!e.clientId&&(e.onlineId||String(e.source||'').toLowerCase()==='site')?btn(`data-x-newclient="${esc(String(e.id))}"`,'＋ Cadastrar cliente'):''}${btn(`data-a-ev="${esc(String(e.id))}"`,'✎')}</div></div>`}).join('')}
     return any?html:'<div class="k-empty">Nada nos próximos 30 dias. Clique em <b>+ Novo compromisso</b> para agendar.</div>';
   }
   function setOldCalendar(show){document.querySelectorAll('#page-agenda .calendar-toolbar,#page-agenda .calendar-wrap,#page-agenda #agendaSelectedDay,#page-agenda .calendar-legend').forEach(el=>el.style.display=show?'':'none')}
@@ -4821,6 +4822,32 @@ ${st.fixed.length&&missing?`<div class="form-actions"><button class="d-btn light
   function button(){const nb=document.getElementById('newClient');if(!nb||document.getElementById('impOpen'))return;nb.insertAdjacentHTML('beforebegin','<button class="d-btn light" type="button" id="impOpen" style="margin-right:8px">⬆ Importar clientes</button>')}
   const oR=window.renderAll;window.renderAll=function(){const r=oR.apply(this,arguments);try{button()}catch(e){}return r};setTimeout(button,1200);
   window.kalinyImport={open,parse:p=>build(p)};
+})();
+</script>
+<script>
+/* V145.47 — Google Agenda nos dois sentidos.
+   Painel → Google: compromissos do painel agora são sincronizados (todos os aparelhos) e o servidor os coloca na Google Agenda.
+   Google → painel: eventos que a Kaliny marca direto na Google Agenda aparecem aqui (📅, só leitura) e bloqueiam os horários do site. */
+(function(){
+  const S=(typeof session!=='undefined'&&session)||{};if(S.role==='colaboradora')return;
+  const KEY='kaliny_gcal_v1';let cache={at:0,events:[],calendar:null};try{cache=JSON.parse(localStorage.getItem(KEY)||'null')||cache}catch(e){}
+  window.kalinyGEvents=()=>(cache.events||[]).map(e=>({id:'g_'+e.id,google:true,date:e.date,time:e.time,end:e.end,title:e.title,location:e.location,allDay:e.allDay,status:''}));
+  let busy=false;
+  async function refresh(force){
+    if(busy||(!force&&Date.now()-(cache.at||0)<5*60000))return;busy=true;
+    try{const cfg=onlineConfig();if(!cfg.url||!cfg.token)return;const r=await fetch(cfg.url+'?'+new URLSearchParams({action:'agendaGoogleList',token:cfg.token,back:'14',days:'90'}),{cache:'no-store'});const j=await r.json();
+      if(j&&j.ok){cache={at:Date.now(),events:j.events||[],calendar:j.calendar};try{localStorage.setItem(KEY,JSON.stringify(cache))}catch(e){}try{renderAll()}catch(e){}}}
+    catch(e){}finally{busy=false}
+  }
+  const css=`.ag .a-it.gc{border-left-color:#41658a;background:#eef3f8;cursor:default}.ag .a-it.gc b::before{content:'📅 ';}.gc-note{font-size:12px;color:#8d7767;margin:4px 0 10px}`;
+  if(!document.getElementById('gcCss')){const s=document.createElement('style');s.id='gcCss';s.textContent=css;document.head.appendChild(s)}
+  document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-page="agenda"],[data-page-jump="agenda"]');if(b)setTimeout(()=>refresh(false),50);
+    const g=e.target.closest&&e.target.closest('#gcRefresh');if(g){e.preventDefault();refresh(true).then(()=>toast('Google Agenda atualizada'))}});
+  function note(){const app=document.getElementById('agApp');if(!app||document.getElementById('gcNote'))return;
+    app.insertAdjacentHTML('afterbegin',`<div class="gc-note" id="gcNote">📅 = evento da sua Google Agenda (só leitura; edite no Google). Horários ocupados lá não aparecem para agendamento no site. <a href="#" id="gcRefresh">Atualizar</a></div>`)}
+  const oR=window.renderAll;window.renderAll=function(){const r=oR.apply(this,arguments);try{note()}catch(e){}return r};
+  setTimeout(()=>refresh(false),2000);setInterval(()=>{if(!document.hidden)refresh(false)},10*60000);
+  window.kalinyGcal={refresh,state:()=>cache};
 })();
 </script>
 </body></html>
