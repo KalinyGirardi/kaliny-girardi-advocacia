@@ -1,5 +1,5 @@
 KALINY GIRARDI ADVOCACIA — site institucional + painel administrativo
-Versão: V145.30
+Versão: V145.31
 
 ESTRUTURA
 - index.html ............ site público (agendamento online, áreas, conteúdos, contato)
@@ -8,6 +8,7 @@ ESTRUTURA
 - dashboard.html ........ painel (todo o JavaScript fica embutido neste arquivo)
 - assets/appointment-config.js ... URL do Apps Script usada pelo site e pelo painel
 - css/style.css ......... estilos do site e do painel
+- areas/*.html .......... páginas de cada área de atuação (SEO; textos para a Kaliny revisar)
 - robots.txt, sitemap.xml, 404.html, CNAME
 
 ONDE FICAM OS DADOS
@@ -77,3 +78,8 @@ HISTÓRICO
   Campo de e-mail no "Novo cliente". Teste de integração de ponta a ponta: site →
   agenda → cliente → processo → contrato/financeiro → Drive → calculadora →
   iPhone → Google Agenda.
+- V145.31: Site — agendamento em 2 passos (dias e horários livres em botões,
+  "prefiro outra data" com calendário), telefone formatado, resumo final com
+  "adicionar à agenda" (.ics) e WhatsApp; WhatsApp com mensagem por área e botão
+  flutuante; 5 páginas de área (areas/*.html) com perguntas frequentes para o Google;
+  fontes sem @import e fotos em WebP (carrega mais rápido no celular).
