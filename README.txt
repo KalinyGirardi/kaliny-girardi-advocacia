@@ -1,5 +1,5 @@
 KALINY GIRARDI ADVOCACIA — site institucional + painel administrativo
-Versão: V145.29
+Versão: V145.30
 
 ESTRUTURA
 - index.html ............ site público (agendamento online, áreas, conteúdos, contato)
@@ -72,3 +72,8 @@ HISTÓRICO
   em aberto e recebido; "Precisa de atenção" (prazos até 15 dias, parcelas
   vencidas com cobrança no WhatsApp, cadastro incompleto, falta de procuração ou
   contrato); ações rápidas; e linha do tempo com tudo do cliente, com filtros.
+- V145.30: Pedido de consulta do site ganha o botão "Cadastrar cliente" (nome,
+  telefone, e-mail e área já preenchidos; a consulta fica ligada à cliente na hora).
+  Campo de e-mail no "Novo cliente". Teste de integração de ponta a ponta: site →
+  agenda → cliente → processo → contrato/financeiro → Drive → calculadora →
+  iPhone → Google Agenda.

@@ -777,6 +777,7 @@ async function saveClientFromForm(){
       id:'cli_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),
       name,
       phone:String(f.get('phone')||'').trim(),
+      email:String(f.get('email')||'').trim().toLowerCase(),
       area:String(f.get('area')||'Cível'),
       cpf:String(f.get('cpf')||'').trim(),
       cep:String(f.get('cep')||'').trim(),
@@ -800,6 +801,7 @@ async function saveClientFromForm(){
     }
 
     data.clients.push(client);
+    try{linkAppointmentsToClients()}catch(e){}
     localStorage.setItem(KEY,JSON.stringify(data));
     closeModal();
     renderClients();
@@ -1204,7 +1206,7 @@ function v37WireCep(form){
   });
   form.querySelector('[data-cep-action="lookup"]')?.addEventListener('click',()=>v37FillAddressByCep(form));
 }
-function v37ClientFormMarkup(){return `<form id="clientForm"><div class="form-grid"><div class="field"><label>Nome completo</label><input name="name" required></div><div class="field"><label>Telefone</label><input name="phone"></div><div class="field"><label>Área</label><select name="area"><option>Cível</option><option>Família e Sucessões</option><option>Consumidor</option><option>Previdenciário</option><option>Imobiliário</option></select></div><div class="field"><label>CPF</label><input name="cpf"></div><div class="field"><label>CEP</label><div class="inline-field"><input name="cep" placeholder="00000-000" autocomplete="postal-code"><button type="button" class="d-btn light" data-cep-action="lookup">Buscar endereço</button></div></div><div class="field"><label>Rua / Avenida</label><input name="street" autocomplete="street-address"></div><div class="field"><label>Número</label><input name="number"></div><div class="field"><label>Complemento</label><input name="complement"></div><div class="field"><label>Bairro</label><input name="neighborhood"></div><div class="field"><label>Cidade</label><input name="city"></div><div class="field"><label>UF</label><input name="state" maxlength="2" value="PR"></div><div class="field full"><label>Status</label><select name="status"><option>Ativo</option><option>Inativo</option></select></div><div class="field full"><label>Observações</label><textarea name="notes"></textarea></div></div><div class="form-actions"><button class="d-btn" type="submit">Salvar cliente</button></div></form>`}
+function v37ClientFormMarkup(){return `<form id="clientForm"><div class="form-grid"><div class="field"><label>Nome completo</label><input name="name" required></div><div class="field"><label>Telefone</label><input name="phone"></div><div class="field"><label>E-mail</label><input type="email" name="email"></div><div class="field"><label>Área</label><select name="area"><option>Cível</option><option>Família e Sucessões</option><option>Consumidor</option><option>Previdenciário</option><option>Imobiliário</option></select></div><div class="field"><label>CPF</label><input name="cpf"></div><div class="field"><label>CEP</label><div class="inline-field"><input name="cep" placeholder="00000-000" autocomplete="postal-code"><button type="button" class="d-btn light" data-cep-action="lookup">Buscar endereço</button></div></div><div class="field"><label>Rua / Avenida</label><input name="street" autocomplete="street-address"></div><div class="field"><label>Número</label><input name="number"></div><div class="field"><label>Complemento</label><input name="complement"></div><div class="field"><label>Bairro</label><input name="neighborhood"></div><div class="field"><label>Cidade</label><input name="city"></div><div class="field"><label>UF</label><input name="state" maxlength="2" value="PR"></div><div class="field full"><label>Status</label><select name="status"><option>Ativo</option><option>Inativo</option></select></div><div class="field full"><label>Observações</label><textarea name="notes"></textarea></div></div><div class="form-actions"><button class="d-btn" type="submit">Salvar cliente</button></div></form>`}
 document.getElementById('newClient').onclick=()=>{
   openModal('Novo cliente',v37ClientFormMarkup());
   const form=document.getElementById('clientForm');
@@ -1477,7 +1479,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
    Regras: vence a alteração mais recente (updatedAt); exclusões viram marcação (deletedAt);
    resposta vazia ou com erro do servidor nunca apaga dados deste navegador. */
 (function(){
-  const VERSION='V145.29';
+  const VERSION='V145.30';
   const META_KEY='kaliny_sync_meta_v1';
   const COLLECTIONS=['processes','finance','notes','calcHistory','previdenciario','documents'];
   const BATCH=50;
@@ -3149,7 +3151,7 @@ ${incompleteTip}<div class="k-group"><span>${list.length} cliente${list.length==
   const dlChip=x=>`<button class="a-it dl" type="button" data-a-proc="${esc(String(x.p.id))}"><b>⚖ ${esc(x.title)}</b>${esc(x.p.number||'')}</button>`;
   function pendingCards(){
     const list=pendingSite();if(!list.length)return '';
-    return `<div class="k-group"><span>⏳ Pedidos do site aguardando confirmação</span><span>${list.length}</span></div><div class="a-pend">${list.map(e=>{const d=parseDay(e.date);return `<div class="a-pc"><b>${esc(e.client||e.title)}</b><div class="muted">${dayLabel(d)} às ${esc(e.time||'')} · ${esc(e.area||e.title||'')} · ${esc(e.mode||'')}</div><div class="k-act">${btn(`data-a-confirm="${esc(String(e.id))}"`,'✓ Confirmar',`color:${C.ok};font-weight:600`)}${btn(`data-a-cancel="${esc(String(e.id))}"`,'Cancelar')}${typeof whatsAppReminderButton==='function'?whatsAppReminderButton(e,e.clientId?clientById(e.clientId):null):''}</div></div>`}).join('')}</div>`;
+    return `<div class="k-group"><span>⏳ Pedidos do site aguardando confirmação</span><span>${list.length}</span></div><div class="a-pend">${list.map(e=>{const d=parseDay(e.date);return `<div class="a-pc"><b>${esc(e.client||e.title)}</b><div class="muted">${dayLabel(d)} às ${esc(e.time||'')} · ${esc(e.area||e.title||'')} · ${esc(e.mode||'')}</div><div class="k-act">${btn(`data-a-confirm="${esc(String(e.id))}"`,'✓ Confirmar',`color:${C.ok};font-weight:600`)}${btn(`data-a-cancel="${esc(String(e.id))}"`,'Cancelar')}${!e.clientId&&(e.onlineId||String(e.source||'').toLowerCase()==='site')?btn(`data-x-newclient="${esc(String(e.id))}"`,'＋ Cadastrar cliente'):''}${typeof whatsAppReminderButton==='function'?whatsAppReminderButton(e,e.clientId?clientById(e.clientId):null):''}</div></div>`}).join('')}</div>`;
   }
   function weekView(){
     const a=parseDay(ui.anchor)||today(),start=add(a,-((a.getDay()+6)%7));
@@ -3160,7 +3162,7 @@ ${incompleteTip}<div class="k-group"><span>${list.length} cliente${list.length==
     let html='',any=false;for(let i=0;i<=30;i++){const d=add(today(),i),{ev,dl}=itemsOn(d);if(!ev.length&&!dl.length)continue;any=true;
       html+=`<div class="k-group"><span>${dayLabel(d)}</span><span>${ev.length?ev.length+' compromisso'+(ev.length>1?'s':''):''}${ev.length&&dl.length?' · ':''}${dl.length?dl.length+' prazo'+(dl.length>1?'s':''):''}</span></div>`+
       dl.map(x=>`<div class="k-row"><div class="k-av" style="background:#fbefed;color:${C.bad}">⚖</div><div class="k-main"><b data-a-proc="${esc(String(x.p.id))}">${esc(x.title)}</b><div class="k-meta">${esc(x.p.number||'')}${x.p.clientId&&clientById(x.p.clientId)?' · '+esc(clientById(x.p.clientId).name):''}</div></div><div class="k-act">${btn(`data-a-proc="${esc(String(x.p.id))}"`,'Abrir')}</div></div>`).join('')+
-      ev.map(e=>{const st=evStatus(e),c=e.clientId?clientById(e.clientId):null;return `<div class="k-row"><div class="k-av" style="font-size:12px">${esc(e.time||'—')}</div><div class="k-main"><b data-a-ev="${esc(String(e.id))}">${esc(e.title||'Compromisso')}</b><div class="k-meta">${[c?esc(c.name):esc(e.client||''),esc(e.mode||'')].filter(Boolean).join(' · ')}</div>${st?`<div class="k-tags"><span class="k-tag" style="background:${st==='Pendente'?C.warn:C.ok}1a;color:${st==='Pendente'?C.warn:C.ok}">${st==='Pendente'?'⏳ aguardando confirmação':'✓ confirmado'}</span></div>`:''}</div><div class="k-act">${st==='Pendente'?btn(`data-a-confirm="${esc(String(e.id))}"`,'✓ Confirmar',`color:${C.ok};font-weight:600`):''}${typeof whatsAppReminderButton==='function'?whatsAppReminderButton(e,c):''}${btn(`data-a-ev="${esc(String(e.id))}"`,'✎')}</div></div>`}).join('')}
+      ev.map(e=>{const st=evStatus(e),c=e.clientId?clientById(e.clientId):null;return `<div class="k-row"><div class="k-av" style="font-size:12px">${esc(e.time||'—')}</div><div class="k-main"><b data-a-ev="${esc(String(e.id))}">${esc(e.title||'Compromisso')}</b><div class="k-meta">${[c?esc(c.name):esc(e.client||''),esc(e.mode||'')].filter(Boolean).join(' · ')}</div>${st?`<div class="k-tags"><span class="k-tag" style="background:${st==='Pendente'?C.warn:C.ok}1a;color:${st==='Pendente'?C.warn:C.ok}">${st==='Pendente'?'⏳ aguardando confirmação':'✓ confirmado'}</span></div>`:''}</div><div class="k-act">${st==='Pendente'?btn(`data-a-confirm="${esc(String(e.id))}"`,'✓ Confirmar',`color:${C.ok};font-weight:600`):''}${typeof whatsAppReminderButton==='function'?whatsAppReminderButton(e,c):''}${!e.clientId&&(e.onlineId||String(e.source||'').toLowerCase()==='site')?btn(`data-x-newclient="${esc(String(e.id))}"`,'＋ Cadastrar cliente'):''}${btn(`data-a-ev="${esc(String(e.id))}"`,'✎')}</div></div>`}).join('')}
     return any?html:'<div class="k-empty">Nada nos próximos 30 dias. Clique em <b>+ Novo compromisso</b> para agendar.</div>';
   }
   function setOldCalendar(show){document.querySelectorAll('#page-agenda .calendar-toolbar,#page-agenda .calendar-wrap,#page-agenda #agendaSelectedDay,#page-agenda .calendar-legend').forEach(el=>el.style.display=show?'':'none')}
@@ -3778,6 +3780,21 @@ ${future.length?`<div class="fc-grp">Próximos</div><div class="fc-tl">${future.
   document.addEventListener('click',ev=>{const t=ev.target.closest&&ev.target.closest('[data-fc-calcnew]');if(!t)return;const w=t.closest('[data-fc-client]');openCalc(t.dataset.fcCalcnew,w?w.getAttribute('data-fc-client'):'')});
   document.addEventListener('keydown',ev=>{if(ev.key==='Enter'&&ev.target.classList&&ev.target.classList.contains('fc-it'))ev.target.click()});
   window.kalinyFicha={render,collect,attention};
+})();
+</script>
+<script>
+/* V145.30 — Pedido de consulta do site → "Cadastrar cliente" com nome, telefone, e-mail e área já preenchidos. */
+(function(){
+  window.kalinyNewClientFromEvent=function(evId){
+    const e=(data.agenda||[]).find(x=>String(x.id)===String(evId));if(!e)return;
+    document.getElementById('newClient').click();
+    const f=document.getElementById('clientForm');if(!f)return;
+    const set=(n,v)=>{const el=f.elements[n];if(el&&v)el.value=v};
+    set('name',e.client||'');set('phone',e.phone||'');set('email',e.email||'');
+    const area=f.elements.area;if(area&&e.area){const o=[...area.options].find(o=>e.area.toLowerCase().includes(o.value.toLowerCase())||o.value.toLowerCase().includes(String(e.area).toLowerCase()));if(o)area.value=o.value}
+    if(f.elements.notes&&!f.elements.notes.value)f.elements.notes.value='Primeiro contato pelo agendamento online do site ('+(e.date||'')+' '+(e.time||'')+').';
+  };
+  document.addEventListener('click',ev=>{const b=ev.target.closest&&ev.target.closest('[data-x-newclient]');if(!b)return;ev.preventDefault();window.kalinyNewClientFromEvent(b.getAttribute('data-x-newclient'))});
 })();
 </script>
 </body></html>
