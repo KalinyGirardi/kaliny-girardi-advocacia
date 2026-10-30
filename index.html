@@ -155,7 +155,7 @@
 <script>
 (function(){
 const overlay=document.getElementById('appointmentOverlay'), form=document.getElementById('appointmentForm'), date=document.getElementById('apDate'), time=document.getElementById('apTime'), msg=document.getElementById('appointmentMsg'), success=document.getElementById('appointmentSuccess');
-function open(){if(date){const t=new Date();date.min=t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');}form.hidden=false;success.hidden=true;msg.textContent='';overlay.classList.add('show');overlay.setAttribute('aria-hidden','false');document.body.classList.add('modal-open');if(date&&!date.value){const d=new Date();d.setDate(d.getDate()+1);date.value=d.toISOString().slice(0,10);} loadSlots();}
+function open(){if(date){const t=new Date();date.min=t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');}form.hidden=false;success.hidden=true;msg.textContent='';overlay.classList.add('show');overlay.setAttribute('aria-hidden','false');document.body.classList.add('modal-open');if(date&&!date.value){const d=new Date();d.setDate(d.getDate()+1);date.value=d.toISOString().slice(0,10);} const nat=document.getElementById('apNative'); if(!nat||!nat.hidden) loadSlots();}
 function close(){overlay.classList.remove('show');overlay.setAttribute('aria-hidden','true');document.body.classList.remove('modal-open');}
 function loadSlots(){ if(!date.value||!APPOINTMENTS_API_URL||APPOINTMENTS_API_URL.includes('COLE_AQUI')){time.innerHTML='<option value="">Agenda ainda não configurada</option>';return;} time.innerHTML='<option>Carregando...</option>'; const cb='apcb_'+Date.now(); window[cb]=data=>{time.innerHTML=data.ok&&data.slots.length?'<option value="">Selecione</option>'+data.slots.map(x=>`<option>${x}</option>`).join(''):'<option value="">Nenhum horário disponível</option>';delete window[cb];}; const sc=document.createElement('script');sc.src=APPOINTMENTS_API_URL+'?action=availability&date='+encodeURIComponent(date.value)+'&callback='+cb;sc.onerror=()=>{time.innerHTML='<option value="">Não foi possível consultar a agenda</option>';delete window[cb];};document.body.appendChild(sc);}
 document.querySelectorAll('[data-open-appointment]').forEach(b=>b.addEventListener('click',e=>{e.preventDefault();open();}));document.querySelectorAll('[data-close-appointment]').forEach(b=>b.addEventListener('click',close));overlay.addEventListener('click',e=>{if(e.target===overlay)close();});date.addEventListener('change',loadSlots);
@@ -223,22 +223,34 @@ body.modal-open .wa-float{display:none}
     const cur=sel.date&&days.includes(sel.date)?sel.date:(daysEl.dataset.day&&days.includes(daysEl.dataset.day)?daysEl.dataset.day:days[0]);daysEl.dataset.day=cur;
     daysEl.innerHTML=days.map(d=>{const x=parse(d),n=cache[d].length;return `<button type="button" class="ap-day ${d===cur?'on':''}" data-d="${d}"><b>${WD[x.getDay()]}</b><strong>${pad(x.getDate())}/${pad(x.getMonth()+1)}</strong><small>${n} horário${n>1?'s':''}</small></button>`}).join('');
     renderTimes(cur);}
+  // V145.38: uma consulta só traz os horários de 3 semanas (servidor V145.26); se o servidor for antigo, consulta dia a dia.
+  function jsonpRange(){return new Promise(res=>{const cb='apr_'+Date.now()+'_'+Math.random().toString(36).slice(2,8),sc=document.createElement('script');let t;
+    const done=d=>{clearTimeout(t);try{delete window[cb]}catch(e){window[cb]=undefined}sc.remove();res(d&&d.ok&&d.days?d.days:null)};
+    window[cb]=done;t=setTimeout(()=>done(null),20000);sc.onerror=()=>done(null);sc.src=api()+'?action=availabilityRange&days=21&callback='+cb;document.head.appendChild(sc)})}
+  let inflight=null;
+  async function fetchAll(){
+    const days=await jsonpRange();
+    if(days){const c={};Object.keys(days).forEach(d=>{c[d]=Array.isArray(days[d])?days[d]:[]});return c}
+    const c={},t=new Date(),list=[];for(let i=0;i<21;i++){const d=new Date(t.getFullYear(),t.getMonth(),t.getDate()+i,12);if(d.getDay()!==0)list.push(iso(d))}
+    let next=0;const enough=()=>Object.keys(c).filter(k=>c[k].length).length>=8;
+    const worker=async()=>{while(next<list.length&&!enough()){const day=list[next++];c[day]=(await jsonp(day))||[]}};
+    await Promise.all([worker(),worker(),worker(),worker()]);return c;
+  }
+  function prefetch(){if(!api()||inflight||(cache&&Date.now()-cacheAt<120000))return inflight;inflight=fetchAll().then(c=>{cache=c;cacheAt=Date.now();inflight=null;return c},()=>{inflight=null;return null});return inflight}
   async function load(){
     if(!api()){daysEl.innerHTML='';timesEl.innerHTML='<div class="ap-loading">Agenda online ainda não configurada.</div>';return}
     if(cache&&Date.now()-cacheAt<120000)return renderDays();
-    daysEl.innerHTML='';timesEl.innerHTML='<div class="ap-loading">Buscando horários livres…</div>';cache={};
-    const t=new Date();const list=[];for(let i=0;i<21;i++){const d=new Date(t.getFullYear(),t.getMonth(),t.getDate()+i,12);if(d.getDay()!==0)list.push(iso(d))}
-    // no máximo 4 consultas ao mesmo tempo; para ao achar 8 dias com horário
-    let next=0,shown=false;const enough=()=>Object.keys(cache).filter(k=>cache[k].length).length>=8;
-    const worker=async()=>{while(next<list.length&&!enough()){const day=list[next++];const s=await jsonp(day);cache[day]=s||[];
-      const done=list.slice(0,next).every(d=>d in cache);if(done&&Object.keys(cache).some(k=>cache[k].length)&&(!shown||enough())){shown=true;renderDays()}}};
-    await Promise.all([worker(),worker(),worker(),worker()]);
-    cacheAt=Date.now();renderDays();
+    daysEl.innerHTML='';timesEl.innerHTML='<div class="ap-loading">Buscando horários livres…</div>';
+    await prefetch();if(!cache)cache={};renderDays();
   }
+  // começa a buscar os horários logo que a página abre (ou quando o visitante se aproxima do botão)
+  const warm=()=>{try{prefetch()}catch(e){}};
+  if('requestIdleCallback' in window)window.addEventListener('load',()=>requestIdleCallback(warm,{timeout:2500}));else window.addEventListener('load',()=>setTimeout(warm,1200));
+  document.querySelectorAll('[data-open-appointment]').forEach(b=>{b.addEventListener('pointerenter',warm,{once:true});b.addEventListener('touchstart',warm,{once:true,passive:true})});
   daysEl.addEventListener('click',e=>{const b=e.target.closest('[data-d]');if(!b)return;daysEl.dataset.day=b.dataset.d;daysEl.querySelectorAll('.ap-day').forEach(x=>x.classList.toggle('on',x===b));renderTimes(b.dataset.d)});
   timesEl.addEventListener('click',e=>{const b=e.target.closest('[data-t]');if(!b)return;setSel(daysEl.dataset.day,b.dataset.t);renderTimes(daysEl.dataset.day);msg.textContent='';
     const nm=form.elements.name;if(nm&&!nm.value&&window.matchMedia('(min-width:641px)').matches)nm.focus({preventScroll:true})});
-  document.getElementById('apOther').addEventListener('click',()=>{nativeEl.hidden=!nativeEl.hidden;if(!nativeEl.hidden)dateEl.focus()});
+  document.getElementById('apOther').addEventListener('click',()=>{nativeEl.hidden=!nativeEl.hidden;if(!nativeEl.hidden){dateEl.dispatchEvent(new Event('change'));dateEl.focus()}});
   dateEl.addEventListener('change',()=>{sel={date:dateEl.value,time:''};chosenEl.hidden=true;daysEl.querySelectorAll('.ap-day').forEach(x=>x.classList.remove('on'));timesEl.innerHTML=''});
   timeEl.addEventListener('change',()=>{if(timeEl.value){sel={date:dateEl.value,time:timeEl.value};chosenEl.hidden=false;chosenEl.textContent='✓ '+label(dateEl.value)+' às '+timeEl.value}});
   // máscara do WhatsApp
