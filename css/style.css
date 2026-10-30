@@ -218,3 +218,7 @@ footer .footer-bottom span:last-child{letter-spacing:.03em}
 .video-close{top:-14px!important;right:-14px!important;box-shadow:0 4px 12px rgba(0,0,0,.25)}
 @media(max-width:640px){.video-close{top:-16px!important;right:-4px!important}.video-modal{margin-top:14px}}
 @media(max-width:640px){.video-overlay{padding:10px!important}}
+.reviews{background:var(--cream);padding:80px 0}.reviews-box{display:grid;grid-template-columns:1.1fr .9fr;gap:55px;align-items:center}.reviews h2{font:500 50px/.98 'Cormorant Garamond';color:var(--brown-dark);margin:13px 0 18px}.reviews-copy p{font-size:13px;line-height:1.8;color:var(--muted);max-width:520px;margin:0}
+.reviews-card{background:#fff;border:1px solid #e4d6c8;box-shadow:var(--shadow);padding:34px 30px;text-align:center}.reviews-stars{font-size:26px;letter-spacing:6px;color:#c99a3c;margin-bottom:10px}.reviews-card strong{display:block;font:500 25px 'Cormorant Garamond';color:var(--brown-dark)}.reviews-card>span{font-size:11px;color:var(--muted)}
+.reviews-actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:22px}.reviews .btn.ghost{color:var(--brown);border-color:#d7c7b6}
+@media(max-width:900px){.reviews{padding:60px 0}.reviews-box{grid-template-columns:1fr;gap:28px}.reviews h2{font-size:40px}.reviews-card{padding:28px 18px}.reviews-actions .btn{flex:1 1 100%}}
