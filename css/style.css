@@ -224,3 +224,4 @@ footer .footer-bottom span:last-child{letter-spacing:.03em}
 @media(max-width:900px){.reviews{padding:60px 0}.reviews-box{grid-template-columns:1fr;gap:28px}.reviews h2{font-size:40px}.reviews-card{padding:28px 18px}.reviews-actions .btn{flex:1 1 100%}}
 .value-item .value-ic{width:55px;height:55px;border-radius:50%;background:#f6eeea;display:grid;place-items:center;margin:0 auto 12px}.value-item .value-ic svg{width:26px;height:26px;fill:none;stroke:#b89a82;stroke-width:1.3;stroke-linecap:round;stroke-linejoin:round}
 .reviews-ic{width:58px;height:58px;border-radius:50%;background:#f6eeea;display:grid;place-items:center;margin:0 auto 12px}.reviews-ic svg{width:28px;height:28px;fill:none;stroke:var(--brown);stroke-width:1.3;stroke-linejoin:round}
+.kc-art b::after{content:attr(data-t)}

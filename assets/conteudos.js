@@ -31,7 +31,7 @@ window.KG_AREA_INFO={
 window.kgCoverHTML=function(item,base){
   base=base||'';const a=window.KG_AREA_INFO[item.area]||{icon:'agenda',grad:'linear-gradient(150deg,#5a3b2b,#a88969)'};
   if(item.capa)return `<span class="kc-cover" style="background-image:url('${base}assets/conteudos/${item.capa}')${item.pos?';background-position:'+item.pos:''}"></span>`;
-  return `<span class="kc-cover kc-art" style="background:${a.grad}"><img src="${base}assets/icons/${a.icon}.jpg" alt="" loading="lazy" decoding="async"><b>${window.kgTitulo(item)}</b></span>`;
+  return `<span class="kc-cover kc-art" style="background:${a.grad}"><img src="${base}assets/icons/${a.icon}.jpg" alt="" loading="lazy" decoding="async"><b aria-hidden="true" data-t="${String(window.kgTitulo(item)).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;')}"></b></span>`;
 };
 const KG_MESES=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
 window.kgMes=function(item){const m=/^(\d{4})-(\d{2})/.exec(item.data||'');return m?KG_MESES[+m[2]-1]+' de '+m[1]:''};
