@@ -1,5 +1,5 @@
 KALINY GIRARDI ADVOCACIA — site institucional + painel administrativo
-Versão: V145.34
+Versão: V145.35
 
 ESTRUTURA
 - index.html ............ site público (agendamento online, áreas, conteúdos, contato)
@@ -98,3 +98,6 @@ HISTÓRICO
 - V145.34: Guia do painel — "❓ Como usar" (menu lateral e topo) com 15 tarefas do dia
   a dia em passos curtos, busca e "Me leve lá" (abre a tela e destaca o botão);
   aviso de boas-vindas no primeiro acesso.
+- V145.35: RG e CPF da advogada saem do código público — os modelos usam
+  {{adv_rg}} e {{adv_cpf}}, buscados no servidor depois do login (Configurações →
+  "Dados da advogada"). Apps Script V145.25: officeProfile / officeProfileSave.
