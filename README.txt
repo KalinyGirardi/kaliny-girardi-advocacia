@@ -1,5 +1,5 @@
 KALINY GIRARDI ADVOCACIA — site institucional + painel administrativo
-Versão: V145.24
+Versão: V145.25
 
 ESTRUTURA
 - index.html ............ site público (agendamento online, áreas, conteúdos, contato)
@@ -53,3 +53,6 @@ HISTÓRICO
   filtros, cartões clicáveis, abas (lançamentos, a receber, a pagar, fluxo de caixa,
   por cliente, categorias), marcar pago com 1 toque e "desfazer", lançamento rápido
   com categorias, parcelamento e repetição mensal.
+- V145.25: Clientes e Processos interativos — cartões clicáveis, filtros em botões,
+  selos (processos, prazo, valor vencido, cadastro incompleto), ações rápidas;
+  processos em lista, prazos (concluir em 1 toque) e quadro por situação.

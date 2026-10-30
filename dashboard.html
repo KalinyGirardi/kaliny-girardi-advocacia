@@ -1477,7 +1477,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
    Regras: vence a alteração mais recente (updatedAt); exclusões viram marcação (deletedAt);
    resposta vazia ou com erro do servidor nunca apaga dados deste navegador. */
 (function(){
-  const VERSION='V145.24';
+  const VERSION='V145.25';
   const META_KEY='kaliny_sync_meta_v1';
   const COLLECTIONS=['processes','finance','notes','calcHistory','previdenciario','documents'];
   const BATCH=50;
@@ -2914,6 +2914,193 @@ ${edit?(f.installmentLabel?`<p class="muted" style="font-size:13px">Parte de um 
   window.renderFinance=function(){const r=typeof origRender==='function'?origRender.apply(this,arguments):undefined;try{install();render()}catch(e){console.warn('Financeiro:',e)}return r};
   window.kalinyFinance={render,openQuick,state,category,ui:()=>ui};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{install()});else setTimeout(install,0);
+})();
+</script>
+<script>
+/* V145.25 — Clientes e Processos interativos (mesmo padrão do Financeiro): cartões clicáveis,
+   filtros em botões, selos que explicam a situação e ações rápidas com "desfazer". */
+(function(){
+  const C={ok:'#557a62',bad:'#9a5a55',warn:'#a8741a',ink:'#3d2b20',mut:'#8d7767',acc:'#b06a1e'};
+  const AREAS=['Cível','Família e Sucessões','Consumidor','Previdenciário','Imobiliário'];
+  const PSTATUS=['Em andamento','Aguardando prazo','Suspenso','Encerrado'];
+  const MONTHS_FULL=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+  const pad=n=>String(n).padStart(2,'0');const iso=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+  const today=()=>{const t=new Date();t.setHours(0,0,0,0);return t};
+  const parseDay=v=>{const s=String(v||'').trim();let m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);if(m)return new Date(+m[1],m[2]-1,+m[3]);m=s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);return m?new Date(+m[3],m[2]-1,+m[1]):null};
+  const br=d=>d?pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear():'—';
+  const lower=v=>String(v||'').trim().toLowerCase();
+  const days=d=>Math.round((d-today())/86400000);
+  const countdown=d=>{const n=days(d);return n<0?`venceu há ${-n} dia${n===-1?'':'s'}`:n===0?'vence hoje':n===1?'vence amanhã':`em ${n} dias`};
+  const initials=n=>String(n||'?').trim().split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase();
+  const waNumber=raw=>{let d=String(raw||'').replace(/\D/g,'').replace(/^0+/,'');if(d.length===10||d.length===11)d='55'+d;return d.length>=12&&d.length<=13?d:''};
+  const UI_KEY='kaliny_cp_ui_v1';let ui={c:{q:'',status:'Ativo',area:'',kpi:'',sort:'name'},p:{q:'',area:'',kpi:'',view:'list',client:''}};
+  try{const s=JSON.parse(localStorage.getItem(UI_KEY)||'{}');if(s.c)Object.assign(ui.c,s.c);if(s.p)Object.assign(ui.p,s.p)}catch(e){}
+  const saveUi=()=>{try{localStorage.setItem(UI_KEY,JSON.stringify(ui))}catch(e){}};
+
+  // ---------- prazos de um processo ----------
+  function pendingDeadlines(p){
+    const list=(Array.isArray(p.deadlines)?p.deadlines:[]).map((d,i)=>({d,i})).filter(({d})=>d&&!lower(d.status).startsWith('conclu')&&parseDay(d.date)).map(({d,i})=>({p,ref:d,idx:i,date:parseDay(d.date),title:d.title||'Prazo'}));
+    const doneDates=new Set((p.deadlines||[]).filter(d=>d&&lower(d.status).startsWith('conclu')).map(d=>String(d.date)));
+    const main=parseDay(p.deadline);
+    if(main&&!list.some(x=>x.date.getTime()===main.getTime())&&!doneDates.has(String(p.deadline)))list.push({p,ref:null,idx:-1,date:main,title:'Próximo prazo'});
+    return list.sort((a,b)=>a.date-b.date);
+  }
+  const activeProcs=()=> (data.processes||[]).filter(p=>p&&lower(p.status)!=='encerrado');
+  function nextDeadline(p){return pendingDeadlines(p)[0]||null}
+  function lastMove(p){const ms=(p.movements||[]).filter(m=>m&&parseDay(m.date)).sort((a,b)=>parseDay(b.date)-parseDay(a.date));return ms[0]?{date:parseDay(ms[0].date),title:ms[0].title}:(parseDay(p.updated)?{date:parseDay(p.updated),title:'Atualização'}:null)}
+  function recomputeNext(p){const t=iso(today());const pend=(p.deadlines||[]).filter(d=>d&&d.date&&!lower(d.status).startsWith('conclu')).map(d=>d.date).sort();p.deadline=pend.find(d=>d>=t)||pend[pend.length-1]||''}
+
+  // ---------- dados do cliente ----------
+  function clientInfo(c){
+    const id=String(c.id),procs=(data.processes||[]).filter(p=>p&&String(p.clientId)===id),act=procs.filter(p=>lower(p.status)!=='encerrado');
+    const dl=act.map(nextDeadline).filter(Boolean).sort((a,b)=>a.date-b.date)[0]||null;
+    const fin=(data.finance||[]).filter(f=>f&&String(f.clientId)===id&&lower(f.type||'receita')!=='despesa'&&lower(f.status)==='pendente');
+    const overdue=fin.filter(f=>{const d=parseDay(f.dueDate||f.date);return d&&d<today()}).reduce((s,f)=>s+Number(f.value||0),0);
+    const open=fin.reduce((s,f)=>s+Number(f.value||0),0);
+    const missing=[];if(!c.cpf)missing.push('CPF');if(!c.rg)missing.push('RG');if(!c.street||!c.city)missing.push('endereço');if(!c.phone)missing.push('telefone');
+    return {procs,act,dl,overdue,open,missing};
+  }
+
+  // ---------- estilo comum ----------
+  const css=`.kx{--b:#eaded2}.kx .k-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:6px 0 12px}
+.kx .k-chip{border:1px solid var(--b);background:#fff;border-radius:999px;padding:7px 13px;font-size:13px;cursor:pointer;color:${C.ink}}.kx .k-chip.on{background:#6b4a36;color:#fff;border-color:#6b4a36}
+.kx .k-search{flex:1;min-width:200px;border:1px solid var(--b);border-radius:999px;padding:8px 14px;background:#fff;font:inherit;font-size:14px}
+.kx select.k-sel{border:1px solid var(--b);border-radius:999px;padding:7px 12px;background:#fff;font-size:13px;max-width:220px}
+.kx .k-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.kx .k-kpi{border:1px solid var(--b);border-radius:14px;background:#fff;padding:12px 14px;cursor:pointer;text-align:left}.kx .k-kpi:hover{box-shadow:0 4px 14px rgba(61,43,32,.08)}.kx .k-kpi.on{border-color:#6b4a36;box-shadow:0 0 0 2px rgba(107,74,54,.15)}
+.kx .k-kpi small{display:block;color:${C.mut};font-size:12px}.kx .k-kpi strong{display:block;font:500 24px Georgia,serif;margin:3px 0;color:${C.ink}}.kx .k-kpi span{font-size:11px;color:${C.mut}}
+.kx .k-tabs{display:flex;gap:4px;border-bottom:1px solid var(--b);margin-bottom:12px;overflow-x:auto}.kx .k-tab{border:0;background:none;padding:10px 14px;cursor:pointer;font-size:14px;color:${C.mut};border-bottom:2px solid transparent;white-space:nowrap}.kx .k-tab.on{color:${C.ink};border-bottom-color:${C.acc};font-weight:600}
+.kx .k-row{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:center;padding:11px 12px;border:1px solid var(--b);border-radius:12px;background:#fff;margin-bottom:7px}.kx .k-row:hover{border-color:#d7c4b3}
+.kx .k-av{width:40px;height:40px;border-radius:50%;background:#efe4d9;color:#6b4a36;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px}
+.kx .k-main b{font-size:15px;color:${C.ink};cursor:pointer}.kx .k-main .k-meta{font-size:12px;color:${C.mut};margin-top:2px}
+.kx .k-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}.kx .k-tag{font-size:11px;border-radius:999px;padding:3px 9px;background:#f4ece4;color:#6b5545;white-space:nowrap}
+.kx .k-act{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}.kx .k-ic{border:1px solid var(--b);background:#fff;border-radius:9px;padding:6px 9px;cursor:pointer;font-size:13px;color:${C.ink};text-decoration:none;white-space:nowrap}.kx .k-ic:hover{background:#f6efe8}
+.kx .k-empty{padding:28px;text-align:center;color:${C.mut};border:1px dashed var(--b);border-radius:14px}
+.kx .k-group{margin:14px 0 6px;display:flex;justify-content:space-between;color:${C.mut};font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+.kx .k-tip{background:#fbf6ee;border:1px solid #efe2cf;border-radius:12px;padding:10px 12px;font-size:13px;color:#6b5545;margin-bottom:12px}
+.kx .k-board{display:grid;grid-template-columns:repeat(4,minmax(220px,1fr));gap:10px;overflow-x:auto}.kx .k-col{background:#faf5f0;border:1px solid var(--b);border-radius:14px;padding:10px;min-height:120px}
+.kx .k-col h4{margin:2px 4px 10px;font-size:13px;display:flex;justify-content:space-between}.kx .k-card{background:#fff;border:1px solid var(--b);border-radius:10px;padding:9px 10px;margin-bottom:8px;font-size:13px}
+.kx .k-card b{display:block;cursor:pointer}.kx .k-move{display:flex;justify-content:space-between;margin-top:6px}
+#cpSnack{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#3d2b20;color:#fff;border-radius:12px;padding:11px 14px;display:none;gap:14px;align-items:center;z-index:9999;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.2)}#cpSnack button{background:none;border:0;color:#f0c38e;font-weight:700;cursor:pointer;font-size:14px}
+@media(max-width:900px){.kx .k-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.kx .k-row{grid-template-columns:40px minmax(0,1fr)}.kx .k-act{grid-column:1/-1;justify-content:flex-start}}
+@media(max-width:700px){.kx .k-kpis{gap:8px}.kx .k-kpi{padding:9px 11px}.kx .k-kpi strong{font-size:20px;margin:1px 0}.kx .k-kpi span{display:none}.kx .k-bar{flex-wrap:nowrap;overflow-x:auto}.kx .k-bar.k-wrap{flex-wrap:wrap}.kx .k-search{min-width:100%}.kx select.k-sel{flex:1 1 0;max-width:none}.kx .k-chip{flex:none}.kx-sub{display:none}}`;
+  const tag=(t,col)=>`<span class="k-tag" style="${col?`background:${col}1a;color:${col}`:''}">${t}</span>`;
+  const kpi=(scope,key,label,val,sub)=>`<button class="k-kpi ${ui[scope].kpi===key?'on':''}" type="button" data-k-kpi="${scope}:${key}"><small>${label}</small><strong>${val}</strong><span>${sub||'&nbsp;'}</span></button>`;
+  let snackT=null;function snack(msg,undo){let el=document.getElementById('cpSnack');if(!el){el=document.createElement('div');el.id='cpSnack';document.body.appendChild(el)}el.innerHTML=`<span>${esc(msg)}</span>${undo?'<button type="button">Desfazer</button>':''}`;el.style.display='flex';if(undo)el.querySelector('button').onclick=()=>{undo();el.style.display='none'};clearTimeout(snackT);snackT=setTimeout(()=>el.style.display='none',6000)}
+
+  // ---------- CLIENTES ----------
+  function renderClientsApp(){
+    const app=document.getElementById('cliApp');if(!app)return;const u=ui.c,t=today();
+    const all=(data.clients||[]).filter(Boolean),infos=new Map(all.map(c=>[String(c.id),clientInfo(c)]));
+    const active=all.filter(c=>(c.status||'Ativo')!=='Inativo');
+    const month=c=>{const d=parseDay(c.createdAt)||parseDay(c.date);return d&&d.getMonth()===t.getMonth()&&d.getFullYear()===t.getFullYear()};
+    const K={novos:month,processo:c=>infos.get(String(c.id)).act.length>0,vencido:c=>infos.get(String(c.id)).overdue>0,incompleto:c=>infos.get(String(c.id)).missing.length>0};
+    const q=lower(u.q).replace(/[.\-\s()]/g,'');
+    let list=all.filter(c=>(!u.status||(c.status||'Ativo')===u.status)&&(!u.area||c.area===u.area)&&(!u.kpi||K[u.kpi](c))&&(!q||[c.name,c.phone,c.cpf,c.email].some(v=>lower(v).replace(/[.\-\s()]/g,'').includes(q))));
+    const sorters={name:(a,b)=>String(a.name).localeCompare(String(b.name),'pt-BR'),recent:(a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')),money:(a,b)=>infos.get(String(b.id)).open-infos.get(String(a.id)).open,deadline:(a,b)=>((infos.get(String(a.id)).dl||{date:new Date(9e15)}).date-(infos.get(String(b.id)).dl||{date:new Date(9e15)}).date)};
+    list.sort(sorters[u.sort]||sorters.name);
+    const cnt=f=>active.filter(f).length;
+    const rows=list.map(c=>{const i=infos.get(String(c.id)),id=esc(String(c.id)),wa=waNumber(c.phone);
+      const tags=[c.area?tag(esc(c.area)):'',(c.status||'Ativo')==='Inativo'?tag('Inativo'):'',i.act.length?tag(`⚖ ${i.act.length} processo${i.act.length>1?'s':''}`):'',
+        i.dl?tag(`⏳ prazo ${countdown(i.dl.date)}`,days(i.dl.date)<=3?C.bad:C.warn):'',i.overdue?tag('⚠ '+money(i.overdue)+' vencido',C.bad):i.open?tag(money(i.open)+' a receber',C.warn):'',
+        i.missing.length?`<span class="k-tag" title="Para gerar procuração e declarações, complete o cadastro" style="background:#eef2f7;color:#41658a">📝 falta ${esc(i.missing.join(', '))}</span>`:''].join('');
+      return `<div class="k-row"><div class="k-av">${esc(initials(c.name))}</div><div class="k-main"><b data-k-open-client="${id}">${esc(c.name||'Sem nome')}</b><div class="k-meta">${[c.phone?esc(typeof formatBrazilPhone==='function'?formatBrazilPhone(c.phone):c.phone):'sem telefone',c.cpf?'CPF '+esc(c.cpf):'',c.city?esc(c.city):''].filter(Boolean).join(' · ')}</div><div class="k-tags">${tags}</div></div>
+<div class="k-act"><button class="k-ic" type="button" data-k-open-client="${id}">Ficha</button>${wa?`<a class="k-ic" href="https://wa.me/${wa}" target="_blank" rel="noopener" title="Abrir conversa no WhatsApp">💬</a>`:''}<button class="k-ic" type="button" data-k-edit-client="${id}" title="Editar cadastro">✎</button><button class="k-ic" type="button" data-k-new-proc="${id}" title="Novo processo">+ Processo</button><button class="k-ic" type="button" data-k-new-fin="${id}" title="Novo lançamento financeiro">+ R$</button><button class="k-ic" type="button" data-k-proc-doc="${id}" title="Gerar procuração">📄</button></div></div>`}).join('');
+    const incompleteTip=u.kpi==='incompleto'?`<div class="k-tip">📝 <b>Por que completar?</b> Com CPF, RG e endereço preenchidos, a procuração e as declarações saem prontas, sem precisar digitar nada. Clique em ✎ para completar.</div>`:'';
+    app.innerHTML=`<style>${css}</style>
+<div class="k-kpis">${kpi('c','','Clientes ativos',active.length,all.length-active.length?(all.length-active.length)+' inativo(s)':'')}${kpi('c','novos','Novos no mês',cnt(month),MONTHS_FULL[t.getMonth()])}${kpi('c','processo','Com processo ativo',cnt(K.processo),'')}${kpi('c','vencido','Com valor vencido',cnt(K.vencido),cnt(K.vencido)?'cobrar':'nenhum')}${kpi('c','incompleto','Cadastro incompleto',cnt(K.incompleto),'faltam dados para documentos')}</div>
+<div class="k-bar">${[['Ativo','Ativos'],['Inativo','Inativos'],['','Todos']].map(([v,l])=>`<button class="k-chip ${u.status===v?'on':''}" type="button" data-k-cstatus="${v}">${l}</button>`).join('')}<span style="width:8px"></span>${['',...AREAS].map(a=>`<button class="k-chip ${u.area===a?'on':''}" type="button" data-k-carea="${esc(a)}">${a||'Todas as áreas'}</button>`).join('')}</div>
+<div class="k-bar k-wrap"><input class="k-search" id="kcSearch" placeholder="Buscar por nome, telefone, CPF ou e-mail" value="${esc(u.q)}"><select class="k-sel" id="kcSort"><option value="name" ${u.sort==='name'?'selected':''}>Ordem: nome A–Z</option><option value="recent" ${u.sort==='recent'?'selected':''}>Mais recentes</option><option value="deadline" ${u.sort==='deadline'?'selected':''}>Prazo mais próximo</option><option value="money" ${u.sort==='money'?'selected':''}>Mais valores a receber</option></select>${u.q||u.area||u.kpi||u.status!=='Ativo'?'<button class="k-chip" type="button" data-k-cclear>✕ Limpar</button>':''}</div>
+${incompleteTip}<div class="k-group"><span>${list.length} cliente${list.length===1?'':'s'}</span><span></span></div>${rows||`<div class="k-empty">${all.length?'Nenhum cliente com esses filtros.':'Nenhum cliente ainda. Clique em <b>+ Novo cliente</b> para começar.'}</div>`}`;
+    const s=app.querySelector('#kcSearch');s.addEventListener('input',()=>{u.q=s.value;saveUi();clearTimeout(renderClientsApp.t);renderClientsApp.t=setTimeout(()=>{renderClientsApp();const n=document.getElementById('kcSearch');n.focus();n.setSelectionRange(n.value.length,n.value.length)},250)});
+    app.querySelector('#kcSort').onchange=e=>{u.sort=e.target.value;saveUi();renderClientsApp()};
+  }
+
+  // ---------- PROCESSOS ----------
+  function procMatches(p,u){const c=p.clientId?clientById(p.clientId):null,q=lower(u.q);return (!u.area||p.area===u.area)&&(!u.client||String(p.clientId)===u.client)&&(!q||[p.number,p.subject,p.tribunal,p.vara,c&&c.name].some(v=>lower(v).includes(q)))}
+  function procRow(p){
+    const c=p.clientId?clientById(p.clientId):null,dl=nextDeadline(p),lm=lastMove(p),id=esc(String(p.id)),closed=lower(p.status)==='encerrado';
+    const stale=!closed&&(!lm||days(lm.date)<-30);
+    const tags=[tag(esc(p.status||'Em andamento'),closed?C.mut:null),p.area?tag(esc(p.area)):'',dl&&!closed?tag(`⏳ ${esc(dl.title)} — ${countdown(dl.date)}`,days(dl.date)<0?C.bad:days(dl.date)<=3?C.bad:C.warn):'',stale?tag('💤 sem movimentação há 30+ dias','#41658a'):'',lm?tag(`última: ${esc(lm.title||'movimentação')} em ${br(lm.date)}`):''].join('');
+    return `<div class="k-row"><div class="k-av" style="font-size:18px">⚖</div><div class="k-main"><b data-k-open-proc="${id}">${esc(p.number||'Processo sem número')}</b><div class="k-meta">${[c?esc(c.name):'sem cliente',p.tribunal?esc(p.tribunal):'',p.subject?esc(p.subject):''].filter(Boolean).join(' · ')}</div><div class="k-tags">${tags}</div></div>
+<div class="k-act"><button class="k-ic" type="button" data-k-open-proc="${id}">Abrir</button><button class="k-ic" type="button" data-k-calc="${id}" title="Calcular prazo">⏱</button><button class="k-ic" type="button" data-k-move="${id}" title="Nova movimentação">+ Movimentação</button><button class="k-ic" type="button" data-k-edit-proc="${id}" title="Editar">✎</button></div></div>`;
+  }
+  function deadlinesView(u){
+    const all=activeProcs().filter(p=>procMatches(p,u)).flatMap(pendingDeadlines);
+    if(!all.length)return '<div class="k-empty">Nenhum prazo pendente 🎉<br><span style="font-size:13px">Use ⏱ em um processo para calcular e salvar um prazo.</span></div>';
+    const b=x=>{const n=days(x.date);return n<0?'⚠ Vencidos':n===0?'Hoje':n<=7?'Próximos 7 dias':n<=30?'Próximos 30 dias':'Mais adiante'};
+    const order=['⚠ Vencidos','Hoje','Próximos 7 dias','Próximos 30 dias','Mais adiante'],g={};all.sort((a,b2)=>a.date-b2.date).forEach(x=>{(g[b(x)]=g[b(x)]||[]).push(x)});
+    return order.filter(k=>g[k]).map(k=>`<div class="k-group"><span>${k}</span><span>${g[k].length}</span></div>`+g[k].map(x=>{const c=x.p.clientId?clientById(x.p.clientId):null,n=days(x.date);
+      return `<div class="k-row"><div class="k-av" style="background:${n<0?'#f5e1df':n<=3?'#fbe9d6':'#efe4d9'};color:${n<0?C.bad:C.ink};font-size:12px;flex-direction:column;line-height:1"><b>${pad(x.date.getDate())}</b><span style="font-size:9px">${MONTHS_FULL[x.date.getMonth()].slice(0,3)}</span></div><div class="k-main"><b data-k-open-proc="${esc(String(x.p.id))}">${esc(x.title)}</b><div class="k-meta">${esc(x.p.number||'Processo')} · ${c?esc(c.name):'sem cliente'} · ${br(x.date)} (${countdown(x.date)})</div></div><div class="k-act"><button class="k-ic" type="button" data-k-done="${esc(String(x.p.id))}" data-idx="${x.idx}" data-date="${iso(x.date)}" style="color:${C.ok};font-weight:600">✓ Concluir</button><button class="k-ic" type="button" data-k-open-proc="${esc(String(x.p.id))}">Abrir</button></div></div>`}).join('')).join('');
+  }
+  function boardView(u){
+    const procs=(data.processes||[]).filter(p=>p&&procMatches(p,u));
+    return '<div class="k-tip">Use ◀ ▶ para mudar a situação do processo. Dá para desfazer.</div><div class="k-board">'+PSTATUS.map((s,si)=>{const arr=procs.filter(p=>(p.status||'Em andamento')===s);return `<div class="k-col"><h4><span>${s}</span><span class="muted">${arr.length}</span></h4>${arr.map(p=>{const c=p.clientId?clientById(p.clientId):null,dl=nextDeadline(p);return `<div class="k-card"><b data-k-open-proc="${esc(String(p.id))}">${esc(p.number||'Sem número')}</b><span class="muted">${c?esc(c.name):''}</span>${dl&&s!=='Encerrado'?`<div style="font-size:12px;color:${days(dl.date)<=3?C.bad:C.warn};margin-top:3px">⏳ ${countdown(dl.date)}</div>`:''}<div class="k-move"><button class="k-ic" type="button" data-k-status="${esc(String(p.id))}" data-to="${si-1}" ${si===0?'disabled style="opacity:.3"':''}>◀</button><button class="k-ic" type="button" data-k-status="${esc(String(p.id))}" data-to="${si+1}" ${si===PSTATUS.length-1?'disabled style="opacity:.3"':''}>▶</button></div></div>`}).join('')||'<div class="muted" style="font-size:12px;padding:6px">—</div>'}</div>`}).join('')+'</div>';
+  }
+  function renderProcsApp(){
+    const app=document.getElementById('procApp');if(!app)return;const u=ui.p;
+    const act=activeProcs(),allDl=act.flatMap(pendingDeadlines),all=(data.processes||[]).filter(Boolean);
+    const K={semana:p=>pendingDeadlines(p).some(x=>days(x.date)>=0&&days(x.date)<=7),vencido:p=>pendingDeadlines(p).some(x=>days(x.date)<0),parado:p=>{const lm=lastMove(p);return !lm||days(lm.date)<-30},encerrado:p=>lower(p.status)==='encerrado'};
+    const base=u.kpi==='encerrado'?all:act;
+    const list=base.filter(p=>procMatches(p,u)&&(!u.kpi||K[u.kpi](p))).sort((a,b)=>((nextDeadline(a)||{date:new Date(9e15)}).date-(nextDeadline(b)||{date:new Date(9e15)}).date));
+    const clients=(data.clients||[]).filter(c=>all.some(p=>String(p.clientId)===String(c.id))).sort((a,b)=>String(a.name).localeCompare(String(b.name),'pt-BR'));
+    app.innerHTML=`<style>${css}</style>
+<div class="k-kpis">${kpi('p','','Em andamento',act.length,'')}${kpi('p','semana','Prazos em 7 dias',allDl.filter(x=>days(x.date)>=0&&days(x.date)<=7).length,'')}${kpi('p','vencido','Prazos vencidos',allDl.filter(x=>days(x.date)<0).length,allDl.some(x=>days(x.date)<0)?'conferir agora':'nenhum')}${kpi('p','parado','Parados há 30+ dias',act.filter(K.parado).length,'sem movimentação')}${kpi('p','encerrado','Encerrados',all.length-act.length,'')}</div>
+<div class="k-tabs">${[['list','Lista'],['dl','Prazos'],['board','Quadro']].map(([k,l])=>`<button class="k-tab ${u.view===k?'on':''}" type="button" data-k-view="${k}">${l}</button>`).join('')}</div>
+<div class="k-bar k-wrap"><input class="k-search" id="kpSearch" placeholder="Buscar por número, cliente, assunto ou vara" value="${esc(u.q)}"><select class="k-sel" id="kpArea"><option value="">Todas as áreas</option>${AREAS.map(a=>`<option ${u.area===a?'selected':''}>${a}</option>`).join('')}</select><select class="k-sel" id="kpClient"><option value="">Todos os clientes</option>${clients.map(c=>`<option value="${esc(String(c.id))}" ${u.client===String(c.id)?'selected':''}>${esc(c.name)}</option>`).join('')}</select>${u.q||u.area||u.kpi||u.client?'<button class="k-chip" type="button" data-k-pclear>✕ Limpar</button>':''}</div>
+<div id="kpBody">${u.view==='dl'?deadlinesView(u):u.view==='board'?boardView(u):(list.length?`<div class="k-group"><span>${list.length} processo${list.length===1?'':'s'}</span><span>ordenados pelo prazo mais próximo</span></div>`+list.map(procRow).join(''):`<div class="k-empty">${all.length?'Nenhum processo com esses filtros.':'Nenhum processo ainda. Clique em <b>+ Novo processo</b>.'}</div>`)}</div>`;
+    const s=app.querySelector('#kpSearch');s.addEventListener('input',()=>{u.q=s.value;saveUi();clearTimeout(renderProcsApp.t);renderProcsApp.t=setTimeout(()=>{renderProcsApp();const n=document.getElementById('kpSearch');n.focus();n.setSelectionRange(n.value.length,n.value.length)},250)});
+    app.querySelector('#kpArea').onchange=e=>{u.area=e.target.value;saveUi();renderProcsApp()};
+    app.querySelector('#kpClient').onchange=e=>{u.client=e.target.value;saveUi();renderProcsApp()};
+  }
+
+  // ---------- ações ----------
+  function concludeDeadline(pid,idx,date){
+    const p=(data.processes||[]).find(x=>String(x.id)===String(pid));if(!p)return;
+    p.deadlines=Array.isArray(p.deadlines)?p.deadlines:[];const before={deadlines:JSON.parse(JSON.stringify(p.deadlines)),deadline:p.deadline,updated:p.updated};
+    if(idx>=0&&p.deadlines[idx])p.deadlines[idx].status='Concluído';
+    else p.deadlines.push({id:'prd_'+Date.now(),date,title:'Próximo prazo',status:'Concluído'});
+    recomputeNext(p);p.updated=iso(today());save();
+    snack('Prazo concluído ✓',()=>{p.deadlines=before.deadlines;p.deadline=before.deadline;p.updated=before.updated;save()});
+  }
+  function moveStatus(pid,to){
+    const p=(data.processes||[]).find(x=>String(x.id)===String(pid));if(!p||to<0||to>=PSTATUS.length)return;const before=p.status;
+    p.status=PSTATUS[to];p.updated=iso(today());save();snack(`Processo movido para "${PSTATUS[to]}"`,()=>{p.status=before;save()});
+  }
+  document.addEventListener('click',ev=>{
+    const t=ev.target.closest&&ev.target.closest('[data-k-kpi],[data-k-cstatus],[data-k-carea],[data-k-cclear],[data-k-pclear],[data-k-view],[data-k-open-client],[data-k-edit-client],[data-k-new-proc],[data-k-new-fin],[data-k-proc-doc],[data-k-open-proc],[data-k-calc],[data-k-move],[data-k-edit-proc],[data-k-done],[data-k-status]');
+    if(!t)return;const d=t.dataset;ev.preventDefault();
+    if(d.kKpi){const [sc,k]=d.kKpi.split(':');ui[sc].kpi=ui[sc].kpi===k?'':k;if(sc==='p'&&ui.p.view==='board')ui.p.view='list'}
+    else if('kCstatus' in d)ui.c.status=d.kCstatus;
+    else if('kCarea' in d)ui.c.area=d.kCarea;
+    else if('kCclear' in d)Object.assign(ui.c,{q:'',area:'',kpi:'',status:'Ativo'});
+    else if('kPclear' in d)Object.assign(ui.p,{q:'',area:'',kpi:'',client:''});
+    else if(d.kView)ui.p.view=d.kView;
+    else if(d.kOpenClient)return viewClient(d.kOpenClient);
+    else if(d.kEditClient)return openEditClient(d.kEditClient);
+    else if(d.kNewProc)return openProcessForm(d.kNewProc);
+    else if(d.kNewFin)return openFinanceForm(d.kNewFin);
+    else if(d.kProcDoc){viewClient(d.kProcDoc);openClientTab(d.kProcDoc,'documents');setTimeout(()=>document.querySelector(`[data-quick-model="procuracao"][data-client="${CSS.escape(d.kProcDoc)}"]`)?.click(),80);return}
+    else if(d.kOpenProc)return openProcessDetail(d.kOpenProc);
+    else if(d.kCalc)return window.kalinyPrazos&&window.kalinyPrazos.open(d.kCalc);
+    else if(d.kMove)return addProcessMovement(d.kMove);
+    else if(d.kEditProc){const p=(data.processes||[]).find(x=>String(x.id)===d.kEditProc);return openProcessForm(p?p.clientId:'',d.kEditProc)}
+    else if(d.kDone)return concludeDeadline(d.kDone,+d.idx,d.date);
+    else if(d.kStatus)return moveStatus(d.kStatus,+d.to);
+    saveUi();renderClientsApp();renderProcsApp();
+  });
+
+  function install(){
+    const cp=document.querySelector('#page-clients .d-panel');
+    if(cp&&!document.getElementById('cliApp')){cp.querySelectorAll(':scope > .client-filterbar, :scope > #clientSummary, :scope > #clientsTable').forEach(el=>el.style.display='none');const m=cp.querySelector('.d-panel-head .muted');if(m){m.textContent='Toque em um cartão para filtrar. Os selos mostram o que precisa de atenção.';m.classList.add('kx-sub')}const a=document.createElement('div');a.id='cliApp';a.className='kx';cp.appendChild(a)}
+    const pp=document.querySelector('#page-processes .d-panel');
+    if(pp&&!document.getElementById('procApp')){pp.querySelectorAll(':scope > .client-filterbar, :scope > #processSummary, :scope > #processesTable').forEach(el=>el.style.display='none');const m=pp.querySelector('.d-panel-head .muted');if(m){m.textContent='Prazos em ordem, contagem regressiva e situação de cada processo.';m.classList.add('kx-sub')}const a=document.createElement('div');a.id='procApp';a.className='kx';pp.appendChild(a)}
+    renderClientsApp();renderProcsApp();
+  }
+  const oc=window.renderClients;window.renderClients=function(){const r=typeof oc==='function'?oc.apply(this,arguments):undefined;try{install()}catch(e){console.warn('Clientes:',e)}return r};
+  const op=window.renderProcesses;window.renderProcesses=function(){const r=typeof op==='function'?op.apply(this,arguments):undefined;try{install()}catch(e){console.warn('Processos:',e)}return r};
+  window.kalinyCP={renderClientsApp,renderProcsApp,pendingDeadlines,clientInfo};
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else setTimeout(install,0);
 })();
 </script>
 </body></html>
