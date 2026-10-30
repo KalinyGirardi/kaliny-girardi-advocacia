@@ -1481,7 +1481,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
    Regras: vence a alteração mais recente (updatedAt); exclusões viram marcação (deletedAt);
    resposta vazia ou com erro do servidor nunca apaga dados deste navegador. */
 (function(){
-  const VERSION='V145.42';
+  const VERSION='V145.43';
   const META_KEY='kaliny_sync_meta_v1';
   const COLLECTIONS=['processes','finance','notes','calcHistory','previdenciario','documents','tasks'];
   const IS_COLLAB=(typeof session!=='undefined'&&session&&session.role==='colaboradora'),COLLAB_PUSH=new Set(['finance','tasks']);let warnedForbidden=false;
@@ -4122,20 +4122,22 @@ ${SIGN}`}};
   function card(){
     const grid=document.querySelector('#page-settings .settings-grid');if(!grid||document.getElementById('officeProfileCard'))return;
     grid.insertAdjacentHTML('beforeend',`<div class="settings-card" id="officeProfileCard"><span class="eyebrow">Modelos de documentos</span><h3>Dados da advogada</h3><p class="muted">Usados nas procurações e contratos. Ficam guardados só no servidor, não no código do site.</p>
-<div class="form-grid"><div class="field"><label>RG (com órgão emissor)</label><input id="opRg" placeholder="carregando…"></div><div class="field"><label>CPF</label><input id="opCpf" placeholder="carregando…" inputmode="numeric"></div></div>
+<div class="form-grid"><div class="field"><label>RG (com órgão emissor)</label><input id="opRg" placeholder="carregando…"></div><div class="field"><label>CPF</label><input id="opCpf" placeholder="carregando…" inputmode="numeric"></div><div class="field full"><label>Chave Pix (vai nas mensagens de cobrança)</label><input id="opPix" placeholder="CPF, CNPJ, e-mail, celular ou chave aleatória"></div></div>
 <div class="form-actions"><button class="d-btn" type="button" id="opSave">Salvar</button></div><div class="mini-help" id="opMsg"></div></div>`);
-    const fill=p=>{if(!p)return;document.getElementById('opRg').value=p.rg||'';document.getElementById('opCpf').value=p.cpf||''};
+    const fill=p=>{if(!p)return;document.getElementById('opRg').value=p.rg||'';document.getElementById('opCpf').value=p.cpf||'';document.getElementById('opPix').value=p.pix||''};
     fill(prof);load().then(p=>{fill(p);if(!p)document.getElementById('opMsg').textContent='Não consegui carregar do servidor. Confira a conexão.'});
     document.getElementById('opSave').onclick=async()=>{
-      const rg=document.getElementById('opRg').value.trim(),cpf=document.getElementById('opCpf').value.trim(),msg=document.getElementById('opMsg');
+      const rg=document.getElementById('opRg').value.trim(),cpf=document.getElementById('opCpf').value.trim(),pix=document.getElementById('opPix').value.trim(),msg=document.getElementById('opMsg');
       if(!rg||cpf.replace(/\D/g,'').length!==11){msg.textContent='Confira o RG e o CPF (11 números).';return}
       msg.textContent='Salvando…';
-      try{const j=await call('officeProfileSave',{data:JSON.stringify({rg,cpf})},true);if(j&&j.ok){prof=j.profile;try{localStorage.setItem(KEY,JSON.stringify(prof))}catch(e){}msg.textContent='✓ Salvo. Os próximos documentos já saem com estes dados.';toast('Dados da advogada salvos')}else msg.textContent='Não foi possível salvar ('+(j&&j.error||'erro')+').'}catch(e){msg.textContent='Sem conexão com o servidor.'}
+      try{const j=await call('officeProfileSave',{data:JSON.stringify({rg,cpf,pix})},true);if(j&&j.ok){prof=j.profile;try{localStorage.setItem(KEY,JSON.stringify(prof))}catch(e){}msg.textContent='✓ Salvo. Os próximos documentos já saem com estes dados.';toast('Dados da advogada salvos')}else msg.textContent='Não foi possível salvar ('+(j&&j.error||'erro')+').'}catch(e){msg.textContent='Sem conexão com o servidor.'}
     };
   }
   document.addEventListener('click',ev=>{const b=ev.target.closest&&ev.target.closest('[data-page="settings"]');if(b)setTimeout(card,80)});
   setTimeout(load,1500);
-  window.kalinyOffice={load,get:()=>prof};
+  // V145.43: chave Pix das cobranças guardada no servidor (vale em todos os aparelhos)
+  async function savePix(pix){try{const j=await call('officeProfileSave',{data:JSON.stringify(prof&&prof.rg?{rg:prof.rg,cpf:prof.cpf,pix}:{pix})},true);if(j&&j.ok&&j.profile){prof=j.profile;try{localStorage.setItem(KEY,JSON.stringify(prof))}catch(e){}return 'pix' in j.profile}}catch(e){}return false}
+  window.kalinyOffice={load,get:()=>prof,savePix};
 })();
 </script>
 <script>
@@ -4560,6 +4562,7 @@ ${p.items.slice().sort((a,b)=>String(a.paidAt||a.dueDate||'').localeCompare(Stri
   const isPaid=f=>['pago','recebido'].includes(lower(f.status));
   const due=f=>String(f.dueDate||f.date||'').slice(0,10);
   let pix='';try{pix=localStorage.getItem(PIX_KEY)||''}catch(e){}
+  const curPix=()=>{const o=window.kalinyOffice&&window.kalinyOffice.get&&window.kalinyOffice.get();return (o&&o.pix)||pix};
   let ui={days:7};
   function waNum(phone){let n=String(phone||'').replace(/\D/g,'');if(n.length===10||n.length===11)n='55'+n;return n.length>=12?n:''}
   function groups(){
@@ -4573,7 +4576,7 @@ ${p.items.slice().sort((a,b)=>String(a.paidAt||a.dueDate||'').localeCompare(Stri
   function message(g){
     const t=todayIso(),first=String(g.c.name||'').trim().split(/\s+/)[0];
     const lines=g.items.map(f=>{const d=due(f),w=d<t?'venceu em '+br(d):d===t?'vence hoje':'vence em '+br(d);return '• '+(f.installmentLabel||f.desc||'Honorários')+' — '+money(f.value)+' — '+w});
-    return `Olá${first?', '+first:''}! Tudo bem? Aqui é a Kaliny Girardi. Passando para lembrar ${g.items.length>1?'dos pagamentos':'do pagamento'} dos honorários:\n\n${lines.join('\n')}${g.items.length>1?'\n\nTotal: '+money(g.total):''}${pix?'\n\nChave Pix: '+pix:''}\n\nSe já pagou, por favor desconsidere e me envie o comprovante. Qualquer dúvida, estou à disposição. Obrigada!`;
+    return `Olá${first?', '+first:''}! Tudo bem? Aqui é a Kaliny Girardi. Passando para lembrar ${g.items.length>1?'dos pagamentos':'do pagamento'} dos honorários:\n\n${lines.join('\n')}${g.items.length>1?'\n\nTotal: '+money(g.total):''}${curPix()?'\n\nChave Pix: '+curPix():''}\n\nSe já pagou, por favor desconsidere e me envie o comprovante. Qualquer dúvida, estou à disposição. Obrigada!`;
   }
   function count(){return groups().length}
   function modal(){
@@ -4585,10 +4588,10 @@ ${p.items.slice().sort((a,b)=>String(a.paidAt||a.dueDate||'').localeCompare(Stri
 .cb-c{border:1px solid #eaded2;border-radius:14px;background:#fff;padding:12px 14px;margin-bottom:8px}.cb-h{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}.cb-h b{font-size:15px;color:#3d2b20}.cb-h small{display:block;color:#8d7767;font-size:12px;margin-top:2px}
 .cb-p{margin-top:8px;font-size:13px}.cb-p div{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:12px;padding:5px 0;border-top:1px solid #f3ebe3}.cb-p span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cb-late{color:#9a5a55;font-weight:600}</style>
 <div class="cb-bar"><button class="cb-chip ${ui.days===0?'on':''}" type="button" data-cb-days="0">Só vencidas</button><button class="cb-chip ${ui.days===7?'on':''}" type="button" data-cb-days="7">+ próximos 7 dias</button><button class="cb-chip ${ui.days===30?'on':''}" type="button" data-cb-days="30">+ 30 dias</button>
-<div class="field"><label>Chave Pix (vai na mensagem)</label><input id="cbPix" value="${esc(pix)}" placeholder="CPF, CNPJ, e-mail, celular ou chave aleatória"></div></div>
+<div class="field"><label>Chave Pix (vai na mensagem)</label><input id="cbPix" value="${esc(curPix())}" placeholder="CPF, CNPJ, e-mail, celular ou chave aleatória"></div></div>
 ${gs.length?gs.map(row).join(''):'<div class="muted" style="padding:20px;text-align:center;border:1px dashed #eaded2;border-radius:14px">Nenhuma parcela em aberto nesse período. 🎉</div>'}
 <div class="mini-help">Uma mensagem por cliente, com todas as parcelas. Ao enviar, a data do lembrete fica marcada nas parcelas.</div>`);
-    const inp=document.getElementById('cbPix');inp.onchange=()=>{pix=inp.value.trim();try{localStorage.setItem(PIX_KEY,pix)}catch(e){}toast(pix?'Chave Pix salva neste aparelho':'Chave Pix removida')};
+    const inp=document.getElementById('cbPix');inp.onchange=async()=>{pix=inp.value.trim();try{localStorage.setItem(PIX_KEY,pix)}catch(e){}const o=window.kalinyOffice&&window.kalinyOffice.get&&window.kalinyOffice.get();if(o)o.pix=pix;const srv=window.kalinyOffice&&window.kalinyOffice.savePix?await window.kalinyOffice.savePix(pix):false;toast(srv?(pix?'Chave Pix salva (vale em todos os aparelhos)':'Chave Pix removida'):(pix?'Chave Pix salva neste aparelho':'Chave Pix removida'))};
   }
   async function send(id){
     const g=groups().find(x=>String(x.c.id)===String(id));if(!g)return;const txt=message(g),n=waNum(g.c.phone);
