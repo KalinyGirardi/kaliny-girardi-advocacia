@@ -1,5 +1,5 @@
 KALINY GIRARDI ADVOCACIA — site institucional + painel administrativo
-Versão: V145.27
+Versão: V145.28
 
 ESTRUTURA
 - index.html ............ site público (agendamento online, áreas, conteúdos, contato)
@@ -62,3 +62,9 @@ HISTÓRICO
 - V145.27: Calculadoras com cartões didáticos (para que serve / quando usar) e
   últimos cálculos; Documentos como central (todos os arquivos, gerar documento
   por cliente, relatórios de cálculo, anexar arquivo).
+- V145.28: Calculadoras refeitas com resultado ao vivo e memória do cálculo com a
+  base legal — Aposentadoria (5 regras da EC 103/2019 com data projetada, tempo
+  especial convertido, carência, teto e mínimo editáveis), Pensão (líquido,
+  cenários 15–30%, 13º e férias, extras proporcionais) e Inventário (meação por
+  regime, concorrência do cônjuge, reserva de 1/4, ascendentes, ITCMD por herdeiro,
+  caminho cartório/judicial). Teto, mínimo, ITCMD e honorários ficam lembrados.

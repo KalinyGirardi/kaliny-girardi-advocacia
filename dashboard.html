@@ -1477,7 +1477,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
    Regras: vence a alteração mais recente (updatedAt); exclusões viram marcação (deletedAt);
    resposta vazia ou com erro do servidor nunca apaga dados deste navegador. */
 (function(){
-  const VERSION='V145.27';
+  const VERSION='V145.28';
   const META_KEY='kaliny_sync_meta_v1';
   const COLLECTIONS=['processes','finance','notes','calcHistory','previdenciario','documents'];
   const BATCH=50;
@@ -3257,9 +3257,9 @@ ${pendingCards()}
   const saveUi=()=>{try{localStorage.setItem(UI_KEY,JSON.stringify(ui))}catch(e){}};
   const TOOLS=[
     {ic:'⏱',t:'Prazos processuais',what:'Calcula o vencimento em dias úteis (CPC), com feriados, recesso forense e prazo em dobro.',when:'Ao receber uma intimação ou publicação no DJe.',act:'data-cd-tool="prazos"',btn:'Calcular prazo'},
-    {ic:'👨‍👩‍👧',t:'Pensão alimentícia',what:'Simula o valor da pensão a partir da renda, do número de filhos e do percentual.',when:'Na primeira conversa com o cliente, para dar uma ideia do valor.',act:'data-cd-tool="pension"',btn:'Simular pensão'},
-    {ic:'🏠',t:'Inventário',what:'Organiza patrimônio, dívidas, meação, ITCMD e custos para estimar a partilha.',when:'Para explicar à família quanto e como cada herdeiro recebe.',act:'data-cd-tool="inventory"',btn:'Simular inventário'},
-    {ic:'👵',t:'Aposentadoria',what:'Estima o benefício pela regra geral e confere idade e tempo de contribuição.',when:'Na triagem do caso previdenciário, antes de montar o dossiê.',act:'data-cd-tool="retirement"',btn:'Simular aposentadoria'},
+    {ic:'👨‍👩‍👧',t:'Pensão alimentícia',what:'Compara cenários de 15% a 30% sobre a renda líquida, com 13º, férias e despesas extras divididas.',when:'Na primeira conversa com o cliente, para dar uma ideia do valor.',act:'data-cd-tool="pension"',btn:'Simular pensão'},
+    {ic:'🏠',t:'Inventário',what:'Separa a meação e mostra quanto cada herdeiro recebe pelo regime de bens, com ITCMD e custos.',when:'Para explicar à família quanto e como cada herdeiro recebe.',act:'data-cd-tool="inventory"',btn:'Simular inventário'},
+    {ic:'👵',t:'Aposentadoria',what:'Compara as regras da Reforma (idade, pontos, pedágios) e mostra quando cada uma é cumprida.',when:'Na triagem do caso previdenciário, antes de montar o dossiê.',act:'data-cd-tool="retirement"',btn:'Simular aposentadoria'},
     {ic:'📂',t:'Dossiê previdenciário',what:'Reúne CNIS, holerites e CTPS, e monta a base salarial conferida do cliente.',when:'Quando o caso previdenciário vai adiante e precisa de prova organizada.',act:'data-cd-tool="dossie"',btn:'Abrir dossiê'}];
   const KIND_ICON={prazo:'⏱',pension:'👨‍👩‍👧',inventory:'🏠',retirement:'👵'};
   const css=`.cd .c-tools{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;margin-bottom:18px}
@@ -3339,6 +3339,285 @@ ${gc&&window.kalinyCP&&window.kalinyCP.clientInfo(gc).missing.length?`<div class
   const od=window.renderDocuments;window.renderDocuments=function(){const r=typeof od==='function'?od.apply(this,arguments):undefined;try{install()}catch(e){console.warn('Documentos:',e)}return r};
   window.kalinyCD={renderCalcApp,renderDocApp};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else setTimeout(install,0);
+})();
+</script>
+<script>
+/* V145.28 — Calculadoras de Aposentadoria, Pensão e Inventário: resultado ao vivo, memória do cálculo
+   passo a passo com a base legal e valores do ano editáveis. As contas ficam em window.kalinyCalc
+   (funções puras, testáveis); a tela só lê o formulário e mostra o resultado. */
+(function(){
+  /* ---------- utilidades ---------- */
+  const R=v=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+  const P=(v,d)=>Number(v||0).toLocaleString('pt-BR',{maximumFractionDigits:d==null?1:d});
+  const MESES=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+  const parseDate=s=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s||''));return m?new Date(+m[1],+m[2]-1,+m[3],12):null};
+  const addMonths=(d,k)=>{const x=new Date(d.getFullYear(),d.getMonth()+k,1,12);x.setDate(Math.min(d.getDate(),new Date(x.getFullYear(),x.getMonth()+1,0).getDate()));return x};
+  const ageMonths=(b,d)=>(d.getFullYear()-b.getFullYear())*12+(d.getMonth()-b.getMonth())-(d.getDate()<b.getDate()?1:0);
+  const ym=m=>{m=Math.max(0,Math.round(m));const a=Math.floor(m/12),r=m%12;return (a?a+(a===1?' ano':' anos'):'')+(a&&r?' e ':'')+(r?r+(r===1?' mês':' meses'):'')||'0 mês'};
+  const mY=d=>MESES[d.getMonth()]+'/'+d.getFullYear();
+  const DEF={teto:8475.55,minimo:1621.00,ano:2026,itcmd:4};
+
+  /* ---------- Aposentadoria (RGPS, EC 103/2019) ---------- */
+  function retire(i){
+    const F=i.sex!=='M',today=i.today||new Date(),birth=parseDate(i.birth);
+    const after=!!i.after,keep=i.keep!==false;
+    const raw=(+i.tY||0)*12+(+i.tM||0);
+    const spM=after?0:(+i.spY||0)*12+(+i.spM||0);
+    const bonus=Math.round(spM*(F?0.2:0.4));               // conversão do tempo especial até 13/11/2019
+    const T0=raw+bonus,T19=after?0:(+i.t19Y||0)*12+(+i.t19M||0)+bonus;
+    const C0=i.carencia===''||i.carencia==null?raw:+i.carencia;
+    const avg=+i.avg||0,teto=+i.teto||DEF.teto,minimo=+i.minimo||DEF.minimo,fator=i.fator===''||i.fator==null?null:+i.fator;
+    const req=F?30:35,base=F?15:20;
+    const coefAt=T=>60+2*Math.max(0,Math.floor(T/12)-base);
+    const clamp=v=>Math.max(minimo,Math.min(teto,v));
+    const at=k=>{const d=addMonths(today,k);return {d,y:d.getFullYear(),age:birth?ageMonths(birth,d):0,T:T0+(keep?k:0),C:C0+(keep?k:0)}};
+    const RULES=[];
+    const idadeAge=y=>F?(after?62:Math.min(62,60+0.5*Math.max(0,y-2019))):65;
+    RULES.push({key:'idade',name:after?'Aposentadoria por idade (regra permanente)':'Aposentadoria por idade (transição)',law:after?'EC 103/2019, art. 19':'EC 103/2019, art. 18',
+      needs:s=>[{l:'Idade',have:s.age,need:idadeAge(s.y)*12,f:'age'},{l:'Tempo de contribuição',have:s.T,need:(F||!after?15:20)*12,f:'t'},{l:'Carência',have:s.C,need:180,f:'c'}],
+      value:s=>({coef:coefAt(s.T),raw:avg*coefAt(s.T)/100,how:`60% + 2% por ano acima de ${base} anos (${Math.floor(s.T/12)} anos) = ${coefAt(s.T)}% da média`,lawV:'art. 26, §2º'})});
+    if(!after){
+      const pts=y=>F?Math.min(100,86+Math.max(0,y-2019)):Math.min(105,96+Math.max(0,y-2019));
+      RULES.push({key:'pontos',name:'Transição por pontos',law:'EC 103/2019, art. 15',
+        needs:s=>[{l:'Tempo de contribuição',have:s.T,need:req*12,f:'t'},{l:'Pontos (idade + tempo)',have:(s.age+s.T)/12,need:pts(s.y),f:'p'},{l:'Carência',have:s.C,need:180,f:'c'}],
+        value:s=>({coef:coefAt(s.T),raw:avg*coefAt(s.T)/100,how:`60% + 2% por ano acima de ${base} anos (${Math.floor(s.T/12)} anos) = ${coefAt(s.T)}% da média`,lawV:'art. 26, §2º'})});
+      const prog=y=>F?Math.min(62,56+0.5*Math.max(0,y-2019)):Math.min(65,61+0.5*Math.max(0,y-2019));
+      RULES.push({key:'progressiva',name:'Transição por idade mínima progressiva',law:'EC 103/2019, art. 16',
+        needs:s=>[{l:'Tempo de contribuição',have:s.T,need:req*12,f:'t'},{l:'Idade mínima',have:s.age,need:prog(s.y)*12,f:'age'},{l:'Carência',have:s.C,need:180,f:'c'}],
+        value:s=>({coef:coefAt(s.T),raw:avg*coefAt(s.T)/100,how:`60% + 2% por ano acima de ${base} anos (${Math.floor(s.T/12)} anos) = ${coefAt(s.T)}% da média`,lawV:'art. 26, §2º'})});
+      const miss=Math.max(0,req*12-T19);
+      const p50=T19>(F?28:33)*12;
+      RULES.push({key:'ped50',name:'Transição com pedágio de 50%',law:'EC 103/2019, art. 17',na:p50?'':`Só vale para quem tinha mais de ${F?28:33} anos de contribuição em 13/11/2019 (tinha ${ym(T19)}).`,
+        needs:s=>[{l:`Tempo de contribuição (${req} anos + 50% dos ${ym(miss)} que faltavam)`,have:s.T,need:req*12+Math.ceil(miss*0.5),f:'t'},{l:'Carência',have:s.C,need:180,f:'c'}],
+        value:()=>fator==null?{coef:null,raw:null,how:'Média × fator previdenciário — informe o fator para estimar o valor',lawV:'art. 17, parágrafo único'}:{coef:fator*100,raw:avg*fator,how:`Média × fator previdenciário ${P(fator,4)}`,lawV:'art. 17, parágrafo único'}});
+      RULES.push({key:'ped100',name:'Transição com pedágio de 100%',law:'EC 103/2019, art. 20',
+        needs:s=>[{l:'Idade',have:s.age,need:(F?57:60)*12,f:'age'},{l:`Tempo de contribuição (${req} anos + 100% dos ${ym(miss)} que faltavam)`,have:s.T,need:req*12+miss,f:'t'},{l:'Carência',have:s.C,need:180,f:'c'}],
+        value:()=>({coef:100,raw:avg,how:'100% da média',lawV:'art. 20, §2º, II'})});
+    }
+    const out=RULES.map(r=>{
+      if(r.na)return {key:r.key,name:r.name,law:r.law,na:r.na};
+      if(!birth)return {key:r.key,name:r.name,law:r.law,na:'Informe a data de nascimento.'};
+      const now=at(0),reqs=r.needs(now).map(q=>({...q,ok:q.have>=q.need-1e-9}));
+      let k=null;for(let m=0;m<=600;m++){const s=at(m);if(r.needs(s).every(q=>q.have>=q.need-1e-9)){k=m;break}if(!keep&&m>0&&r.needs(s).some(q=>q.f!=='age'&&q.f!=='p'&&q.have<q.need))break}
+      const s=k==null?null:at(k),v=s?r.value(s):null;
+      return {key:r.key,name:r.name,law:r.law,reqs,k,date:s?s.d:null,okNow:k===0,coef:v&&v.coef,how:v&&v.how,lawV:v&&v.lawV,value:v&&v.raw!=null?clamp(v.raw):null,clamped:v&&v.raw!=null&&clamp(v.raw)!==v.raw,T:s?s.T:null};
+    });
+    const live=out.filter(r=>!r.na&&r.k!=null);
+    const nowOk=live.filter(r=>r.okNow);
+    const best=nowOk.slice().sort((a,b)=>(b.value||0)-(a.value||0))[0]||null;
+    const next=live.slice().sort((a,b)=>a.k-b.k||(b.value||0)-(a.value||0))[0]||null;
+    return {F,after,raw,bonus,T0,T19,C0,avg,teto,minimo,rules:out,best,next,today,birth,age:birth?ageMonths(birth,today):null};
+  }
+
+  /* ---------- Pensão alimentícia ---------- */
+  function pension(i){
+    const gross=+i.gross||0,ded=i.isNet?0:+i.deductions||0,net=Math.max(0,gross-ded);
+    const kids=Math.max(1,Math.round(+i.kids||1)),minimo=+i.minimo||DEF.minimo,useMin=i.base==='minimo';
+    const baseVal=useMin?minimo:net,pct=+i.pct||0,clt=!!i.clt&&!useMin;
+    const extras=+i.extras||0,other=+i.other||0,ratio=other>0&&net+other>0?net/(net+other):1,extraShare=extras*ratio;
+    const scen=p=>{const m=baseVal*p/100;return {p,monthly:m,perKid:m/kids,annual:m*12+(clt?m+m/3:0)}};
+    const list=[...new Set([15,20,25,30,pct].filter(p=>p>0))].sort((a,b)=>a-b).map(scen);
+    const chosen=scen(pct),total=chosen.monthly+extraShare;
+    return {gross,ded,net,kids,minimo,useMin,baseVal,pct,clt,extras,other,ratio,extraShare,list,chosen,total,perKid:total/kids,commit:net>0?total/net:null,
+      d13:clt?chosen.monthly:0,ferias:clt?chosen.monthly/3:0};
+  }
+
+  /* ---------- Inventário e partilha ---------- */
+  function inventory(i){
+    const reg=i.regime||'parcial',spouse=reg!=='none',kids=Math.max(0,Math.round(+i.kids||0));
+    let comuns=+i.comuns||0,part=+i.part||0;const debts=+i.debts||0;
+    const s377=reg==='obrig'&&!!i.s377;
+    if(reg==='conv'||(reg==='obrig'&&!s377)||!spouse){part+=comuns;comuns=0}
+    const meacao=spouse?comuns/2:0;
+    let hc=comuns-meacao,hp=part;const H0=hc+hp,f=H0>0?Math.max(0,H0-debts)/H0:0;hc=Math.round(hc*f*100)/100;hp=Math.round(hp*f*100)/100;const H=hc+hp;
+    const heirs=[],notes=[],steps=[];let spouseHer=0;
+    const SP=reg==='uniao'?'Companheiro(a)':'Cônjuge';
+    if(spouse&&meacao)steps.push(`Meação: metade dos bens comuns fica com o(a) ${SP.toLowerCase()} por direito próprio — não é herança (${R(meacao)}).`);
+    if(debts)steps.push(`Dívidas do falecido abatidas da herança: ${R(Math.min(debts,H0))}${debts>H0?' (as dívidas superam a herança: herdeiros não respondem além dela, art. 1.792 CC)':''}.`);
+    steps.push(`Herança a partilhar: ${R(H)}${hp&&hc?` (${R(hc)} da metade dos bens comuns + ${R(hp)} de bens particulares)`:''}.`);
+    if(kids>0){
+      let concBase=0;
+      if(spouse){
+        if(reg==='parcial'||reg==='uniao'){concBase=hp;steps.push(hp?`Com descendentes, no regime de comunhão parcial o(a) ${SP.toLowerCase()} herda só sobre os bens particulares (art. 1.829, I).`:`Sem bens particulares, o(a) ${SP.toLowerCase()} não herda junto com os filhos — fica só com a meação (art. 1.829, I).`)}
+        else if(reg==='conv'){concBase=H;steps.push(`Na separação convencional, o(a) ${SP.toLowerCase()} herda junto com os descendentes sobre toda a herança (art. 1.829, I; STJ, REsp 1.382.170).`)}
+        else steps.push(reg==='universal'?`Na comunhão universal, o(a) ${SP.toLowerCase()} não herda junto com os descendentes — fica com a meação (art. 1.829, I).`:`Na separação obrigatória, o(a) ${SP.toLowerCase()} não herda junto com os descendentes (art. 1.829, I).`);
+      }
+      const q=concBase>0?(i.allCommon?Math.max(1/4,1/(kids+1)):1/(kids+1)):0;
+      if(concBase>0){spouseHer=concBase*q;steps.push(`Parte do(a) ${SP.toLowerCase()}: ${q===1/4&&kids>=3?'reserva mínima de 1/4, porque é ascendente de todos os herdeiros':'quinhão igual ao de cada filho (1/'+(kids+1)+')'} (art. 1.832) = ${R(spouseHer)}.`)}
+      const each=(H-spouseHer)/kids;
+      if(spouse)heirs.push({who:SP,meacao,her:spouseHer});
+      for(let k=1;k<=kids;k++)heirs.push({who:'Filho(a) '+k,meacao:0,her:each});
+      steps.push(`Cada um dos ${kids} descendente(s) recebe partes iguais do restante: ${R(each)} (art. 1.835).`);
+    }else if(i.asc&&i.asc!=='none'){
+      const sq=spouse?(i.asc==='pais2'?1/3:1/2):0;spouseHer=H*sq;
+      if(spouse){heirs.push({who:SP,meacao,her:spouseHer});steps.push(`Sem descendentes, o(a) ${SP.toLowerCase()} herda junto com os ascendentes, em qualquer regime: ${i.asc==='pais2'?'1/3, porque concorre com pai e mãe':'1/2, porque concorre com um só ascendente de 1º grau ou com avós'} (art. 1.837) = ${R(spouseHer)}.`)}
+      const rest=H-spouseHer;
+      if(i.asc==='pais2'){heirs.push({who:'Pai',meacao:0,her:rest/2},{who:'Mãe',meacao:0,her:rest/2});steps.push(`Pai e mãe dividem o restante em partes iguais (art. 1.836): ${R(rest/2)} cada.`)}
+      else if(i.asc==='pais1'){heirs.push({who:'Pai ou mãe',meacao:0,her:rest});steps.push(`O ascendente vivo recebe o restante (art. 1.836, §1º): ${R(rest)}.`)}
+      else{heirs.push({who:'Avós (por linha)',meacao:0,her:rest});steps.push(`Os avós recebem o restante, metade para a linha paterna e metade para a materna (art. 1.836, §2º): ${R(rest)}.`)}
+    }else if(spouse){spouseHer=H;heirs.push({who:SP,meacao,her:H});steps.push(`Sem descendentes nem ascendentes, o(a) ${SP.toLowerCase()} herda tudo, em qualquer regime (art. 1.838).`)}
+    else{heirs.push({who:'Colaterais (irmãos, sobrinhos, tios…)',meacao:0,her:H});steps.push('Sem cônjuge, descendentes ou ascendentes, herdam os colaterais até o 4º grau (art. 1.839) — confira a ordem e o direito de representação.')}
+    if(spouse&&kids===0)notes.push('Se o casal estava separado de fato há mais de 2 anos, o cônjuge pode perder o direito à herança (art. 1.830).');
+    if(reg==='uniao')notes.push('União estável: o STF equiparou o companheiro ao cônjuge na sucessão (RE 878.694, Tema 809). A calculadora usa a comunhão parcial, regime legal da união estável sem contrato.');
+    if(s377)notes.push('Separação obrigatória com Súmula 377/STF: os bens adquiridos durante a união se comunicam (o STJ exige prova do esforço comum — EREsp 1.623.858).');
+    if(spouse&&kids>0&&!i.allCommon&&kids>=3)notes.push('Filiação híbrida (filhos só do falecido): o STJ não aplica a reserva de 1/4 (REsp 1.617.650).');
+    const rate=(i.itcmd===''||i.itcmd==null?DEF.itcmd:+i.itcmd)/100;
+    heirs.forEach(h=>{h.itcmd=h.her*rate;h.total=h.meacao+h.her});
+    const monte=H+meacao,fees=monte*(+i.feePct||0)/100,costs=+i.costs||0,itcmd=H*rate;
+    return {reg,spouse,kids,meacao,H,hc,hp,heirs,steps,notes,rate,itcmd,fees,costs,monte,totalCost:itcmd+fees+costs};
+  }
+  window.kalinyCalc={retire,pension,inventory,DEF,addMonths,ageMonths};
+  if(typeof document==='undefined')return;
+
+  /* ---------- tela ---------- */
+  const C={ok:'#557a62',bad:'#9a5a55',warn:'#a8741a',ink:'#3d2b20',mut:'#8d7767',acc:'#b06a1e'};
+  const css=`.modal-box.kc-wide{max-width:1060px}
+.kc-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:18px;align-items:start}
+@media(max-width:860px){.kc-grid{grid-template-columns:minmax(0,1fr)}.kc-res{position:static}}
+.kc .kc-tw{overflow-x:auto}@media(max-width:600px){.kc .kc-tw table,.kc .kc-tw tbody{display:block;width:100%}.kc .kc-tw thead{display:none}.kc .kc-tw tr{display:block;border-bottom:1px solid #efe5dc;padding:6px 0}.kc .kc-tw td{display:flex;justify-content:space-between;gap:10px;border:0;padding:2px 0!important;text-align:right}.kc .kc-tw td:before{content:attr(data-l);color:#8d7767;text-align:left}.kc .kc-tw td:first-child{font-weight:600;justify-content:flex-start;text-align:left}.kc .kc-tw td:first-child:before{content:''}}@media(max-width:600px){.kc table{font-size:12px}.kc th,.kc td{padding:5px 3px}.kc .kc-hero b{font-size:24px}}
+.kc-res{position:sticky;top:0;display:flex;flex-direction:column;gap:10px}
+.kc fieldset{border:1px solid #eaded2;border-radius:14px;padding:12px 14px;margin:0 0 12px;background:#fff}
+.kc legend{font:500 15px Georgia,serif;color:${C.ink};padding:0 6px}
+.kc .kc-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.kc label{display:block;font-size:12px;color:#6b5546;margin-bottom:4px}.kc input,.kc select{width:100%;box-sizing:border-box}
+.kc .kc-pair{display:flex;gap:6px}.kc .kc-pair input{min-width:0}
+.kc .kc-check{display:flex;gap:8px;align-items:flex-start;font-size:13px;color:${C.ink};margin:8px 0 0}.kc .kc-check input{width:auto;margin-top:2px}
+.kc .kc-help{font-size:12px;color:${C.mut};margin-top:4px;line-height:1.4}
+.kc .kc-hero{border-radius:16px;padding:16px;background:#f7efe6;border:1px solid #eaded2}
+.kc .kc-hero small{display:block;font-size:12px;color:${C.mut};text-transform:uppercase;letter-spacing:.04em}
+.kc .kc-hero b{display:block;font:500 28px Georgia,serif;color:${C.ink};margin:4px 0}.kc .kc-hero span{font-size:13px;color:#5f4b3e}
+.kc .kc-card{border:1px solid #eaded2;border-radius:14px;background:#fff;padding:12px 14px}
+.kc .kc-card.on{border-color:${C.ok};box-shadow:0 0 0 2px rgba(85,122,98,.15)}.kc .kc-card.na{opacity:.65}
+.kc .kc-card h4{margin:0;font-size:15px;color:${C.ink};display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.kc .kc-law{font-size:11px;color:${C.mut}}
+.kc .kc-chip{font-size:12px;border-radius:999px;padding:2px 9px;white-space:nowrap;font-weight:600}
+.kc .kc-chip.ok{background:#e5efe8;color:${C.ok}}.kc .kc-chip.wait{background:#f6ead6;color:${C.warn}}.kc .kc-chip.no{background:#f3e4e2;color:${C.bad}}
+.kc .kc-req{list-style:none;margin:8px 0 0;padding:0;font-size:13px}.kc .kc-req li{display:flex;justify-content:space-between;gap:8px;padding:3px 0;border-bottom:1px dashed #efe5dc}
+.kc .kc-req li:last-child{border-bottom:0}.kc .kc-req .y{color:${C.ok}}.kc .kc-req .n{color:${C.bad}}
+.kc .kc-val{margin-top:8px;font-size:13px;color:#5f4b3e}.kc .kc-val b{font-size:17px;color:${C.ink}}
+.kc .kc-steps{margin:0;padding-left:20px;font-size:13px;color:#4d3a2e;line-height:1.5}.kc .kc-steps li{margin:3px 0}
+.kc .kc-note{font-size:12px;color:#6b5546;background:#faf5f0;border-radius:10px;padding:8px 10px;line-height:1.45}
+.kc table{width:100%;min-width:0!important;border-collapse:collapse;font-size:13px}.kc th,.kc td{text-align:right;padding:6px 4px;border-bottom:1px solid #efe5dc}.kc th:first-child,.kc td:first-child{text-align:left}
+.kc th{font-size:11px;color:${C.mut};font-weight:600;text-transform:uppercase}.kc tr.on td{background:#f7efe6;font-weight:600}
+.kc .kc-bar{height:10px;border-radius:6px;background:#efe5dc;overflow:hidden;margin-top:6px}.kc .kc-bar i{display:block;height:100%;background:${C.acc}}
+.kc .kc-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}`;
+  const LAST_KEY='kaliny_calc2_params_v1';
+  const loadP=()=>{try{return Object.assign({teto:DEF.teto,minimo:DEF.minimo,itcmd:DEF.itcmd,feePct:5},JSON.parse(localStorage.getItem(LAST_KEY)||'{}'))}catch(e){return {teto:DEF.teto,minimo:DEF.minimo,itcmd:DEF.itcmd,feePct:5}}};
+  const saveP=o=>{try{localStorage.setItem(LAST_KEY,JSON.stringify(Object.assign(loadP(),o)))}catch(e){}};
+  const mv=v=>v?esc(money(v)):'';
+  const num=(el)=>el?(el.classList.contains('money-input')?parseMoneyBR(el.value):el.type==='checkbox'?el.checked:el.value):'';
+  const F=(name,label,inner,help)=>`<div><label for="kc_${name}">${label}</label>${inner}${help?`<div class="kc-help">${help}</div>`:''}</div>`;
+  const money_=(name,label,val,help)=>F(name,label,`<input id="kc_${name}" name="${name}" type="text" inputmode="decimal" class="money-input" placeholder="R$ 0,00" value="${mv(val)}">`,help);
+  const numI=(name,label,val,attrs,help)=>F(name,label,`<input id="kc_${name}" name="${name}" type="number" ${attrs||''} value="${val==null?'':val}">`,help);
+  const pair=(a,b,label,help)=>F(a,label,`<div class="kc-pair"><input id="kc_${a}" name="${a}" type="number" min="0" max="80" placeholder="anos" aria-label="${label} — anos"><input name="${b}" type="number" min="0" max="11" placeholder="meses" aria-label="${label} — meses"></div>`,help);
+  const chk=(name,label,on)=>`<label class="kc-check"><input type="checkbox" name="${name}" ${on?'checked':''}> <span>${label}</span></label>`;
+  const sel=(name,label,opts,help)=>F(name,label,`<select id="kc_${name}" name="${name}">${opts.map(o=>`<option value="${o[0]}">${o[1]}</option>`).join('')}</select>`,help);
+
+  const FORMS={
+    retirement:p=>`<fieldset><legend>1. Quem é o segurado</legend><div class="kc-row">${sel('sex','Sexo',[['F','Mulher'],['M','Homem']])}${F('birth','Data de nascimento','<input id="kc_birth" name="birth" type="date">')}</div>
+${chk('after','Começou a contribuir <b>depois</b> de 13/11/2019 (Reforma) — só vale a regra permanente')}</fieldset>
+<fieldset><legend>2. Tempo de contribuição</legend><div class="kc-row">${pair('tY','tM','Tempo total até hoje','Some todos os vínculos do CNIS, sem converter o tempo especial.')}<div class="kc-pre">${pair('t19Y','t19M','Tempo em 13/11/2019','Usado nas regras de pedágio.')}</div></div>
+<div class="kc-row kc-pre" style="margin-top:10px">${pair('spY','spM','Desse tempo, quanto foi especial até 13/11/2019?','Atividade insalubre de 25 anos: vira ×1,2 (mulher) ou ×1,4 (homem). Depois da Reforma não converte mais.')}${numI('carencia','Nº de contribuições (carência)','','min="0" placeholder="igual ao tempo"','Se deixar em branco, usa o tempo total em meses. Mínimo: 180.')}</div>
+${chk('keep','Vai continuar contribuindo (projeta as datas mês a mês)',true)}</fieldset>
+<fieldset><legend>3. Valor</legend><div class="kc-row">${money_('avg','Média salarial (desde 07/1994, corrigida)',window.RETIREMENT_PREFILL||'','Use a média conferida no dossiê/CNIS.')}<div class="kc-pre">${numI('fator','Fator previdenciário (opcional)','','step="0.0001" min="0" placeholder="ex.: 0,7123"','Só para o pedágio de 50%. Sai na simulação do Meu INSS.')}</div></div>
+<div class="kc-row" style="margin-top:10px">${money_('teto','Teto do INSS',p.teto)}${money_('minimo','Salário mínimo',p.minimo)}</div><div class="kc-help">Valores de ${DEF.ano}. Mudam todo janeiro — corrija aqui e o painel lembra.</div></fieldset>`,
+    pension:p=>`<fieldset><legend>1. Renda de quem paga</legend>${sel('base','O cálculo parte de',[['renda','Renda comprovada (holerite, pró-labore)'],['minimo','Salário mínimo (autônomo/informal)']])}
+<div class="kc-row kc-renda" style="margin-top:10px">${money_('gross','Renda bruta mensal','')}${money_('deductions','Descontos obrigatórios (INSS + IR)','','Os tribunais costumam usar a renda líquida.')}</div>
+${chk('isNet','O valor acima já é líquido')}${chk('clt','Tem carteira assinada (incide sobre 13º e férias)',true)}</fieldset>
+<fieldset><legend>2. Filhos e percentual</legend><div class="kc-row">${numI('kids','Nº de filhos (alimentandos)',1,'min="1" max="15"')}${numI('pct','Percentual a simular (%)',20,'min="0" max="100" step="0.5"','Não há percentual fixo em lei: o juiz equilibra necessidade, possibilidade e proporcionalidade (art. 1.694, §1º, CC).')}</div></fieldset>
+<fieldset><legend>3. Despesas extras (opcional)</legend><div class="kc-row">${money_('extras','Gastos extras do mês (escola, saúde…)','')}${money_('other','Renda líquida do outro genitor','','Os extras são divididos na proporção das rendas (art. 1.703 CC).')}</div></fieldset>
+<fieldset><legend>Parâmetro</legend>${money_('minimo','Salário mínimo',p.minimo,`Valor de ${DEF.ano}. Corrija em janeiro.`)}</fieldset>`,
+    inventory:p=>`<fieldset><legend>1. Família</legend>${sel('regime','Situação do falecido',[['parcial','Casado(a) — comunhão parcial'],['uniao','União estável (sem contrato)'],['universal','Casado(a) — comunhão universal'],['conv','Casado(a) — separação convencional (pacto)'],['obrig','Casado(a) — separação obrigatória (ex.: mais de 70 anos)'],['none','Solteiro(a), divorciado(a) ou viúvo(a)']])}
+<div class="kc-s377">${chk('s377','Aplicar Súmula 377/STF (bens adquiridos juntos durante o casamento se comunicam)')}</div>
+<div class="kc-row" style="margin-top:10px">${numI('kids','Nº de filhos/descendentes',2,'min="0" max="20"','Neto de filho já falecido entra no lugar dele (conte o filho).')}<div class="kc-asc">${sel('asc','Sem filhos: ascendentes vivos',[['pais2','Pai e mãe'],['pais1','Só pai ou só mãe'],['avos','Avós (pais já falecidos)'],['none','Nenhum']])}</div></div>
+<div class="kc-all">${chk('allCommon','Todos os filhos são também do(a) cônjuge/companheiro(a)',true)}</div></fieldset>
+<fieldset><legend>2. Patrimônio (valor de mercado)</legend><div class="kc-row">${money_('comuns','Bens comuns do casal','','Adquiridos durante o casamento/união. Entram por inteiro (a meação é separada no cálculo).')}${money_('part','Bens particulares do falecido','','Anteriores ao casamento, herdados ou doados a ele.')}${money_('debts','Dívidas do falecido','')}</div></fieldset>
+<fieldset><legend>3. Custos</legend><div class="kc-row">${numI('itcmd','Alíquota do ITCMD (%)',p.itcmd,'min="0" max="20" step="0.01"','PR: 4%. A EC 132/2023 exige alíquotas progressivas — confira a lei estadual vigente.')}${numI('feePct','Honorários (% do monte)',p.feePct,'min="0" max="30" step="0.5"')}${money_('costs','Cartório, certidões e registros','','Tabela de emolumentos do TJPR conforme o ato.')}</div></fieldset>
+<fieldset><legend>4. Dá para fazer em cartório?</legend>${chk('agree','Todos os herdeiros estão de acordo com a partilha',true)}${chk('minor','Há herdeiro menor de idade ou incapaz')}${chk('will','O falecido deixou testamento')}</fieldset>`};
+
+  const TITLES={retirement:'Aposentadoria — regras da Reforma',pension:'Pensão alimentícia — simulação',inventory:'Inventário e partilha'};
+  const LABELS={retirement:'Aposentadoria (EC 103/2019)',pension:'Pensão alimentícia',inventory:'Inventário e partilha'};
+
+  function readForm(form,type){
+    const o={};[...form.elements].forEach(el=>{if(el.name&&el.name!=='calcClient')o[el.name]=num(el)});
+    ['tY','tM','t19Y','t19M','spY','spM','kids','pct','itcmd','feePct'].forEach(k=>{if(k in o&&o[k]!=='')o[k]=+o[k]});
+    if(type==='retirement'&&o.fator!=='')o.fator=+String(o.fator).replace(',','.');
+    return o;
+  }
+
+  function viewRetirement(i){
+    const r=retire(i);
+    if(!r.birth||!(r.raw>0))return {html:`<div class="kc-hero"><small>Comece pelo básico</small><b>Preencha nascimento e tempo</b><span>O resultado aparece aqui na hora, regra por regra.</span></div>`,text:''};
+    const chip=x=>x.na?`<span class="kc-chip no">Não se aplica</span>`:x.okNow?`<span class="kc-chip ok">✓ Já cumpre</span>`:x.k!=null?`<span class="kc-chip wait">⏳ ${mY(x.date)}</span>`:`<span class="kc-chip no">Não alcança</span>`;
+    const fmt=q=>q.f==='p'?P(q.have,2)+' / '+P(q.need,1):q.f==='c'?q.have+' / '+q.need+' meses':ym(q.have)+' / '+ym(q.need);
+    const top=r.best||r.next;
+    const hero=top?`<div class="kc-hero"><small>${r.best?'Melhor opção hoje':'Regra mais próxima'}</small><b>${top.value!=null?R(top.value):'Depende do fator'}</b><span>${esc(top.name)} · ${top.okNow?'requisitos já cumpridos':'a partir de '+mY(top.date)+' (faltam '+ym(top.k)+')'}${r.best&&r.next&&r.next!==r.best&&!r.next.okNow?'':''}</span></div>`:`<div class="kc-hero"><small>Resultado</small><b>Nenhuma regra alcançada</b><span>Com os dados informados, não há requisito cumprido nos próximos 50 anos.</span></div>`;
+    const cards=r.rules.map(x=>`<div class="kc-card ${x.na?'na':x===top?'on':''}" data-kc-rule="${x.key}"><h4><span>${esc(x.name)}<br><span class="kc-law">${esc(x.law)}</span></span>${chip(x)}</h4>${x.na?`<div class="kc-help">${esc(x.na)}</div>`:`<ul class="kc-req">${x.reqs.map(q=>`<li><span>${esc(q.l)}</span><span class="${q.ok?'y':'n'}">${fmt(q)} ${q.ok?'✓':'✗'}</span></li>`).join('')}</ul>${x.k!=null?`<div class="kc-val">${esc(x.how)} <span class="kc-law">(${esc(x.lawV)})</span>${x.value!=null?`<br>Valor estimado: <b>${R(x.value)}</b>${x.clamped?` <span class="kc-law">(limitado ao ${x.value>=r.teto?'teto':'salário mínimo'})</span>`:''}`:''}${!x.okNow?`<br><span class="kc-law">Na data projetada terá ${ym(x.T)} de contribuição.</span>`:''}</div>`:''}`}</div>`).join('');
+    const steps=`<div class="kc-card"><h4>Como o cálculo foi feito</h4><ol class="kc-steps"><li>Idade hoje: <b>${ym(r.age)}</b>.</li><li>Tempo informado: ${ym(r.raw)}${r.bonus?` + acréscimo do tempo especial convertido (${ym(r.bonus)}) = <b>${ym(r.T0)}</b>`:''}.</li>${r.after?'<li>Filiação depois da Reforma: só a regra permanente (art. 19).</li>':`<li>Em 13/11/2019 tinha ${ym(r.T19)} — define os pedágios.</li>`}<li>Média salarial: ${R(r.avg)}. Benefício nunca abaixo de ${R(r.minimo)} nem acima de ${R(r.teto)} (art. 201, §2º, CF).</li><li>Datas projetadas mês a mês${i.keep===false?' sem novas contribuições':' supondo contribuição contínua'}; os requisitos de idade e pontos sobem a cada 1º de janeiro.</li></ol></div>
+<div class="kc-note">⚠ Simulação de apoio. Não inclui aposentadoria especial pura, da pessoa com deficiência, do professor ou rural, nem revisa a média (que deve vir do CNIS conferido). Confirme sempre no Meu INSS antes de orientar o cliente.</div>`;
+    const lines=['Aposentadoria — simulação pelas regras da EC 103/2019',`Sexo: ${r.F?'mulher':'homem'} · idade hoje: ${ym(r.age)} · tempo: ${ym(r.T0)}${r.bonus?' (com '+ym(r.bonus)+' de conversão do tempo especial)':''}${r.after?' · filiação após a Reforma':' · tempo em 13/11/2019: '+ym(r.T19)}`,`Média salarial: ${R(r.avg)} · teto ${R(r.teto)} · mínimo ${R(r.minimo)}`,''];
+    r.rules.forEach(x=>{lines.push(`• ${x.name} (${x.law}): `+(x.na?'não se aplica — '+x.na:x.okNow?'JÁ CUMPRE':x.k!=null?'cumpre em '+mY(x.date)+' (faltam '+ym(x.k)+')':'não alcança'));if(!x.na){x.reqs.forEach(q=>lines.push(`    ${q.l}: ${fmt(q)} ${q.ok?'✓':'✗'}`));if(x.k!=null)lines.push(`    ${x.how}${x.value!=null?' → '+R(x.value):''}`)}});
+    if(top)lines.push('',`${r.best?'Melhor opção hoje':'Regra mais próxima'}: ${top.name}${top.value!=null?' — '+R(top.value):''}`);
+    return {html:hero+cards+steps,text:lines.join('\n')};
+  }
+
+  function viewPension(i){
+    const r=pension(i);
+    if(!r.useMin&&!(r.net>0))return {html:`<div class="kc-hero"><small>Comece pela renda</small><b>Informe a renda de quem paga</b><span>Os cenários aparecem aqui na hora.</span></div>`,text:''};
+    const hero=`<div class="kc-hero"><small>Pensão com ${P(r.pct)}%${r.extraShare?' + extras':''}</small><b>${R(r.total)} <span style="font-size:15px">por mês</span></b><span>${r.kids>1?R(r.perKid)+' por filho · ':''}${r.commit!=null?P(r.commit*100)+'% da renda líquida de quem paga':''}</span>${r.commit!=null?`<div class="kc-bar" title="Comprometimento da renda"><i style="width:${Math.min(100,r.commit*100)}%"></i></div>`:''}</div>`;
+    const table=`<div class="kc-card"><h4>Compare cenários</h4><div class="kc-tw"><table><thead><tr><th>Percentual</th><th>Por mês</th>${r.kids>1?'<th>Por filho</th>':''}<th>No ano${r.clt?' *':''}</th></tr></thead><tbody>${r.list.map(s=>`<tr class="${s.p===r.pct?'on':''}"><td>${P(s.p)}%</td><td data-l="Por mês">${R(s.monthly)}</td>${r.kids>1?`<td data-l="Por filho">${R(s.perKid)}</td>`:''}<td data-l="No ano">${R(s.annual)}</td></tr>`).join('')}</tbody></table></div>${r.clt?'<div class="kc-help">* Ano = 12 meses + 13º + 1/3 de férias.</div>':''}</div>`;
+    const steps=`<div class="kc-card"><h4>Como o cálculo foi feito</h4><ol class="kc-steps">${r.useMin?`<li>Base: salário mínimo de ${R(r.minimo)} (usado quando a renda não é comprovada).</li>`:`<li>Renda líquida: ${R(r.gross)}${r.ded?' − '+R(r.ded)+' de descontos':''} = <b>${R(r.net)}</b>.</li>`}<li>${P(r.pct)}% de ${R(r.baseVal)} = <b>${R(r.chosen.monthly)}</b>${r.kids>1?`, dividido por ${r.kids} filhos = ${R(r.chosen.perKid)} cada`:''}.</li>${r.extras?`<li>Extras de ${R(r.extras)}: quem paga arca com ${P(r.ratio*100)}%${r.other?' (proporção das rendas)':' (renda do outro genitor não informada)'} = ${R(r.extraShare)}.</li>`:''}${r.clt?`<li>Com carteira assinada, o percentual incide também no 13º (${R(r.d13)}) e no terço de férias (${R(r.ferias)}) — entendimento do STJ (Tema 192 / REsp 1.106.654).</li>`:''}</ol></div>
+<div class="kc-note">⚖ Não existe "30% fixo" em lei. O valor segue o binômio necessidade × possibilidade (art. 1.694, §1º, CC); os percentuais acima são só referências de conversa com o cliente. PLR, horas extras e verbas indenizatórias têm tratamento próprio na jurisprudência.</div>`;
+    const lines=['Pensão alimentícia — simulação',r.useMin?`Base: salário mínimo ${R(r.minimo)}`:`Renda bruta ${R(r.gross)} − descontos ${R(r.ded)} = líquida ${R(r.net)}`,`Filhos: ${r.kids} · percentual: ${P(r.pct)}%`,'',...r.list.map(s=>`• ${P(s.p)}%: ${R(s.monthly)}/mês${r.kids>1?' ('+R(s.perKid)+' por filho)':''} · ${R(s.annual)}/ano`),...(r.extras?['',`Extras ${R(r.extras)} × ${P(r.ratio*100)}% = ${R(r.extraShare)}`]:[]),'',`Total mensal simulado: ${R(r.total)}${r.commit!=null?' ('+P(r.commit*100)+'% da renda líquida)':''}`];
+    return {html:hero+table+steps,text:lines.join('\n')};
+  }
+
+  function viewInventory(i){
+    const r=inventory(i);
+    if(!(r.monte>0))return {html:`<div class="kc-hero"><small>Comece pelo patrimônio</small><b>Informe os bens</b><span>A partilha aparece aqui na hora, com quem recebe o quê.</span></div>`,text:''};
+    const extra=i.agree&&!i.minor&&!i.will,why=[];if(!i.agree)why.push('não há consenso entre os herdeiros');if(i.minor)why.push('há herdeiro menor/incapaz');if(i.will)why.push('há testamento');
+    const hero=`<div class="kc-hero"><small>Patrimônio líquido (monte)</small><b>${R(r.monte)}</b><span>${r.meacao?'Meação '+R(r.meacao)+' + ':''}herança ${R(r.H)} · custo estimado ${R(r.totalCost)}</span></div>`;
+    const table=`<div class="kc-card"><h4>Quem recebe o quê</h4><div class="kc-tw"><table><thead><tr><th>Pessoa</th>${r.meacao?'<th>Meação</th>':''}<th>Herança</th><th>ITCMD</th><th>Total</th></tr></thead><tbody>${r.heirs.map(h=>`<tr><td>${esc(h.who)}</td>${r.meacao?`<td data-l="Meação">${h.meacao?R(h.meacao):'—'}</td>`:''}<td data-l="Herança">${R(h.her)}</td><td data-l="ITCMD">${R(h.itcmd)}</td><td data-l="Total"><b>${R(h.total)}</b></td></tr>`).join('')}</tbody></table></div><div class="kc-help">ITCMD incide só sobre a herança — a meação não é transmissão.</div></div>`;
+    const costs=`<div class="kc-card"><h4>Custos estimados</h4><ul class="kc-req"><li><span>ITCMD (${P(r.rate*100,2)}% de ${R(r.H)})</span><span>${R(r.itcmd)}</span></li><li><span>Honorários (${P(+i.feePct||0)}% do monte)</span><span>${R(r.fees)}</span></li><li><span>Cartório e registros</span><span>${R(r.costs)}</span></li><li><span><b>Total</b></span><span><b>${R(r.totalCost)}</b></span></li></ul></div>`;
+    const way=`<div class="kc-card ${extra?'on':''}"><h4>Caminho<span class="kc-chip ${extra?'ok':'wait'}">${extra?'✓ Cartório possível':'Judicial (ou avaliar)'}</span></h4><div class="kc-help" style="font-size:13px">${extra?'Todos concordam, sem menores e sem testamento: inventário por escritura pública, com advogado (art. 610, §1º, CPC).':'Motivo: '+why.join('; ')+'. Desde a Resolução CNJ 571/2024 o cartório pode aceitar alguns desses casos (testamento já registrado em juízo; menor/incapaz com parecer favorável do MP e quinhão ideal) — confira os requisitos com o tabelionato.'}</div></div>`;
+    const steps=`<div class="kc-card"><h4>Como a partilha foi feita</h4><ol class="kc-steps">${r.steps.map(s=>`<li>${esc(s)}</li>`).join('')}</ol></div>${r.notes.map(n=>`<div class="kc-note">${esc(n)}</div>`).join('')}<div class="kc-note">⚠ Simulação de apoio: não considera testamento (a parte disponível é de 50%, art. 1.789), doações a colacionar, bens no exterior nem previdência privada.</div>`;
+    const lines=['Inventário e partilha — simulação',`Monte: ${R(r.monte)} · meação ${R(r.meacao)} · herança ${R(r.H)}`,'',...r.steps.map(s=>'• '+s),'','Quem recebe:',...r.heirs.map(h=>`  ${h.who}: ${h.meacao?'meação '+R(h.meacao)+' + ':''}herança ${R(h.her)} (ITCMD ${R(h.itcmd)}) = ${R(h.total)}`),'',`ITCMD ${P(r.rate*100,2)}%: ${R(r.itcmd)} · honorários ${R(r.fees)} · cartório/registros ${R(r.costs)} · total ${R(r.totalCost)}`,`Caminho: ${extra?'extrajudicial possível':'judicial ou avaliar ('+why.join('; ')+')'}`,...r.notes.map(n=>'Obs.: '+n)];
+    return {html:hero+table+costs+way+steps,text:lines.join('\n')};
+  }
+  const VIEWS={retirement:viewRetirement,pension:viewPension,inventory:viewInventory};
+
+  function sync(form,type){
+    const q=s=>form.querySelectorAll(s);
+    if(type==='retirement'){const after=form.elements.after.checked;q('.kc-pre').forEach(e=>e.style.display=after?'none':'')}
+    if(type==='pension'){const m=form.elements.base.value==='minimo';q('.kc-renda').forEach(e=>e.style.display=m?'none':'');form.elements.deductions.disabled=form.elements.isNet.checked;form.elements.isNet.closest('label').style.display=m?'none':'';form.elements.clt.closest('label').style.display=m?'none':''}
+    if(type==='inventory'){const reg=form.elements.regime.value,kids=+form.elements.kids.value||0;form.querySelector('.kc-s377').style.display=reg==='obrig'?'':'none';form.querySelector('.kc-asc').style.display=kids?'none':'';form.querySelector('.kc-all').style.display=kids&&reg!=='none'?'':'none'}
+  }
+
+  function open(type,clientId){
+    const p=loadP();
+    if(!document.getElementById('kcCss')){const s=document.createElement('style');s.id='kcCss';s.textContent=css;document.head.appendChild(s)}
+    const opts=(data.clients||[]).map(c=>`<option value="${esc(String(c.id))}" ${String(c.id)===String(clientId)?'selected':''}>${esc(c.name)}</option>`).join('');
+    openModal(TITLES[type],`<div class="kc"><div class="kc-grid"><form id="kcForm" autocomplete="off" onsubmit="return false">
+<fieldset><legend>Cliente</legend><select id="calcClient" name="calcClient" aria-label="Vincular ao cliente"><option value="">Sem cliente vinculado</option>${opts}</select></fieldset>${FORMS[type](p)}</form>
+<div class="kc-res"><div id="kcOut" aria-live="polite"></div><div class="kc-actions"><button class="d-btn light" type="button" id="kcClear">Limpar</button><button class="d-btn gold" type="button" id="kcSave" disabled>Salvar no histórico</button></div></div></div></div>`);
+    document.querySelector('#modal .modal-box').classList.add('kc-wide');
+    const form=document.getElementById('kcForm');
+    form.querySelectorAll('.money-input').forEach(el=>wireMoneyField(el));
+    let last={text:''};
+    const run=()=>{sync(form,type);const i=readForm(form,type);last=VIEWS[type](i);document.getElementById('kcOut').innerHTML=last.html;document.getElementById('kcSave').disabled=!last.text;
+      const keepP={};if(type==='retirement'){if(i.teto)keepP.teto=i.teto;if(i.minimo)keepP.minimo=i.minimo}if(type==='pension'&&i.minimo)keepP.minimo=i.minimo;if(type==='inventory'){if(i.itcmd!=='')keepP.itcmd=i.itcmd;if(i.feePct!=='')keepP.feePct=i.feePct}saveP(keepP)};
+    form.addEventListener('input',run);form.addEventListener('change',run);
+    document.getElementById('kcClear').onclick=()=>open(type,document.getElementById('calcClient').value);
+    document.getElementById('kcSave').onclick=()=>{
+      if(!last.text)return;data.calcHistory=Array.isArray(data.calcHistory)?data.calcHistory:[];
+      data.calcHistory.push({id:'calc_'+Date.now(),type,label:LABELS[type],clientId:document.getElementById('calcClient').value||'',date:new Date().toLocaleDateString('pt-BR'),result:last.text});
+      save();toast('Cálculo salvo no histórico');try{window.kalinyCD&&window.kalinyCD.renderCalcApp()}catch(e){}
+    };
+    run();
+  }
+  const om=window.openModal;window.openModal=function(){const b=document.querySelector('#modal .modal-box');if(b)b.classList.remove('kc-wide');return om.apply(this,arguments)};
+  const oc=window.openCalc;window.openCalc=function(type,clientId){if(VIEWS[type])return open(type,clientId||'');return oc.apply(this,arguments)};
+  window.kalinyCalc.open=open;
 })();
 </script>
 </body></html>
