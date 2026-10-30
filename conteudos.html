@@ -22,8 +22,8 @@
 .kl-body{padding:18px 20px 20px}.kl-body h2{font:500 24px/1.1 'Cormorant Garamond',Georgia,serif;color:var(--brown-dark);margin:0 0 8px}.kl-body p{margin:0 0 12px;font-size:13px;line-height:1.6;color:var(--muted)}
 .kl-date{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin-bottom:6px}.kl-body a{font-size:13px;text-decoration:underline;color:var(--brown)}.kl-empty{grid-column:1/-1;text-align:center;color:var(--muted);padding:40px 0}
 .kl-ov{position:fixed;inset:0;background:rgba(36,25,19,.8);display:none;align-items:center;justify-content:center;z-index:10000;padding:16px}.kl-ov.show{display:flex}
-.kl-modal{background:#fbf7f2;max-width:520px;width:100%;max-height:94vh;overflow:auto;position:relative;padding:14px}.kl-modal iframe{width:100%;height:min(78vh,760px);border:0;background:#fff}
-.kl-close{position:absolute;right:8px;top:6px;width:38px;height:38px;border:0;border-radius:50%;background:#efe4d8;font-size:22px;cursor:pointer;z-index:2}.kl-modal h3{font:500 22px 'Cormorant Garamond',Georgia,serif;margin:4px 44px 10px 2px;color:var(--brown-dark)}
+.kl-modal{background:#fbf7f2;position:relative;padding:12px;display:flex;flex-direction:column;align-items:center}.kl-modal iframe{display:block;width:360px;height:694px;max-width:100%;border:0;background:#000;border-radius:6px}
+.kl-close{position:absolute;right:-14px;top:-14px;box-shadow:0 4px 12px rgba(0,0,0,.25);width:38px;height:38px;border:0;border-radius:50%;background:#efe4d8;font-size:22px;cursor:pointer;z-index:2}.kl-modal h3{font:500 20px 'Cormorant Garamond',Georgia,serif;margin:2px 4px 8px;color:var(--brown-dark);max-width:440px;align-self:flex-start}@media(max-width:640px){.kl-close{right:6px;top:6px}.kl-modal h3{margin-right:44px}}
 .kl-modal .kl-ext{display:block;text-align:center;margin-top:10px;font-size:13px;text-decoration:underline}
 .kc-cover{position:absolute;inset:0;z-index:0;background-size:cover;background-position:center 22%}
 .kc-art{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px 22px 54px;text-align:center}
@@ -35,7 +35,7 @@
 .video-thumb:has(.kc-art) .play-button{display:none}
 .kl-thumb:has(.kc-art) .kl-play{top:auto;left:auto;bottom:12px;right:12px;transform:none;width:42px;height:42px;font-size:13px}
 </style>
-<script src="assets/conteudos.js"></script>
+<script src="assets/conteudos.js"></script><script src="assets/video-fit.js"></script>
 </head>
 <body class="ap-page">
 <header class="site-header scrolled"><div class="container nav">
@@ -64,7 +64,7 @@
     grid.innerHTML=list.length?list.map(function(x){var s=(A[x.area]||{}).slug;return '<article class="kl-card"><button class="kl-thumb" type="button" data-id="'+esc(x.id)+'" aria-label="Assistir: '+esc(x.titulo)+'">'+window.kgCoverHTML(x,'')+'<span class="kl-play">▶</span><span class="kl-tag">'+esc(lab(x.area))+'</span></button><div class="kl-body"><div class="kl-date">'+esc(window.kgMes(x))+'</div><h2>'+esc(window.kgTitulo(x))+'</h2><p>'+esc(x.descricao||'Toque para assistir. O tema está na legenda do vídeo.')+'</p>'+(s?'<a href="areas/'+s+'.html">Sobre '+esc(x.area)+' →</a>':'')+'</div></article>'}).join(''):'<div class="kl-empty">Nenhum vídeo com essa busca. <a href="https://www.instagram.com/kalinygirardiadvocacia/" target="_blank" rel="noopener">Veja todos no Instagram</a>.</div>'}
   bar.addEventListener('click',function(e){var c=e.target.closest('[data-a]');if(!c)return;st.area=c.getAttribute('data-a');var u=new URL(location.href);if(st.area)u.searchParams.set('area',st.area);else u.searchParams.delete('area');history.replaceState(null,'',u);drawBar();draw()});
   var ov=document.getElementById('klOv'),fr=document.getElementById('klFrame');
-  function open(id){var x=L.find(function(i){return i.id===id});if(!x)return;document.getElementById('klTitle').textContent=window.kgTitulo(x);fr.src='https://www.instagram.com/p/'+encodeURIComponent(x.id)+'/embed/captioned/';document.getElementById('klExt').href='https://www.instagram.com/p/'+encodeURIComponent(x.id)+'/';ov.classList.add('show');ov.setAttribute('aria-hidden','false')}
+  function open(id){var x=L.find(function(i){return i.id===id});if(!x)return;document.getElementById('klTitle').textContent=window.kgTitulo(x);fr.src='https://www.instagram.com/p/'+encodeURIComponent(x.id)+'/embed/';document.getElementById('klExt').href='https://www.instagram.com/p/'+encodeURIComponent(x.id)+'/';ov.classList.add('show');ov.setAttribute('aria-hidden','false')}
   function close(){ov.classList.remove('show');ov.setAttribute('aria-hidden','true');fr.src='about:blank'}
   grid.addEventListener('click',function(e){var t=e.target.closest('[data-id]');if(t)open(t.getAttribute('data-id'))});
   ov.addEventListener('click',function(e){if(e.target===ov||e.target.closest('.kl-close'))close()});document.addEventListener('keydown',function(e){if(e.key==='Escape')close()});

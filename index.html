@@ -14,7 +14,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "LegalService", "name": "Kaliny Girardi Advocacia", "url": "https://kalinygirardiadvocacia.com.br/", "image": "https://kalinygirardiadvocacia.com.br/assets/kaliny-hero.jpg", "logo": "https://kalinygirardiadvocacia.com.br/assets/logo.jpg", "telephone": "+55-45-99843-4981", "email": "kalinygirardi.adv@gmail.com", "address": {"@type": "PostalAddress", "streetAddress": "Rua Marechal Cândido Rondon, 954", "addressLocality": "Cascavel", "addressRegion": "PR", "postalCode": "85802-130", "addressCountry": "BR"}, "areaServed": {"@type": "City", "name": "Cascavel"}, "knowsAbout": ["Direito Civil", "Direito de Família e Sucessões", "Direito do Consumidor", "Direito Previdenciário", "Direito Imobiliário"], "sameAs": ["https://www.instagram.com/kalinygirardiadvocacia/"], "employee": {"@type": "Person", "name": "Kaliny Girardi", "jobTitle": "Advogada", "identifier": "OAB/PR 118212"}}</script>
 <style>.ap-consent{display:flex!important;flex-direction:row!important;align-items:flex-start;gap:10px!important;text-transform:none!important;letter-spacing:0!important;font-size:13px!important;line-height:1.45}.ap-consent input{margin-top:3px;width:auto;flex:none}.ap-consent a{color:inherit;text-decoration:underline}.ap-hp{position:absolute!important;left:-9999px!important;width:1px;height:1px;overflow:hidden}.appointment-msg.error{color:#8b3e33}</style>
-<link rel="stylesheet" href="css/style.css"><script src="assets/appointment-config.js"></script><script src="assets/conteudos.js"></script>
+<link rel="stylesheet" href="css/style.css"><script src="assets/appointment-config.js"></script><script src="assets/conteudos.js"></script><script src="assets/video-fit.js"></script>
 <link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32.png"><link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png"><link rel="manifest" href="/site.webmanifest"><meta name="theme-color" content="#5a3b2b"><link rel="preload" href="assets/fonts/montserrat-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin><link rel="preload" href="assets/fonts/cormorant-garamond-latin-500-normal.woff2" as="font" type="font/woff2" crossorigin></head>
 <body><div class="scroll-progress" id="scrollProgress" aria-hidden="true"></div>
 <header class="site-header"><div class="container nav">
@@ -137,7 +137,7 @@
     if(externalLink){ externalLink.href=url||'https://www.instagram.com/kalinygirardiadvocacia/'; externalLink.style.display=url?'inline-block':'none'; }
     if(url){
       const embedUrl = /instagram\.com\/p\//.test(url) ? url.replace(/\/$/,'') + '/embed/' : url;
-      frame.src=embedUrl; frame.hidden=false; placeholder.hidden=true;
+      frame.src=embedUrl; frame.hidden=false; placeholder.hidden=true; if(window.kgFitVideo)requestAnimationFrame(window.kgFitVideo);
     }else{
       frame.src=''; frame.hidden=true; placeholder.hidden=false;
     }
