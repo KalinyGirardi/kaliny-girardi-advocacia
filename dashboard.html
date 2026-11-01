@@ -1481,7 +1481,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
    Regras: vence a alteração mais recente (updatedAt); exclusões viram marcação (deletedAt);
    resposta vazia ou com erro do servidor nunca apaga dados deste navegador. */
 (function(){
-  const VERSION='V145.48';
+  const VERSION='V145.49';
   const META_KEY='kaliny_sync_meta_v1';
   const COLLECTIONS=['processes','finance','notes','calcHistory','previdenciario','documents','tasks','agenda'];
   const IS_COLLAB=(typeof session!=='undefined'&&session&&session.role==='colaboradora'),COLLAB_PUSH=new Set(['finance','tasks']);let warnedForbidden=false;
@@ -2611,7 +2611,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
   // Estado da tela (lembrado neste aparelho).
   const UI_KEY='kaliny_fin_ui_v1';
   let ui={period:'month',anchor:iso(new Date()).slice(0,7),tab:'list',q:'',client:'',status:'',type:''};
-  try{Object.assign(ui,JSON.parse(localStorage.getItem(UI_KEY)||'{}'))}catch(e){}
+  try{Object.assign(ui,JSON.parse(localStorage.getItem(UI_KEY)||'{}'))}catch(e){}ui.status=''; // V145.49: o filtro do cartão não fica salvo entre visitas
   const saveUi=()=>{try{localStorage.setItem(UI_KEY,JSON.stringify(ui))}catch(e){}};
 
   function range(){
@@ -2688,7 +2688,9 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
   }
   function listView(list,{groupBy='month'}={}){
     if(!list.length)return '<div class="fa-empty">Nenhum lançamento aqui. Use <b>+ Novo lançamento</b> para começar.</div>';
-    const sorted=list.slice().sort((a,b)=>(refDate(b)||0)-(refDate(a)||0));
+    const m0=(()=>{const t=new Date();return new Date(t.getFullYear(),t.getMonth(),1).getTime()})();
+    const ord=f=>{const d=refDate(f),x=d?d.getTime():0;return d&&x>=m0?[0,x]:[1,-x]};
+    const sorted=list.slice().sort((a,b)=>{const A=ord(a),B=ord(b);return A[0]-B[0]||A[1]-B[1]});
     const groups=new Map();sorted.forEach(f=>{const d=refDate(f);const k=groupBy==='bucket'?bucket(f):(d?d.getFullYear()+'-'+pad(d.getMonth()+1):'sem data');if(!groups.has(k))groups.set(k,[]);groups.get(k).push(f)});
     let html='';groups.forEach((arr,k)=>{const t=totals(arr),net=t.received+t.receivable+t.overdue-(t.expense+t.payable+t.late);
       const title=groupBy==='bucket'?k:(k==='sem data'?'Sem data':MONTHS_FULL[+k.slice(5)-1]+' de '+k.slice(0,4));
@@ -2697,7 +2699,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
   }
   function bucket(f){const d=refDate(f),t=today();if(!d)return 'Sem data';const diff=Math.round((d-t)/86400000);if(diff<0)return '⚠ Vencidos';if(diff===0)return 'Hoje';if(diff<=7)return 'Próximos 7 dias';if(diff<=30)return 'Próximos 30 dias';return 'Mais adiante'}
   function openView(dir){
-    const list=filtered((data.finance||[]).filter(f=>f&&!isPaid(f)&&(dir==='in'?isIn(f):!isIn(f))));
+    const keepSt=ui.status;ui.status='';const list=filtered((data.finance||[]).filter(f=>f&&!isPaid(f)&&(dir==='in'?isIn(f):!isIn(f))));ui.status=keepSt;
     if(!list.length)return `<div class="fa-empty">${dir==='in'?'Nada a receber 🎉':'Nenhuma conta a pagar 🎉'}</div>`;
     const order=['⚠ Vencidos','Hoje','Próximos 7 dias','Próximos 30 dias','Mais adiante','Sem data'];
     const sorted=list.slice().sort((a,b)=>(refDate(a)||0)-(refDate(b)||0));
@@ -2735,8 +2737,11 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
 
   function render(){
     const app=document.getElementById('finApp');if(!app)return;
-    const r=range(),list=filtered(items(r)),t=totals(list);
+    const r=range(),list=filtered(items(r));
+    const keepSt=ui.status;ui.status=''; // os cartões mostram sempre todos os valores do período; o filtro vale só para a lista
+    const t=totals(filtered(items(r)));
     const prev=r.prevFrom?totals(filtered((data.finance||[]).filter(f=>f&&inRange(f,r,r.prevFrom,r.prevTo)))):null;
+    ui.status=keepSt;
     const delta=(cur,old)=>{if(!prev)return '';if(!old&&!cur)return 'igual ao anterior';if(!old)return 'novo no período';const p=Math.round((cur-old)/old*100);return (p>0?'▲ ':p<0?'▼ ':'')+Math.abs(p)+'% vs anterior'};
     const saldo=t.received-t.expense;
     const kpi=(key,label,val,sub,col)=>`<button class="fa-kpi ${ui.status===key?'on':''}" type="button" data-fa-kpi="${key}"><small>${label}</small><strong style="${col?'color:'+col:''}">${money(val)}</strong><span>${sub||'&nbsp;'}</span></button>`;
@@ -2824,6 +2829,8 @@ ${edit?(f.installmentLabel?`<p class="muted" style="font-size:13px">Parte de um 
 <div class="field"><label>Número de parcelas</label><input type="number" id="fqN" min="2" max="60" value="2"></div>
 <div class="field"><label>Entrada (opcional)</label><input class="money-input" id="fqEntry" placeholder="R$ 0,00"></div>
 <div class="field"><label>Entrada já paga?</label><select id="fqEntryPaid"><option value="1">Sim</option><option value="0">Não</option></select></div>
+<div class="field"><label>Data da entrada</label><input type="date" id="fqEntryDate" value="${(d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'))(new Date())}"></div>
+<div class="field"><label>&nbsp;</label><div class="mini-help" style="margin-top:8px">A 1ª parcela vence na data de vencimento lá de cima; as outras, no mesmo dia dos meses seguintes.</div></div>
 </div></div></div>
 <div class="fq-box"><label class="tgl"><input type="checkbox" id="fqRepeat"> Repetir todo mês (ex.: aluguel, sistema)</label><div id="fqRepeatBox" hidden><div class="form-grid" style="margin-top:10px"><div class="field"><label>Por quantos meses</label><input type="number" id="fqMonths" min="2" max="36" value="12"></div></div></div></div>
 <div class="fq-prev" id="fqPrev"></div>`}
@@ -2855,7 +2862,7 @@ ${edit?(f.installmentLabel?`<p class="muted" style="font-size:13px">Parte de um 
       if(split){
         const n=Math.max(2,Math.min(60,+form.querySelector('#fqN').value||2)),entry=parseBRMoney(form.querySelector('#fqEntry').value),entryPaid=form.querySelector('#fqEntryPaid').value==='1';
         const base=form.querySelector('#fqBase').value,parcela=base==='total'?Math.round(Math.max(0,v-entry)/n*100)/100:v;
-        const out=[];if(entry>0)out.push({label:'Entrada',value:entry,date:new Date(),paid:entryPaid});
+        const out=[];if(entry>0)out.push({label:'Entrada',value:entry,date:parseDay(form.querySelector('#fqEntryDate')&&form.querySelector('#fqEntryDate').value)||new Date(),paid:entryPaid});
         for(let i=0;i<n;i++)out.push({label:`Parcela ${i+1}/${n}`,value:parcela,date:addM(start,i),paid:false});
         if(base==='total'&&out.length){const sum=out.reduce((s,x)=>s+x.value,0),diff=Math.round((v-sum)*100)/100;if(diff)out[out.length-1].value=Math.round((out[out.length-1].value+diff)*100)/100}
         return {kind:'split',desc,rows:out};
@@ -2906,7 +2913,7 @@ ${edit?(f.installmentLabel?`<p class="muted" style="font-size:13px">Parte de um 
     else if('faNow' in d)ui.anchor=iso(new Date()).slice(0,7);
     else if(d.faYear){ui.anchor=(+ui.anchor.slice(0,4)+ +d.faYear)+ui.anchor.slice(4)}
     else if(d.faKpi){ui.status=ui.status===d.faKpi?'':d.faKpi;if(['flow','clients','cats'].includes(ui.tab))ui.tab='list'}
-    else if(d.faTab)ui.tab=d.faTab;
+    else if(d.faTab){ui.tab=d.faTab;ui.status=''}
     else if('faClear' in d){ui.q='';ui.client='';ui.status='';ui.type=''}
     else if(d.faToggle)return toggle(d.faToggle);
     else if(d.faEdit)return openQuick('',byId(d.faEdit),false);
@@ -4720,7 +4727,7 @@ ${st.fixed.length&&missing?`<div class="form-actions"><button class="d-btn light
     f.onsubmit=async e=>{e.preventDefault();const v=Math.abs(parseMoneyBR(f.value.value)||0);if(!v)return toast('Informe o valor');
       const it={id:f.id.value||('fx'+Date.now().toString(36)),name:f.name.value.trim(),value:v,day:Math.max(1,Math.min(31,parseInt(f.day.value,10)||5))};
       const list=st.fixed.filter(x=>x.id!==it.id).concat(it);const isNew=!f.id.value;await store({fixed:list});
-      if(isNew&&(st.fixedDone||[]).includes(ym()))launch(ym(),[it]);toast(isNew?'Despesa fixa adicionada':'Despesa fixa atualizada');card()};
+      if(isNew&&st.fixedAuto!==false)launch(ym(),[it]);toast(isNew?'Despesa fixa adicionada':'Despesa fixa atualizada');card()};
     document.getElementById('fxAuto').onchange=async e=>{await store({fixedAuto:e.target.checked});toast(e.target.checked?'Lançamento automático ligado':'Lançamento automático desligado')};
     const now=document.getElementById('fxNow');if(now)now.onclick=async()=>{const n=launch(ym());if(!(st.fixedDone||[]).includes(ym()))await store({fixedDone:(st.fixedDone||[]).concat(ym()).slice(-24)});toast(n+' lançada'+(n>1?'s':'')+' no Financeiro');card()};
   }
