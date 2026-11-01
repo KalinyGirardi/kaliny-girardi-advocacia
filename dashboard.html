@@ -1481,7 +1481,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
    Regras: vence a alteração mais recente (updatedAt); exclusões viram marcação (deletedAt);
    resposta vazia ou com erro do servidor nunca apaga dados deste navegador. */
 (function(){
-  const VERSION='V145.47';
+  const VERSION='V145.48';
   const META_KEY='kaliny_sync_meta_v1';
   const COLLECTIONS=['processes','finance','notes','calcHistory','previdenciario','documents','tasks','agenda'];
   const IS_COLLAB=(typeof session!=='undefined'&&session&&session.role==='colaboradora'),COLLAB_PUSH=new Set(['finance','tasks']);let warnedForbidden=false;
@@ -4846,8 +4846,61 @@ ${st.fixed.length&&missing?`<div class="form-actions"><button class="d-btn light
   function note(){const app=document.getElementById('agApp');if(!app||document.getElementById('gcNote'))return;
     app.insertAdjacentHTML('afterbegin',`<div class="gc-note" id="gcNote">📅 = evento da sua Google Agenda (só leitura; edite no Google). Horários ocupados lá não aparecem para agendamento no site. <a href="#" id="gcRefresh">Atualizar</a></div>`)}
   const oR=window.renderAll;window.renderAll=function(){const r=oR.apply(this,arguments);try{note()}catch(e){}return r};
+  // a agenda se redesenha sozinha ao trocar de semana/visão: recoloca o aviso
+  try{new MutationObserver(()=>{if(!document.getElementById('gcNote'))note()}).observe(document.getElementById('page-agenda')||document.body,{childList:true,subtree:true})}catch(e){}
   setTimeout(()=>refresh(false),2000);setInterval(()=>{if(!document.hidden)refresh(false)},10*60000);
   window.kalinyGcal={refresh,state:()=>cache};
+})();
+</script>
+<script>
+/* V145.48 — Página do cliente: a ficha abre em tela inteira (não mais numa janela), com o cartão do cliente fixo à
+   esquerda e todas as abas à direita. "← Clientes", o voltar do navegador e o recarregar funcionam (#cliente/ID). */
+(function(){
+  const M=()=>document.getElementById('modal');let curId='',pushed=false;
+  const css=`#modal.kg-cpage{inset:0 0 0 255px!important;background:#f7f1ea!important;padding:0!important;align-items:stretch!important;justify-content:stretch!important;z-index:30}
+#modal.kg-cpage .modal-box{max-width:none!important;width:100%!important;max-height:none!important;height:100%!important;border-radius:0!important;padding:22px clamp(18px,3vw,46px) 40px!important;box-shadow:none!important;background:#f7f1ea!important;overflow:auto}
+#modal.kg-cpage .modal-head{position:sticky;top:-22px;z-index:4;background:#f7f1ea;margin:-22px calc(-1*clamp(18px,3vw,46px)) 14px;padding:14px clamp(18px,3vw,46px);border-bottom:1px solid #eaded2;justify-content:flex-start;gap:14px}
+#modal.kg-cpage .modal-head h2{font:500 22px Georgia,serif;margin:0;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#modal.kg-cpage .modal-head .close{display:none}
+.cp-back{border:1px solid #d9c7b6;background:#fff;border-radius:999px;padding:8px 14px;font-size:14px;cursor:pointer;color:#3d2b20;white-space:nowrap}
+.cp-det{margin-top:16px;border-top:1px solid #eaded2;padding-top:10px}.cp-det summary{cursor:pointer;font-size:13px;font-weight:600;color:#6b4a36;list-style:none}.cp-det summary::after{content:' ▾'}.cp-det[open] summary::after{content:' ▴'}.cp-info{margin-top:8px;display:grid;gap:9px;font-size:13px}.cp-info div{display:grid;gap:1px}.cp-info small{color:#8d7767;font-size:11px;text-transform:uppercase;letter-spacing:.05em}.cp-info b{font-weight:500;color:#3d2b20;word-break:break-word}.cp-info .cp-miss{color:#b49a85;font-style:italic}
+@media(min-width:1101px){
+ #modal.kg-cpage .cp-det summary{display:none}
+ #modal.kg-cpage #modalBody>.d-panel{display:grid!important;grid-template-columns:310px minmax(0,1fr);column-gap:26px;align-items:start}
+ #modal.kg-cpage #modalBody>.d-panel>*{grid-column:2;min-width:0}
+ #modal.kg-cpage #modalBody>.d-panel>.cp-aside{grid-column:1;grid-row:1/span 60;position:sticky;top:64px;background:#fffdf9;border:1px solid #eaded2;border-radius:16px;padding:18px;display:block!important}
+ #modal.kg-cpage .cp-aside .client-actions{display:grid!important;grid-template-columns:1fr 1fr;gap:6px;margin-top:12px}#modal.kg-cpage .cp-aside .client-actions>*{width:100%;justify-content:center;text-align:center;box-sizing:border-box}
+ #modal.kg-cpage .client-tabs{position:sticky;top:62px;z-index:3;background:#f7f1ea;padding:8px 0;margin-top:0}
+}
+#modal.kg-cpage .cp-aside h3{word-break:break-word}
+@media(max-width:950px){#modal.kg-cpage{inset:0 0 0 78px!important}}
+@media(max-width:600px){#modal.kg-cpage{inset:0!important}#modal.kg-cpage .modal-box{padding:14px 14px 40px!important}#modal.kg-cpage .modal-head{margin:-14px -14px 12px;padding:10px 14px;top:-14px}}`;
+  function style(){if(!document.getElementById('cpCss')){const s=document.createElement('style');s.id='cpCss';s.textContent=css;document.head.appendChild(s)}}
+  const fmtDate=v=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(v||'');return m?m[3]+'/'+m[2]+'/'+m[1]:(v||'')};
+  function info(c){
+    const addr=typeof clientAddress==='function'?clientAddress(c):'';const row=(l,v)=>`<div><small>${l}</small>${v?`<b>${v}</b>`:'<b class="cp-miss">não informado</b>'}</div>`;
+    const wide=window.innerWidth>1100;
+    return `<details class="cp-det" ${wide?'open':''}><summary>Dados do cliente</summary><div class="cp-info">${row('CPF',esc(c.cpf||''))}${row('RG',esc(c.rg||''))}${row('Nascimento',esc(fmtDate(c.birthDate)))}${row('Estado civil',esc(c.maritalStatus||''))}${row('Profissão',esc(c.profession||''))}${row('Telefone',esc(c.phone&&typeof formatBrazilPhone==='function'?formatBrazilPhone(c.phone):c.phone||''))}${row('E-mail',esc(c.email||''))}${row('Endereço',/não informado/i.test(addr)?'':addr)}${row('Origem',esc(c.source||''))}</div></details>`;
+  }
+  function decorate(id){
+    const m=M(),c=clientById(id);if(!m||!c)return;style();curId=String(id);m.classList.add('kg-cpage');
+    document.getElementById('modalTitle').textContent=c.name||'Cliente';
+    const head=m.querySelector('.modal-head');if(head&&!head.querySelector('.cp-back'))head.insertAdjacentHTML('afterbegin','<button class="cp-back" type="button" id="cpBack">← Clientes</button>');
+    const panel=document.querySelector('#modalBody>.d-panel'),top=panel&&panel.firstElementChild;
+    if(top&&!top.classList.contains('cp-aside')){top.classList.add('cp-aside');top.insertAdjacentHTML('beforeend',info(c))}
+    const want='#cliente/'+encodeURIComponent(id);if(location.hash!==want){try{history[pushed?'replaceState':'pushState']({kgClient:id},'',want);pushed=true}catch(e){}}
+  }
+  function leave(){const m=M();if(m)m.classList.remove('kg-cpage');const b=document.getElementById('cpBack');if(b)b.remove();curId='';
+    if(/^#cliente\//.test(location.hash)){try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}}pushed=false}
+  if(typeof window.viewClient==='function'){const ov=window.viewClient;window.viewClient=function(id){const r=ov.apply(this,arguments);try{decorate(id)}catch(e){console.warn('Página do cliente:',e)}return r}}
+  const oOpen=window.openModal;window.openModal=function(title){const r=oOpen.apply(this,arguments);try{if(title!=='Ficha do cliente'){const m=M();if(m&&m.classList.contains('kg-cpage')){m.classList.remove('kg-cpage');const b=document.getElementById('cpBack');if(b)b.remove()}}}catch(e){}return r};
+  const oClose=window.closeModal;window.closeModal=function(){const was=M()&&M().classList.contains('kg-cpage');const r=oClose.apply(this,arguments);if(was)leave();return r};
+  document.addEventListener('click',e=>{if(e.target&&e.target.id==='cpBack'){e.preventDefault();closeModal();const nb=document.querySelector('.dash-nav button[data-page="clients"]');if(nb&&!document.getElementById('page-clients').classList.contains('active'))nb.click()}});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&M()&&M().classList.contains('kg-cpage')&&M().classList.contains('show')){const box=M().querySelector('#modalBody');if(box&&box.querySelector('form'))return;closeModal()}});
+  window.addEventListener('popstate',()=>{const m=/^#cliente\/(.+)$/.exec(location.hash);if(m){const id=decodeURIComponent(m[1]);if(clientById(id)&&String(id)!==curId)viewClient(id)}else if(M()&&M().classList.contains('kg-cpage')){pushed=false;oClose();const mm=M();mm.classList.remove('kg-cpage');curId=''}});
+  // recarregar a página com #cliente/ID reabre o cliente
+  (function reopen(n){const m=/^#cliente\/(.+)$/.exec(location.hash);if(!m)return;const id=decodeURIComponent(m[1]);if(typeof clientById==='function'&&clientById(id)){pushed=true;viewClient(id)}else if(n<20)setTimeout(()=>reopen(n+1),500)})(0);
+  window.kalinyClientPage={decorate,leave};
 })();
 </script>
 </body></html>
