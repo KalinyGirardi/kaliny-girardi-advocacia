@@ -1481,7 +1481,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
    Regras: vence a alteração mais recente (updatedAt); exclusões viram marcação (deletedAt);
    resposta vazia ou com erro do servidor nunca apaga dados deste navegador. */
 (function(){
-  const VERSION='V145.49';
+  const VERSION='V145.50';
   const META_KEY='kaliny_sync_meta_v1';
   const COLLECTIONS=['processes','finance','notes','calcHistory','previdenciario','documents','tasks','agenda'];
   const IS_COLLAB=(typeof session!=='undefined'&&session&&session.role==='colaboradora'),COLLAB_PUSH=new Set(['finance','tasks']);let warnedForbidden=false;
@@ -1559,10 +1559,12 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
   // Traz da planilha e junta com o que está neste navegador.
   async function pull(){
     let changed=false;
+    // V145.50: pede todas as coleções ao mesmo tempo e processa na ordem de sempre
+    const pre={};COLLECTIONS.forEach(col=>{pre[col]=call('GET',{action:'syncPull',collection:col}).then(j=>({j}),e=>({e}))});
     for(const col of COLLECTIONS){
-      let j;
-      try{j=await call('GET',{action:'syncPull',collection:col})}
-      catch(e){if(String(e&&e.message)==='invalid_collection'){unsupported.add(col);continue}throw e}
+      let j;const got=await pre[col];
+      if(got.e){if(String(got.e&&got.e.message)==='invalid_collection'){unsupported.add(col);continue}throw got.e}
+      j=got.j;
       unsupported.delete(col);
       if(!Array.isArray(j.items))throw new Error('invalid_response');
       const local=new Map(list(col).map(x=>[String(x&&x.id),x]));
@@ -4910,4 +4912,7 @@ ${st.fixed.length&&missing?`<div class="form-actions"><button class="d-btn light
   window.kalinyClientPage={decorate,leave};
 })();
 </script>
+<style>/* V145.50: campos e tabelas das janelas cabem na tela do celular */
+#modal select,#modal input,#modal textarea{max-width:100%;box-sizing:border-box}#modal .form-grid>*,#modal .field{min-width:0}#modal .field{grid-template-columns:minmax(0,1fr)}
+@media(max-width:760px){#modal table.d-table,#modal .fa-t{display:block;overflow-x:auto;max-width:100%;min-width:0!important;-webkit-overflow-scrolling:touch}#modal .form-grid{grid-template-columns:minmax(0,1fr)!important}#modal .form-grid>.full{grid-column:1/-1}.cb-bar .field{min-width:0!important;flex:1 1 100%!important}}</style>
 </body></html>
