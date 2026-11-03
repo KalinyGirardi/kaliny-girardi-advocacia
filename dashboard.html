@@ -1481,7 +1481,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
    Regras: vence a alteração mais recente (updatedAt); exclusões viram marcação (deletedAt);
    resposta vazia ou com erro do servidor nunca apaga dados deste navegador. */
 (function(){
-  const VERSION='V145.51';
+  const VERSION='V145.52';
   const META_KEY='kaliny_sync_meta_v1';
   const COLLECTIONS=['processes','finance','notes','calcHistory','previdenciario','documents','tasks','agenda'];
   const IS_COLLAB=(typeof session!=='undefined'&&session&&session.role==='colaboradora'),COLLAB_PUSH=new Set(['finance','tasks']);let warnedForbidden=false;
@@ -2803,6 +2803,32 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
     data.finance.splice(idx,1);save();
     snack('Lançamento excluído',()=>{data.finance.splice(Math.min(idx,data.finance.length),0,f);save()});
   }
+  // V145.52: excluir um lançamento que faz parte de uma série (parcelas, repetição mensal, contrato ou despesa fixa)
+  function seriesOf(f){
+    const keys=[['planId','parcelamento'],['recurringId','repetição mensal'],['contractId','parcelas do contrato'],['fixedId','despesa fixa']];
+    for(const [k,label] of keys){if(f[k]){const list=(data.finance||[]).filter(x=>x&&!x.deletedAt&&x[k]===f[k]);if(list.length>1)return {k,label,list}}}
+    return null;
+  }
+  function removeMany(list,msg){
+    const saved=list.map(f=>({f,idx:data.finance.indexOf(f)})).filter(x=>x.idx>=0).sort((a,b)=>b.idx-a.idx);
+    saved.forEach(x=>data.finance.splice(x.idx,1));save();
+    snack(msg,()=>{saved.slice().reverse().forEach(x=>data.finance.splice(Math.min(x.idx,data.finance.length),0,x.f));save()});
+  }
+  function askDelete(id){
+    const f=byId(id);if(!f)return;const s=seriesOf(f);
+    if(!s){if(confirm('Excluir este lançamento?'))remove(id);return}
+    const d=x=>String(x.dueDate||x.date||'').slice(0,10),me=d(f);
+    const next=s.list.filter(x=>d(x)>=me),paid=s.list.filter(isPaid).length;
+    openModal('Excluir lançamento',`<p style="margin-top:0"><b>${esc(f.desc||'Lançamento')}</b> faz parte de uma série (${s.label}) com <b>${s.list.length}</b> lançamentos${paid?`, dos quais ${paid} já ${isIn(f)?'recebido':'pago'}${paid>1?'s':''}`:''}.</p>
+<div style="display:grid;gap:8px"><button class="d-btn light" type="button" id="fdOne">Excluir só este</button>
+${next.length>1&&next.length<s.list.length?`<button class="d-btn light" type="button" id="fdNext">Excluir este e os próximos (${next.length})</button>`:''}
+<button class="d-btn" type="button" id="fdAll" style="background:#8b3f35">Excluir todos os ${s.list.length} da série</button></div>
+${s.k==='fixedId'?'<div class="mini-help" style="margin-top:10px">É uma despesa fixa: para ela não voltar no mês que vem, tire-a também em <b>Configurações → Despesas fixas</b>.</div>':''}
+<div class="mini-help" style="margin-top:8px">Dá para desfazer logo depois, no aviso que aparece embaixo.</div>`);
+    document.getElementById('fdOne').onclick=()=>{closeModal();remove(id)};
+    const n=document.getElementById('fdNext');if(n)n.onclick=()=>{closeModal();removeMany(next,next.length+' lançamentos excluídos')};
+    document.getElementById('fdAll').onclick=()=>{closeModal();removeMany(s.list,s.list.length+' lançamentos excluídos')};
+  }
   function duplicate(id){const f=byId(id);if(!f)return;const copy={...JSON.parse(JSON.stringify(f)),id:'fin_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),status:'pendente'};delete copy.paidAt;delete copy.updatedAt;delete copy.planId;delete copy.installmentLabel;openQuick('',copy,true)}
 
   // ---------- lançamento rápido ----------
@@ -2920,7 +2946,7 @@ ${edit?(f.installmentLabel?`<p class="muted" style="font-size:13px">Parte de um 
     else if(d.faToggle)return toggle(d.faToggle);
     else if(d.faEdit)return openQuick('',byId(d.faEdit),false);
     else if(d.faDup)return duplicate(d.faDup);
-    else if(d.faDel){if(confirm('Excluir este lançamento?'))remove(d.faDel);return}
+    else if(d.faDel){askDelete(d.faDel);return}
     else if('faClient' in d){ui.client=d.faClient;ui.tab='list';ui.period='all'}
     saveUi();render();
   });
