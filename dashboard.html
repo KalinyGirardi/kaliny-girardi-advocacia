@@ -1481,7 +1481,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
    Regras: vence a alteração mais recente (updatedAt); exclusões viram marcação (deletedAt);
    resposta vazia ou com erro do servidor nunca apaga dados deste navegador. */
 (function(){
-  const VERSION='V145.50';
+  const VERSION='V145.51';
   const META_KEY='kaliny_sync_meta_v1';
   const COLLECTIONS=['processes','finance','notes','calcHistory','previdenciario','documents','tasks','agenda'];
   const IS_COLLAB=(typeof session!=='undefined'&&session&&session.role==='colaboradora'),COLLAB_PUSH=new Set(['finance','tasks']);let warnedForbidden=false;
@@ -4766,17 +4766,46 @@ ${st.fixed.length&&missing?`<div class="form-actions"><button class="d-btn light
     wb.SheetNames.forEach(n=>{const rows=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:''});
       for(let i=0;i<Math.min(15,rows.length);i++){const h=rows[i].map(norm);const col={};Object.entries(COLS).forEach(([k,re])=>{const j=h.findIndex((x,jj)=>x&&re.test(x)&&!Object.values(col).includes(jj));if(j>=0)col[k]=j});
         if(col.name!=null){const data=rows.slice(i+1).filter(r=>String(r[col.name]||'').trim());if(!best||data.length>best.data.length)best={sheet:n,col,data,headers:rows[i]};break}}});
+    if(best){wb.SheetNames.forEach(n=>{if(n===best.sheet)return;const rows=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:''});const hh=(rows[0]||[]).map(norm),f=re=>hh.findIndex(x=>re.test(x));
+      const cols={pasta:f(/^pasta do cliente/),nome:f(/^nome$/),cpf:f(/^cpf$/),rg:f(/^rg$/),ec:f(/^estado civil/),prof:f(/^profiss/),end:f(/^endereco/),obs:f(/^observac/),orig:f(/^documento de origem/)};
+      if(cols.pasta>=0&&cols.nome>=0&&cols.cpf>=0)best.cad={cols,rows:rows.slice(1).filter(r=>String(r[cols.pasta]||'').trim())}})}
     return best;
   }
+  // V145.51: a aba "Dados cadastrais" (Pasta do cliente, Nome, CPF, RG, Estado civil, Profissão, Endereço…) completa as linhas;
+  // quem já está no painel é reconhecido pelo CPF, pelo nome ou pelo nome completo (nome da pasta contido nele).
+  const tok=s=>norm(s).split(' ').filter(w=>w&&!['de','da','do','das','dos','e'].includes(w));
+  const EC={solteiro:['Solteiro(a)','M'],solteira:['Solteiro(a)','F'],casado:['Casado(a)','M'],casada:['Casado(a)','F'],divorciado:['Divorciado(a)','M'],divorciada:['Divorciado(a)','F'],viuvo:['Viúvo(a)','M'],viuva:['Viúvo(a)','F'],'em uniao estavel':['União estável',''],'uniao estavel':['União estável','']};
+  const cpfOk=v=>{const d=String(v||'').replace(/\D/g,'');if(d.length!==11||/^(\d)\1+$/.test(d))return false;for(const n of [9,10]){let s=0;for(let i=0;i<n;i++)s+=+d[i]*(n+1-i);if((s*10)%11%10!==+d[n])return false}return true};
+  function cadastro(p){
+    const out={};if(!p.cad)return out;const c=p.cad.cols;
+    p.cad.rows.forEach(r=>{const k=norm(cleanName(r[c.pasta]).name);if(k)(out[k]=out[k]||{folder:String(r[c.pasta]).trim(),rows:[]}).rows.push(r)});
+    Object.values(out).forEach(g=>{const ft=tok(cleanName(g.folder).name),sc=r=>ft.filter(w=>tok(r[c.nome]).includes(w)).length/Math.max(1,ft.length);
+      const best=g.rows.slice().sort((a,b)=>sc(b)-sc(a))[0];g.best=best&&sc(best)>=.5?best:null;g.others=g.rows.filter(r=>r!==g.best);g.ft=ft});
+    return out;
+  }
   function build(p){
-    const existing=new Set((data.clients||[]).map(c=>norm(c.name)));const seen=new Set();
-    return p.data.map((r,i)=>{const g=k=>p.col[k]!=null?r[p.col[k]]:'';const nm=cleanName(g('name'));const key=norm(nm.name);
+    const cl=(data.clients||[]),cpfs=new Set(cl.map(c=>String(c.cpf||'').replace(/\D/g,'')).filter(Boolean)),names=new Set(cl.map(c=>norm(c.name))),toks=cl.map(c=>tok(c.name));
+    const isDup=(name,cpf)=>{const d=String(cpf||'').replace(/\D/g,'');if(d&&cpfs.has(d))return true;if(names.has(norm(name)))return true;const t=tok(name);return t.length>=2&&toks.some(x=>t.every(w=>x.includes(w)))};
+    const cad=cadastro(p),C=p.cad&&p.cad.cols,seen=new Set(),used=new Set();
+    const fill=(o,g)=>{if(!g)return o;used.add(norm(cleanName(g.folder).name));const notes=[];const b=g.best,v=k=>b&&C[k]>=0?String(b[C[k]]||'').trim():'';
+      if(b){const full=v('nome');if(full&&g.ft.every(w=>tok(full).includes(w))&&norm(full)!==norm(o.name))o.name=full;else if(full&&norm(full)!==norm(o.name))notes.push('Nome nos documentos: '+full);
+        const cpf=v('cpf');if(cpf){if(cpfOk(cpf)){const d=cpf.replace(/\D/g,'');o.cpf=o.cpf||d.slice(0,3)+'.'+d.slice(3,6)+'.'+d.slice(6,9)+'-'+d.slice(9)}else notes.push('CPF na planilha (dígito verificador não confere, conferir): '+cpf)}
+        o.rg=o.rg||v('rg');const e=EC[norm(v('ec'))];if(e){o.marital=o.marital||e[0];if(e[1])o.sex=e[1]}const pr=v('prof');if(pr)o.profession=o.profession||(pr[0].toUpperCase()+pr.slice(1));
+        const en=v('end');if(en&&!o.street)o.street=en;if(v('obs'))notes.push('Observação (dados cadastrais): '+v('obs'));if(v('orig'))notes.push('Fonte dos dados cadastrais: '+v('orig'))}
+      const list=r=>String(r[C.nome]||'').trim()+(r[C.cpf]?' (CPF '+String(r[C.cpf]).trim()+')':'');
+      if(g.others.length)notes.push((b?'Outras pessoas nos documentos da pasta: ':'CONFERIR — dados encontrados na pasta, sem certeza de qual é o cliente: ')+g.others.map(list).join('; '));
+      o.cadNotes=notes.join('\n');return o};
+    const base=p.data.map((r,i)=>{const g=k=>p.col[k]!=null?r[p.col[k]]:'';const nm=cleanName(g('name'));
       const procs=String(g('process')||'').split(/[;\n]+/).map(x=>x.trim()).filter(Boolean);
       const sit=String(g('confirmed')||g('status')||'').trim();
-      const dup=existing.has(key)||seen.has(key);seen.add(key);
-      return {i,on:!dup&&!!key,dup,name:nm.name,extra:nm.extra,area:mapArea([g('area'),g('areaDetail'),nm.extra].join(' ')),areaRaw:[g('area'),g('areaDetail')].filter(Boolean).join(' — '),subject:String(g('subject')||'').trim(),procs,
+      const o={i,name:nm.name,extra:nm.extra,area:mapArea([g('area'),g('areaDetail'),nm.extra].join(' ')),areaRaw:[g('area'),g('areaDetail')].filter(Boolean).join(' — '),subject:String(g('subject')||'').trim(),procs,
         nomeacao:String(g('nomeacao')||'').trim(),lastMove:dateIso(g('lastMove')),sit,status:ACTIVE(sit)?'Ativo':'Inativo',closing:String(g('closing')||'').trim(),obs:String(g('notes')||'').trim(),next:String(g('next')||'').trim(),
-        phone:String(g('phone')||'').trim(),cpf:String(g('cpf')||'').trim(),email:String(g('email')||'').trim().toLowerCase(),birth:dateIso(g('birth')),profession:String(g('profession')||'').trim(),marital:String(g('marital')||'').trim(),street:String(g('address')||'').trim(),city:String(g('city')||'').trim(),cep:String(g('cep')||'').trim()}});
+        phone:String(g('phone')||'').trim(),cpf:String(g('cpf')||'').trim(),email:String(g('email')||'').trim().toLowerCase(),birth:dateIso(g('birth')),profession:String(g('profession')||'').trim(),marital:String(g('marital')||'').trim(),street:String(g('address')||'').trim(),city:String(g('city')||'').trim(),cep:String(g('cep')||'').trim(),rg:'',sex:''};
+      return fill(o,cad[norm(nm.name)]);
+    });
+    // pastas que só existem na aba "Dados cadastrais"
+    Object.entries(cad).forEach(([k,g])=>{if(used.has(k))return;const o={i:0,name:cleanName(g.folder).name,extra:'',area:'Cível',areaRaw:'',subject:'',procs:[],nomeacao:'',lastMove:'',sit:'',status:'Ativo',closing:'',obs:'',next:'',phone:'',cpf:'',email:'',birth:'',profession:'',marital:'',street:'',city:'',cep:'',rg:'',sex:''};base.push(fill(o,g))});
+    return base.map((o,i)=>{o.i=i;const key=norm(o.name);o.dup=!key||isDup(o.name,o.cpf)||seen.has(key);seen.add(key);o.on=!o.dup;return o});
   }
   let rows=[],src='',ui={sit:{}};
   function sits(){const c={};rows.forEach(r=>{const k=r.sit||'Sem situação';c[k]=(c[k]||0)+1});return c}
@@ -4787,13 +4816,13 @@ ${st.fixed.length&&missing?`<div class="form-actions"><button class="d-btn light
 <div class="imp-wrap"><table class="imp-t"><thead><tr><th></th><th>Nome</th><th>Área no painel</th><th>Situação</th><th>Processos</th></tr></thead><tbody>${rows.map(r=>`<tr class="${r.on?'':'off'}"><td><input type="checkbox" data-imp-on="${r.i}" ${r.on?'checked':''}></td><td><input class="imp-name" data-imp-name="${r.i}" value="${esc(r.name)}">${r.dup?'<small class="imp-dup">já cadastrado</small>':''}${r.extra?`<small>assunto: ${esc(r.extra)}</small>`:''}<small>${esc(r.areaRaw)}${r.subject?' · '+esc(r.subject.slice(0,70)):''}</small></td><td><select data-imp-area="${r.i}">${AREAS.map(a=>`<option ${a===r.area?'selected':''}>${a}</option>`).join('')}</select></td><td><select data-imp-st="${r.i}"><option ${r.status==='Ativo'?'selected':''}>Ativo</option><option ${r.status==='Inativo'?'selected':''}>Inativo</option></select><small>${esc(r.sit)}</small></td><td>${r.procs.length||'—'}</td></tr>`).join('')}</tbody></table></div>
 <div class="imp-act"><button class="d-btn" type="button" id="impGo" ${on.length?'':'disabled'}>Importar ${on.length} cliente${on.length===1?'':'s'}</button></div><div class="mini-help">O nome, a área e a situação podem ser ajustados acima. Os dados da planilha (assunto, situação, nomeação, última movimentação, observações) vão para as observações de cada cliente. O telefone e o CPF você completa depois na ficha.</div>`;
   }
-  function notes(r){return ['Importado de '+src+' em '+br(new Date().toISOString().slice(0,10))+'.',r.areaRaw&&'Área na planilha: '+r.areaRaw,r.extra&&'Assunto (nome da pasta): '+r.extra,r.subject&&'Assunto: '+r.subject,r.procs.length&&'Processo(s): '+r.procs.join('; '),r.nomeacao&&'Nomeação: '+r.nomeacao,r.sit&&'Situação no levantamento: '+r.sit,r.closing&&'Indício de encerramento: '+r.closing,r.lastMove&&'Última movimentação na pasta: '+br(r.lastMove),r.obs&&'Observações: '+r.obs,r.next&&'Próximo passo: '+r.next].filter(Boolean).join('\n')}
+  function notes(r){return ['Importado de '+src+' em '+br(new Date().toISOString().slice(0,10))+'.',r.areaRaw&&'Área na planilha: '+r.areaRaw,r.extra&&'Assunto (nome da pasta): '+r.extra,r.subject&&'Assunto: '+r.subject,r.procs.length&&'Processo(s): '+r.procs.join('; '),r.nomeacao&&'Nomeação: '+r.nomeacao,r.sit&&'Situação no levantamento: '+r.sit,r.closing&&'Indício de encerramento: '+r.closing,r.lastMove&&'Última movimentação na pasta: '+br(r.lastMove),r.obs&&'Observações: '+r.obs,r.next&&'Próximo passo: '+r.next,r.cadNotes].filter(Boolean).join('\n')}
   async function run(){
     const list=rows.filter(r=>r.on&&String(r.name).trim());if(!list.length)return;const btn=document.getElementById('impGo');btn.disabled=true;
     const b=document.getElementById('impBody');b.insertAdjacentHTML('afterbegin','<div class="imp-prog"><div class="imp-bar2"><i id="impFill"></i></div><span id="impTxt"></span></div>');
     let ok=0,fail=0,np=0,nt=0;const now=()=>new Date().toISOString();data.processes=Array.isArray(data.processes)?data.processes:[];data.tasks=Array.isArray(data.tasks)?data.tasks:[];
     for(const [k,r] of list.entries()){
-      const c={id:'cli_'+Date.now()+'_'+Math.random().toString(36).slice(2,8),name:String(r.name).trim(),area:r.area,status:r.status,phone:r.phone,cpf:r.cpf,email:r.email,birthDate:r.birth,profession:r.profession,maritalStatus:r.marital,street:r.street,city:r.city,cep:r.cep,source:'Planilha de clientes',notes:notes(r),createdAt:now()};
+      const c={id:'cli_'+Date.now()+'_'+Math.random().toString(36).slice(2,8),name:String(r.name).trim(),area:r.area,status:r.status,phone:r.phone,cpf:r.cpf,rg:r.rg,sex:r.sex,email:r.email,birthDate:r.birth,profession:r.profession,maritalStatus:r.marital,street:r.street,city:r.city,cep:r.cep,source:'Planilha de clientes',notes:notes(r),createdAt:now()};
       Object.keys(c).forEach(x=>{if(c[x]==='')delete c[x]});
       let saved=false;for(let t=0;t<3&&!saved;t++){saved=await saveClientRemote(c,true);if(!saved)await new Promise(z=>setTimeout(z,1200))}
       if(!saved){fail++;continue}
@@ -4915,4 +4944,66 @@ ${st.fixed.length&&missing?`<div class="form-actions"><button class="d-btn light
 <style>/* V145.50: campos e tabelas das janelas cabem na tela do celular */
 #modal select,#modal input,#modal textarea{max-width:100%;box-sizing:border-box}#modal .form-grid>*,#modal .field{min-width:0}#modal .field{grid-template-columns:minmax(0,1fr)}
 @media(max-width:760px){#modal table.d-table,#modal .fa-t{display:block;overflow-x:auto;max-width:100%;min-width:0!important;-webkit-overflow-scrolling:touch}#modal .form-grid{grid-template-columns:minmax(0,1fr)!important}#modal .form-grid>.full{grid-column:1/-1}.cb-bar .field{min-width:0!important;flex:1 1 100%!important}}</style>
+<script>
+/* V145.51 — Conferir cadastros: clientes em dobro (mesmo CPF ou mesmo nome) com "Juntar", fichas marcadas
+   "CONFERIR" com "Já conferi", e processos/documentos/compromissos ligados a um cliente que não existe mais. */
+(function(){
+  const S=(typeof session!=='undefined'&&session)||{};if(S.role==='colaboradora')return;
+  const norm=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+  const dig=s=>String(s||'').replace(/\D/g,'');
+  const COLS=['processes','documents','finance','agenda','tasks','notes','calcHistory','previdenciario'];
+  const links=id=>COLS.reduce((n,c)=>n+(data[c]||[]).filter(x=>x&&!x.deletedAt&&String(x.clientId)===String(id)).length,0);
+  const pad=n=>String(n).padStart(2,'0'),hoje=()=>{const d=new Date();return pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear()};
+  function dups(){
+    const cl=(data.clients||[]).filter(c=>c&&c.id),pairs=[],seen=new Set();
+    const add=(a,b,why)=>{const k=[a.id,b.id].sort().join('|');if(seen.has(k))return;seen.add(k);pairs.push({a,b,why})};
+    const byCpf={},byName={};
+    cl.forEach(c=>{const d=dig(c.cpf);if(d.length===11)(byCpf[d]=byCpf[d]||[]).push(c);const n=norm(c.name);if(n)(byName[n]=byName[n]||[]).push(c)});
+    Object.values(byCpf).forEach(l=>{for(let i=1;i<l.length;i++)add(l[0],l[i],'mesmo CPF')});
+    Object.values(byName).forEach(l=>{for(let i=1;i<l.length;i++)add(l[0],l[i],'mesmo nome')});
+    return pairs.map(p=>{const la=links(p.a.id),lb=links(p.b.id);const keep=la>lb||(la===lb&&String(p.a.createdAt||'')<=String(p.b.createdAt||''))?p.a:p.b;return {keep,drop:keep===p.a?p.b:p.a,why:p.why}});
+  }
+  const conferir=()=>(data.clients||[]).filter(c=>c&&/CONFERIR|dígito verificador não confere/.test(String(c.notes||'')));
+  function orphans(){const ids=new Set((data.clients||[]).map(c=>String(c.id)));const o=[];
+    [['processes','Processo',x=>x.number||x.subject],['documents','Documento',x=>x.name||x.title],['agenda','Compromisso',x=>(x.title||'')+(x.date?' — '+x.date:'')]].forEach(([c,l,t])=>(data[c]||[]).forEach(x=>{if(x&&!x.deletedAt&&!x.onlineId&&x.clientId&&!ids.has(String(x.clientId)))o.push({col:c,label:l,item:x,text:t(x)||'(sem título)'})}));return o}
+  function count(){return dups().length+conferir().length+orphans().length}
+  function render(){
+    const el=document.getElementById('cfBody');if(!el)return;const D=dups(),C=conferir(),O=orphans();
+    const opts=(data.clients||[]).slice().sort((a,b)=>String(a.name).localeCompare(String(b.name))).map(c=>`<option value="${esc(String(c.id))}">${esc(c.name)}</option>`).join('');
+    const card=(t,b)=>`<div class="cf-card">${t}${b}</div>`;
+    el.innerHTML=`<style>.cf-sec{margin:14px 0 6px;font:500 18px Georgia,serif}.cf-card{border:1px solid #eaded2;border-radius:12px;background:#fff;padding:10px 12px;margin-bottom:6px;display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}.cf-card small{display:block;color:#8d7767;font-size:12px}.cf-act{display:flex;gap:6px;flex-wrap:wrap}.cf-ok{color:#557a62;padding:6px 0}.cf-card select{border:1px solid #eaded2;border-radius:8px;padding:5px;max-width:220px}</style>
+<div class="cf-sec">Clientes em dobro (${D.length})</div>${D.length?D.map((p,i)=>card(`<div><b>${esc(p.keep.name)}</b><small>${esc(p.why)} · fica o cadastro com ${links(p.keep.id)} registro(s) ligado(s); o outro${p.drop.name!==p.keep.name?' ("'+esc(p.drop.name)+'")':''} tem ${links(p.drop.id)}</small></div>`,`<div class="cf-act"><button class="d-btn light" type="button" data-cf-view="${esc(String(p.keep.id))}">Abrir</button><button class="d-btn" type="button" data-cf-merge="${i}">Juntar</button></div>`)).join(''):'<div class="cf-ok">✓ Nenhum cliente em dobro.</div>'}
+<div class="cf-sec">Fichas para conferir (${C.length})</div>${C.length?C.map(c=>card(`<div><b>${esc(c.name)}</b><small>${/dígito verificador/.test(c.notes)?'CPF da planilha com dígito errado':'dados da pasta sem certeza de quem é o cliente'} — veja as observações da ficha</small></div>`,`<div class="cf-act"><button class="d-btn light" type="button" data-cf-view="${esc(String(c.id))}">Abrir</button><button class="d-btn" type="button" data-cf-done="${esc(String(c.id))}">Já conferi</button></div>`)).join(''):'<div class="cf-ok">✓ Nada para conferir.</div>'}
+<div class="cf-sec">Registros sem cliente (${O.length})</div>${O.length?O.map((o,i)=>card(`<div><b>${esc(o.label)}: ${esc(o.text)}</b><small>o cliente deste registro foi apagado</small></div>`,`<div class="cf-act"><select data-cf-to="${i}"><option value="">Ligar a…</option>${opts}</select><button class="d-btn light" type="button" data-cf-link="${i}">Ligar</button><button class="d-btn light" type="button" data-cf-del="${i}">Excluir</button></div>`)).join(''):'<div class="cf-ok">✓ Todos os registros têm cliente.</div>'}`;
+    el._d=D;el._o=O;
+  }
+  async function merge(p){
+    if(!confirm('Juntar "'+p.drop.name+'" em "'+p.keep.name+'"?\n\nOs processos, documentos, lançamentos e compromissos passam para um cadastro só, os dados que faltam são completados e as observações dos dois ficam guardadas. O cadastro repetido é apagado.'))return;
+    const k=clientById(p.keep.id),d=clientById(p.drop.id);if(!k||!d)return;const now=new Date().toISOString();
+    ['phone','email','cpf','rg','birthDate','profession','maritalStatus','nationality','sex','street','number','complement','neighborhood','city','state','cep','area','source'].forEach(f=>{if(!String(k[f]||'').trim()&&String(d[f]||'').trim())k[f]=d[f]});
+    if(String(d.notes||'').trim()&&String(d.notes)!==String(k.notes))k.notes=(String(k.notes||'').trim()?k.notes+'\n\n':'')+'Do cadastro repetido "'+d.name+'" (juntado em '+hoje()+'):\n'+d.notes;
+    if(Array.isArray(d.team))k.team=[...new Set([...(k.team||[]),...d.team])];
+    let moved=0;COLS.forEach(c=>(data[c]||[]).forEach(x=>{if(x&&String(x.clientId)===String(d.id)){x.clientId=k.id;x.updatedAt=now;moved++}}));
+    const ok=await saveClientRemote(k,true);if(ok===false){toast('Não consegui salvar no servidor agora; nada foi apagado.');return}
+    try{const cfg=onlineConfig();const r=await fetch(cfg.url,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:new URLSearchParams({action:'clientDelete',token:cfg.token,id:String(d.id)})});const j=await r.json();if(!j.ok&&j.error!=='not_found')throw new Error(j.error)}catch(e){toast('O cadastro foi completado, mas não consegui apagar o repetido agora. Tente de novo.');save();return render()}
+    data.clients=data.clients.filter(c=>String(c.id)!==String(d.id));save();try{window.kalinySync&&window.kalinySync.syncNow()}catch(e){}
+    toast('Juntado: '+k.name+(moved?' ('+moved+' registro(s) passaram para este cadastro)':''));render();badge();
+  }
+  async function done(id){const c=clientById(id);if(!c)return;c.notes=String(c.notes||'').replace(/CONFERIR\b/g,'Conferido em '+hoje()).replace(/dígito verificador não confere, conferir/g,'dígito verificador não confere — conferido em '+hoje());
+    try{save()}catch(e){}const ok=await saveClientRemote(c,true);toast(ok===false?'Não consegui salvar no servidor agora':'Marcado como conferido');render();badge()}
+  function open(){openModal('Conferir cadastros','<div id="cfBody"></div>');render()}
+  function badge(){const b=document.getElementById('cfOpen');if(!b)return;const n=count();b.innerHTML='🔎 Conferir cadastros'+(n?` <em style="font-style:normal;background:#b06a1e;color:#fff;border-radius:999px;padding:0 7px;font-size:11px;margin-left:4px">${n}</em>`:'')}
+  function button(){const nb=document.getElementById('newClient');if(!nb)return;if(!document.getElementById('cfOpen')){nb.insertAdjacentHTML('beforebegin','<button class="d-btn light" type="button" id="cfOpen" style="margin-right:8px"></button>')}badge()}
+  document.addEventListener('click',async e=>{const g=k=>e.target.closest&&e.target.closest('['+k+']');let b;const el=document.getElementById('cfBody');
+    if(e.target&&e.target.id==='cfOpen')return open();
+    if((b=g('data-cf-merge'))&&el)return merge(el._d[+b.dataset.cfMerge]);
+    if((b=g('data-cf-done')))return done(b.dataset.cfDone);
+    if((b=g('data-cf-view')))return viewClient(b.dataset.cfView);
+    if((b=g('data-cf-link'))&&el){const o=el._o[+b.dataset.cfLink],to=el.querySelector(`[data-cf-to="${b.dataset.cfLink}"]`).value;if(!to)return toast('Escolha o cliente');o.item.clientId=to;o.item.updatedAt=new Date().toISOString();save();try{window.kalinySync&&window.kalinySync.syncNow()}catch(err){}toast(o.label+' ligado a '+(clientById(to)||{}).name);return render()}
+    if((b=g('data-cf-del'))&&el){const o=el._o[+b.dataset.cfDel];if(!confirm('Excluir este '+o.label.toLowerCase()+' sem cliente?'))return;data[o.col]=data[o.col].filter(x=>x!==o.item);save();try{window.kalinySync&&window.kalinySync.syncNow()}catch(err){}toast(o.label+' excluído');return render()}
+  });
+  const oR=window.renderAll;window.renderAll=function(){const r=oR.apply(this,arguments);try{button()}catch(e){}return r};setTimeout(button,1500);
+  window.kalinyConferir={dups,conferir,orphans,open};
+})();
+</script>
 </body></html>
