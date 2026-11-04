@@ -1485,7 +1485,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
    Regras: vence a alteração mais recente (updatedAt); exclusões viram marcação (deletedAt);
    resposta vazia ou com erro do servidor nunca apaga dados deste navegador. */
 (function(){
-  const VERSION='V145.54';
+  const VERSION='V145.56';
   const META_KEY='kaliny_sync_meta_v1';
   const COLLECTIONS=['processes','finance','notes','calcHistory','previdenciario','documents','tasks','agenda'];
   const IS_COLLAB=(typeof session!=='undefined'&&session&&session.role==='colaboradora'),COLLAB_PUSH=new Set(['finance','tasks']);let warnedForbidden=false;
@@ -5068,13 +5068,17 @@ ${st.fixed.length&&missing?`<div class="form-actions"><button class="d-btn light
   const when=f=>String(isPaid(f)?(f.paidAt||f.dueDate||f.date):(f.dueDate||f.date)||'').slice(0,7);
   const team=()=>{let t=[];try{t=JSON.parse(localStorage.getItem('kaliny_team_v1')||'[]')||[]}catch(e){}const fromFin={};(data.finance||[]).forEach(f=>{if(f&&f.collab&&f.collab.email)fromFin[lower(f.collab.email)]=f.collab.name||f.collab.email});
     const all=t.filter(u=>u&&u.email).map(u=>({email:u.email,name:u.name||u.email}));Object.entries(fromFin).forEach(([e,n])=>{if(!all.some(u=>lower(u.email)===e))all.push({email:e,name:n})});return all};
-  let ui={m:ymOf(new Date()),who:''};
-  function calc(m,email){
-    const F=(data.finance||[]).filter(f=>f&&!f.deletedAt);
-    const rec=F.filter(f=>isIn(f)&&isPaid(f)&&when(f)===m),total=r2(rec.reduce((s,f)=>s+Number(f.value||0),0));
+  let ui={m:ymOf(new Date()),who:'',mode:'prev'};
+  const isFixed=f=>f.category==='Despesas fixas'||f.category==='Aluguel e condomínio'||!!f.fixedId;
+  function calc(m,email,mode){mode=mode||'rec';
+    const F=(data.finance||[]).filter(f=>f&&!f.deletedAt&&lower(f.status)!=='cancelado');
+    const all=F.filter(f=>isIn(f)&&!Array.isArray(f.repasseOf)&&when(f)===m&&(mode==='prev'||isPaid(f)));
+    const rec=F.filter(f=>isIn(f)&&isPaid(f)&&when(f)===m);
     const mine=rec.filter(f=>f.collab&&lower(f.collab.email)===lower(email)),share=f=>r2(Number(f.value||0)*Number(f.collab.pct||0)/100);
-    const part=r2(mine.reduce((s,f)=>s+share(f),0)),frac=total?part/total:0;
-    let fixed=F.filter(f=>!isIn(f)&&f.category==='Despesas fixas'&&when(f)===m).map(f=>({name:f.desc,value:Number(f.value||0)}));
+    const mineAll=all.filter(f=>f.collab&&lower(f.collab.email)===lower(email)),base=mode==='prev'?all:rec;
+    const total=r2(base.reduce((s,f)=>s+Number(f.value||0),0)),paidTotal=r2(rec.reduce((s,f)=>s+Number(f.value||0),0));
+    const part=r2((mode==='prev'?mineAll:mine).reduce((s,f)=>s+share(f),0)),frac=total?part/total:0;
+    let fixed=F.filter(f=>!isIn(f)&&isFixed(f)&&when(f)===m).map(f=>({name:f.desc,value:Number(f.value||0)}));
     let fromCfg=false;if(!fixed.length&&window.kalinyFixed){fixed=(window.kalinyFixed.state().fixed||[]).map(x=>({name:x.name,value:Number(x.value||0)}));fromCfg=!!fixed.length}
     const fixedTotal=r2(fixed.reduce((s,x)=>s+x.value,0)),prop=r2(fixedTotal*frac);
     const fee=window.kalinyLastFee?window.kalinyLastFee(email):0,rule=r2(part*fee/100);
@@ -5082,49 +5086,120 @@ ${st.fixed.length&&missing?`<div class="form-actions"><button class="d-btn light
     const paidOut=r2(mine.filter(f=>f.repasseAt).reduce((s,f)=>s+(f.repasseNet!=null?Number(f.repasseNet):share(f)),0));
     const waiting=mine.filter(f=>!f.repasseAt);
     const open=F.filter(f=>isIn(f)&&!isPaid(f)&&f.collab&&lower(f.collab.email)===lower(email)&&when(f)===m);
-    return {total,part,frac,fixed,fixedTotal,fromCfg,prop,fee,rule,paidOut,waiting,waitingPart:r2(waiting.reduce((s,f)=>s+share(f),0)),openPart:r2(open.reduce((s,f)=>s+share(f),0)),mine:mine.length,reps};
+    return {total,part,frac,fixed,fixedTotal,fromCfg,prop,fee,rule,paidOut,waiting,waitingPart:r2(waiting.reduce((s,f)=>s+share(f),0)),openPart:r2(open.reduce((s,f)=>s+share(f),0)),mine:mine.length,reps,mode,paidTotal,list:mode==='prev'?mineAll:mine,share};
   }
   const pct=v=>(Math.round(v*1000)/10).toString().replace('.',',')+'%';
   function render(){
     const el=document.getElementById('partnersApp');if(!el)return;const T=team();
     if(!T.length){el.innerHTML='<div class="muted" style="padding:20px;border:1px dashed #eaded2;border-radius:14px;text-align:center">Nenhuma parceira ainda. Convide em <b>Configurações → Equipe</b> e coloque a parceira e a % no contrato ou no lançamento.</div>';return}
     if(!ui.who||!T.some(u=>lower(u.email)===lower(ui.who)))ui.who=T[0].email;
-    const p=T.find(u=>lower(u.email)===lower(ui.who)),c=calc(ui.m,p.email),first=String(p.name).split(' ')[0];
-    const hist=Array.from({length:6},(_,i)=>shift(ui.m,-i)).map(m=>({m,...calc(m,p.email)}));
+    const p=T.find(u=>lower(u.email)===lower(ui.who)),c=calc(ui.m,p.email,ui.mode),cr=ui.mode==='rec'?c:calc(ui.m,p.email,'rec'),first=String(p.name).split(' ')[0],PV=ui.mode==='prev';
+    const hist=Array.from({length:6},(_,i)=>shift(ui.m,-i)).map(m=>({m,...calc(m,p.email,ui.mode)}));
     const card=(l,v,s,col)=>`<div class="pr-k"><small>${l}</small><strong style="${col?'color:'+col:''}">${v}</strong><span>${s||'&nbsp;'}</span></div>`;
     el.innerHTML=`<style>.pr-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}.pr-bar select{border:1px solid #eaded2;border-radius:999px;padding:8px 12px;background:#fff;font-size:14px}.pr-nav{display:inline-flex;align-items:center;gap:4px;border:1px solid #eaded2;border-radius:999px;background:#fff;padding:2px}.pr-nav button{border:0;background:none;padding:6px 10px;cursor:pointer;font-size:14px}.pr-nav b{min-width:150px;text-align:center;font-size:14px}
 .pr-ks{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px}.pr-k{border:1px solid #eaded2;border-radius:14px;background:#fff;padding:12px 14px}.pr-k small{display:block;color:#8d7767;font-size:12px}.pr-k strong{display:block;font:500 22px Georgia,serif;color:#3d2b20;margin:3px 0}.pr-k span{font-size:12px;color:#8d7767}
 .pr-grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:14px}.pr-box{border:1px solid #eaded2;border-radius:14px;background:#fff;padding:14px 16px}.pr-box h3{font:500 19px Georgia,serif;margin:0 0 10px}.pr-t{width:100%;border-collapse:collapse;font-size:14px}.pr-t td,.pr-t th{padding:7px 4px;border-bottom:1px solid #f1e8df;text-align:left}.pr-t th{font-size:12px;color:#8d7767;font-weight:600}.pr-t .n{text-align:right;white-space:nowrap}.pr-t tr.tot td{font-weight:700;border-top:2px solid #3d2b20;border-bottom:0}
 .pr-cmp{display:grid;gap:8px;font-size:14px}.pr-cmp div{display:flex;justify-content:space-between;gap:10px}.pr-cmp .big{font:500 22px Georgia,serif;color:#557a62}.pr-note{font-size:12px;color:#8d7767;margin-top:8px;line-height:1.5}
-@media(max-width:900px){.pr-ks{grid-template-columns:1fr 1fr}.pr-grid{grid-template-columns:1fr}}</style>
+@media(max-width:900px){.pr-ks{grid-template-columns:1fr 1fr}.pr-grid{grid-template-columns:1fr}}.pr-mode button{font-size:13px}</style>
 <div class="pr-bar"><select id="prWho">${T.map(u=>`<option value="${esc(u.email)}" ${lower(u.email)===lower(p.email)?'selected':''}>${esc(u.name)}</option>`).join('')}</select>
-<div class="pr-nav"><button type="button" data-pr-m="-1" aria-label="Mês anterior">◀</button><b>${label(ui.m)}</b><button type="button" data-pr-m="1" aria-label="Próximo mês">▶</button></div><button class="d-btn light" type="button" data-pr-now>Este mês</button>
+<div class="pr-nav"><button type="button" data-pr-m="-1" aria-label="Mês anterior">◀</button><b>${label(ui.m)}</b><button type="button" data-pr-m="1" aria-label="Próximo mês">▶</button></div><button class="d-btn light" type="button" data-pr-now>Este mês</button><span class="pr-nav pr-mode"><button type="button" data-pr-mode="prev" style="${PV?'background:#4b3425;color:#fff;border-radius:999px':''}">Previsto no mês</button><button type="button" data-pr-mode="rec" style="${PV?'':'background:#4b3425;color:#fff;border-radius:999px'}">Só o que já entrou</button></span>
 <span style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap"><button class="d-btn light" type="button" data-pr-ext>📄 Extratos</button>${c.waiting.length?`<button class="d-btn" type="button" data-pr-rep>Registrar repasse</button>`:''}</span></div>
-<div class="pr-ks">${card('Recebido pelo escritório',money(c.total),'no mês')}${card('Parte de '+esc(first),money(c.part),c.total?pct(c.frac)+' do faturamento':'—')}${card('Despesas fixas do mês',money(c.fixedTotal),c.fromCfg?'pelas Configurações':'lançadas no Financeiro')}${card('Aluguel e fixas proporcionais',money(c.prop),'parte de '+esc(first),'#b06a1e')}</div>
+<div class="pr-ks">${PV?card('Previsto para o escritório',money(c.total),'recebido '+money(c.paidTotal)+' + a receber'):card('Recebido pelo escritório',money(c.total),'no mês')}${card('Parte de '+esc(first),money(c.part),c.total?pct(c.frac)+' do faturamento':'—')}${card('Despesas fixas do mês',money(c.fixedTotal),c.fromCfg?'pelas Configurações':'lançadas no Financeiro')}${card('Aluguel e fixas proporcionais',money(c.prop),'parte de '+esc(first),'#b06a1e')}</div>
 <div class="pr-grid"><div class="pr-box"><h3>Quanto cabe a ${esc(first)} de cada despesa fixa</h3>${c.fixed.length?`<table class="pr-t"><thead><tr><th>Despesa</th><th class="n">Valor</th><th class="n">${pct(c.frac)}</th></tr></thead><tbody>${c.fixed.map(x=>`<tr><td>${esc(x.name)}</td><td class="n">${money(x.value)}</td><td class="n">${money(r2(x.value*c.frac))}</td></tr>`).join('')}<tr class="tot"><td>Total</td><td class="n">${money(c.fixedTotal)}</td><td class="n">${money(c.prop)}</td></tr></tbody></table>
 <div class="pr-note">Conta: a fração do faturamento do mês que é de ${esc(first)} (${money(c.part)} de ${money(c.total)} = ${pct(c.frac)}) aplicada a cada despesa fixa.${c.total?'':' Sem receitas recebidas neste mês ainda.'}</div>`:'<div class="muted">Cadastre as despesas fixas em <b>Configurações → Despesas fixas do escritório</b>.</div>'}</div>
 <div class="pr-box"><h3>Contribuição e repasse</h3><div class="pr-cmp">
-<div><span>Parte de ${esc(first)} no mês</span><b>${money(c.part)}</b></div>
+<div><span>Parte de ${esc(first)} no mês${PV?' (prevista)':''}</span><b>${money(c.part)}</b></div>
 <div><span>Pela regra combinada (${String(c.fee).replace('.',',')}% da parte dela)</span><b>− ${money(c.rule)}</b></div>
 <div><span>Proporcional real às despesas fixas</span><b>− ${money(c.prop)}</b></div>
 <div style="border-top:1px solid #eaded2;padding-top:8px"><span>A repassar pela regra</span><span class="big">${money(r2(c.part-c.rule))}</span></div>
 <div><span>A repassar pelo proporcional</span><b>${money(r2(c.part-c.prop))}</b></div>
 <div style="border-top:1px solid #eaded2;padding-top:8px"><span>Aguardando repasse (todas as datas)</span><b>${money(c.waitingPart)}</b></div>
 <div><span>A receber de ${esc(first)} neste mês (parcelas em aberto)</span><b>${money(c.openPart)}</b></div></div>
-${c.waiting.length&&c.part?`<div class="form-actions" style="margin-top:10px;flex-wrap:wrap;gap:6px"><button class="d-btn light" type="button" data-pr-rep="rule">Repassar pela regra</button><button class="d-btn" type="button" data-pr-rep="prop">Repassar pelo proporcional (${c.part?String(Math.round(c.prop/c.part*1000)/10).replace('.',','):0}%)</button></div>`:''}
+${cr.waiting.length&&cr.part?`<div class="form-actions" style="margin-top:10px;flex-wrap:wrap;gap:6px"><button class="d-btn light" type="button" data-pr-rep="rule">Repassar pela regra</button><button class="d-btn" type="button" data-pr-rep="prop">Repassar pelo proporcional (${cr.part?String(Math.round(cr.prop/cr.part*1000)/10).replace('.',','):0}%)</button></div>`:(PV&&c.part?`<div class="pr-note">O repasse fica disponível quando as parcelas forem marcadas como pagas no Financeiro.</div>`:'')}
 <div class="pr-note">A regra combinada é a % que fica guardada no repasse. O proporcional muda conforme o faturamento do mês: mês bom, ela contribui mais; mês fraco, menos.</div></div></div>
-<div class="pr-box" style="margin-top:14px"><h3>Últimos 6 meses</h3><div style="overflow-x:auto"><table class="pr-t"><thead><tr><th>Mês</th><th class="n">Recebido (escritório)</th><th class="n">Parte dela</th><th class="n">Fixas proporcionais</th><th class="n">Pela regra</th></tr></thead><tbody>${hist.map(h=>`<tr><td>${label(h.m)}</td><td class="n">${money(h.total)}</td><td class="n">${money(h.part)}</td><td class="n">${money(h.prop)}</td><td class="n">${money(h.rule)}</td></tr>`).join('')}</tbody></table></div></div>`;
+<div class="pr-box" style="margin-top:14px"><h3>Lançamentos com ${esc(first)} em ${label(ui.m)}</h3>${c.list.length?`<div style="overflow-x:auto"><table class="pr-t pr-list"><thead><tr><th>Cliente</th><th>Lançamento</th><th>Vencimento</th><th>Situação</th><th class="n">Valor</th><th class="n">Parte dela</th></tr></thead><tbody>${c.list.slice().sort((a,b)=>String(a.dueDate||a.date||'').localeCompare(String(b.dueDate||b.date||''))).map(f=>{const cl=f.clientId&&clientById(f.clientId),d=String(f.dueDate||f.date||'').slice(0,10).split('-').reverse().join('/');return `<tr><td>${esc(cl?cl.name:'—')}</td><td>${esc(f.desc||'Honorários')}</td><td>${d}</td><td>${isPaid(f)?(f.repasseAt?'<span style="color:#557a62">Repassado</span>':'<span style="color:#557a62">Recebido</span>'):'<span style="color:#b06a1e">A receber</span>'}</td><td class="n">${money(f.value)}</td><td class="n">${money(c.share(f))} <small style="color:#8d7767">(${String(f.collab.pct).replace('.',',')}%)</small></td></tr>`}).join('')}</tbody></table></div>`:`<div class="muted">Nenhum lançamento com ${esc(first)} neste mês. Para marcar, abra o lançamento no Financeiro e escolha a advogada parceira e a %.</div>`}</div>
+<div class="pr-box" style="margin-top:14px"><h3>Últimos 6 meses</h3><div style="overflow-x:auto"><table class="pr-t"><thead><tr><th>Mês</th><th class="n">${PV?'Previsto':'Recebido'} (escritório)</th><th class="n">Parte dela</th><th class="n">Fixas proporcionais</th><th class="n">Pela regra</th></tr></thead><tbody>${hist.map(h=>`<tr><td>${label(h.m)}</td><td class="n">${money(h.total)}</td><td class="n">${money(h.part)}</td><td class="n">${money(h.prop)}</td><td class="n">${money(h.rule)}</td></tr>`).join('')}</tbody></table></div></div>`;
     document.getElementById('prWho').onchange=e=>{ui.who=e.target.value;render()};
   }
   document.addEventListener('click',e=>{const g=k=>e.target.closest&&e.target.closest('['+k+']');let b;
     if((b=g('data-pr-m'))){ui.m=shift(ui.m,+b.dataset.prM);return render()}
     if(g('data-pr-now')){ui.m=ymOf(new Date());return render()}
+    if((b=g('data-pr-mode'))){ui.mode=b.dataset.prMode;return render()}
     if(g('data-pr-ext')){if(window.kalinyExtratos)window.kalinyExtratos();return}
-    if((b=g('data-pr-rep'))){const c=calc(ui.m,ui.who);if(!window.kalinyRepasse)return;window.kalinyRepasse.repasseModal(ui.who);
+    if((b=g('data-pr-rep'))){const c=calc(ui.m,ui.who,'rec');if(!window.kalinyRepasse)return;window.kalinyRepasse.repasseModal(ui.who);
       if(b.dataset.prRep==='prop'&&c.part)setTimeout(()=>{const fee=document.querySelector('#tm2RepForm [name=fee]');if(fee){fee.value=Math.round(c.prop/c.part*1000)/10;fee.dispatchEvent(new Event('input',{bubbles:true}))}},50)}
   });
   const oR=window.renderAll;window.renderAll=function(){const r=oR.apply(this,arguments);try{const pg=document.getElementById('page-partners');if(pg&&pg.classList.contains('active'))render()}catch(e){console.warn('Parceria:',e)}return r};
   window.kalinyPartners={calc,render};
+})();
+</script>
+<script>
+/* V145.55 — (1) Processo marcado como "Encerrado": sugere pedir a avaliação no Google ao cliente (uma vez por processo).
+   (2) Resumo do mês: página para imprimir/salvar em PDF com financeiro, parceria, clientes, processos, consultas e tarefas. */
+(function(){
+  const S=(typeof session!=='undefined'&&session)||{};if(S.role==='colaboradora')return;
+  const lower=v=>String(v||'').trim().toLowerCase(),pad=n=>String(n).padStart(2,'0');
+  /* ---------- 1) avaliação ao encerrar ---------- */
+  let snap=null;const queue=[];
+  function check(){
+    const now={};(data.processes||[]).forEach(p=>{if(p&&p.id)now[p.id]=lower(p.status)});
+    if(snap){(data.processes||[]).forEach(p=>{if(!p||!p.id)return;const was=snap[p.id];if(was!==undefined&&was!=='encerrado'&&now[p.id]==='encerrado'&&!p.reviewAsked&&p.clientId&&!queue.includes(p.id))queue.push(p.id)})}
+    snap=now;flush();
+  }
+  function flush(){
+    if(!queue.length)return;const m=document.getElementById('modal'),cpg=!!(m&&m.classList.contains('show')&&m.classList.contains('kg-cpage'));if(m&&m.classList.contains('show')&&!cpg){setTimeout(flush,800);return}
+    const id=queue.shift(),p=(data.processes||[]).find(x=>x.id===id);if(!p)return flush();const c=clientById(p.clientId);if(!c)return flush();
+    p.reviewAsked=new Date().toISOString().slice(0,10);p.updatedAt=new Date().toISOString();try{save()}catch(e){}
+    const link=(window.kgReviewLink&&window.kgReviewLink())||'';if(!link||!window.kalinyReviewText)return flush();
+    let n=String(c.phone||'').replace(/\D/g,'');if(n.length===10||n.length===11)n='55'+n;
+    openModal('Processo encerrado 🎉',`<p style="margin-top:0">O processo <b>${esc(p.number||p.subject||'')}</b> de <b>${esc(c.name)}</b> foi encerrado.</p><p>Que tal pedir uma avaliação no Google? Avaliações de clientes atendidos ajudam o escritório a aparecer para quem procura advogada em Cascavel.</p>
+<div class="form-actions" style="flex-wrap:wrap;gap:8px">${n.length>=12?`<a class="d-btn" id="rvGo" href="https://wa.me/${n}?text=${encodeURIComponent(window.kalinyReviewText(c))}" target="_blank" rel="noopener">⭐ Pedir avaliação no WhatsApp</a>`:`<button class="d-btn" type="button" id="rvCopy">⭐ Copiar mensagem (cliente sem WhatsApp)</button>`}<button class="d-btn light" type="button" id="rvNo">Agora não</button></div>
+<div class="mini-help">Peça só a quem ficou satisfeito, sem oferecer nada em troca.</div>`);
+    const hm=/^#cliente\/(.+)$/.exec(location.hash),backId=hm?decodeURIComponent(hm[1]):c.id;const done=()=>{closeModal();if(cpg&&clientById(backId))try{viewClient(backId)}catch(e){}};const go=document.getElementById('rvGo');if(go)go.onclick=()=>setTimeout(()=>{done();toast('Pedido de avaliação aberto no WhatsApp')},100);
+    const cp=document.getElementById('rvCopy');if(cp)cp.onclick=async()=>{try{await navigator.clipboard.writeText(window.kalinyReviewText(c));toast('Mensagem copiada')}catch(e){}done()};
+    document.getElementById('rvNo').onclick=()=>done();
+  }
+  const oR=window.renderAll;window.renderAll=function(){const r=oR.apply(this,arguments);try{check()}catch(e){console.warn('Avaliação ao encerrar:',e)}return r};
+  setTimeout(()=>{try{if(!snap)check()}catch(e){}},1500);
+  /* ---------- 2) resumo do mês ---------- */
+  const MF=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+  const isPaid=f=>['pago','recebido'].includes(lower(f.status)),isIn=f=>f.type!=='despesa';
+  const ym=v=>{const s=String(v||'');let m=s.match(/^(\d{4})-(\d{2})/);if(m)return m[1]+'-'+m[2];m=s.match(/^\d{2}\/(\d{2})\/(\d{4})/);return m?m[2]+'-'+m[1]:''};
+  const br=s=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(s||'');return m?m[3]+'/'+m[2]+'/'+m[1]:String(s||'')};
+  function report(m){
+    const [Y,M]=m.split('-').map(Number),next=Y+'-'+pad(M===12?1:M+1),nextY=M===12?Y+1:Y,nx=nextY+'-'+pad(M===12?1:M+1);
+    const F=(data.finance||[]).filter(f=>f&&!f.deletedAt),wh=f=>ym(isPaid(f)?(f.paidAt||f.dueDate||f.date):(f.dueDate||f.date));
+    const recv=F.filter(f=>isIn(f)&&isPaid(f)&&wh(f)===m),paid=F.filter(f=>!isIn(f)&&isPaid(f)&&wh(f)===m),sum=a=>a.reduce((s,f)=>s+Number(f.value||0),0);
+    const today=new Date().toISOString().slice(0,10),over=F.filter(f=>isIn(f)&&!isPaid(f)&&String(f.dueDate||f.date||'')<today),toPay=F.filter(f=>!isIn(f)&&!isPaid(f)&&wh(f)===m);
+    const byCli={};recv.forEach(f=>{const c=f.clientId?clientById(f.clientId):null,k=c?c.name:'Sem cliente';byCli[k]=(byCli[k]||0)+Number(f.value||0)});
+    const top=Object.entries(byCli).sort((a,b)=>b[1]-a[1]).slice(0,5);
+    const byCat={};paid.forEach(f=>{const k=f.category||'Outras despesas';byCat[k]=(byCat[k]||0)+Number(f.value||0)});
+    const coll={};recv.filter(f=>f.collab&&f.collab.email).forEach(f=>{const k=f.collab.name||f.collab.email;coll[k]=(coll[k]||0)+Number(f.value||0)*Number(f.collab.pct||0)/100});
+    const reps=F.filter(f=>Array.isArray(f.repasseOf)&&ym(f.date)===m);
+    const newCli=(data.clients||[]).filter(c=>ym(c.createdAt||c.date)===m);
+    const P=(data.processes||[]).filter(p=>p&&!p.deletedAt),newP=P.filter(p=>ym(p.createdAt||p.date)===m),closed=P.filter(p=>lower(p.status)==='encerrado'&&ym(p.updatedAt||p.updated)===m);
+    const dls=[];P.forEach(p=>{if(lower(p.status)==='encerrado')return;(Array.isArray(p.deadlines)?p.deadlines:[]).filter(d=>d&&!/conclu/i.test(d.status||'')).forEach(d=>{if(ym(d.date)===nx)dls.push({d:String(d.date).slice(0,10),t:d.title||'Prazo',p})});if(p.deadline&&ym(p.deadline)===nx&&!dls.some(x=>x.p===p&&x.d===String(p.deadline).slice(0,10)))dls.push({d:String(p.deadline).slice(0,10),t:'Próximo prazo',p})});dls.sort((a,b)=>a.d.localeCompare(b.d));
+    const ag=(data.agenda||[]).filter(e=>e&&ym(e.date)===m&&lower(e.status)!=='cancelado'),site=ag.filter(e=>e.onlineId||lower(e.source)==='site');
+    const T=(data.tasks||[]).filter(t=>t&&!t.deletedAt),tDone=T.filter(t=>t.status==='feita'&&ym(t.doneAt||t.updatedAt)===m),tOpen=T.filter(t=>t.status!=='feita');
+    const cn=id=>{const c=id?clientById(id):null;return c?c.name:''};
+    const row=(a,b)=>`<tr><td>${a}</td><td class="n">${b}</td></tr>`;
+    const w=window.open('','_blank');if(!w){toast('Permita a abertura de janelas para ver o resumo');return}
+    w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Resumo de ${MF[M-1]} de ${Y} — Kaliny Girardi Advocacia</title><style>body{font-family:Arial,sans-serif;color:#382319;max-width:820px;margin:28px auto;padding:0 20px;font-size:13px}h1{font:500 28px Georgia,serif;margin:6px 0 2px}h2{font:500 18px Georgia,serif;margin:22px 0 8px;border-bottom:1px solid #eaded2;padding-bottom:4px}.m{color:#7a5d4a}.ks{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.k{border:1px solid #eaded2;border-radius:10px;padding:8px 10px}.k small{display:block;color:#7a5d4a;font-size:11px}.k b{font:500 18px Georgia,serif}table{width:100%;border-collapse:collapse}td,th{padding:5px 4px;border-bottom:1px solid #f1e8df;text-align:left}th{color:#7a5d4a;font-size:11px}.n{text-align:right;white-space:nowrap}.two{display:grid;grid-template-columns:1fr 1fr;gap:18px}.e{color:#9a8a7c;font-style:italic}@media(max-width:640px){body{margin:16px auto;padding:0 14px}.ks{grid-template-columns:1fr 1fr}.two{grid-template-columns:1fr}td,th{font-size:12px}}@media print{button{display:none}h2{break-after:avoid}}</style></head><body>
+<div class="m">KALINY GIRARDI ADVOCACIA · OAB/PR 118212</div><h1>Resumo de ${MF[M-1]} de ${Y}</h1><div class="m">Gerado em ${new Date().toLocaleDateString('pt-BR')} pelo painel do escritório</div>
+<h2>Financeiro</h2><div class="ks"><div class="k"><small>Recebido</small><b>${money(sum(recv))}</b></div><div class="k"><small>Despesas pagas</small><b>${money(sum(paid))}</b></div><div class="k"><small>Saldo do mês</small><b>${money(sum(recv)-sum(paid))}</b></div><div class="k"><small>Vencido a receber (hoje)</small><b>${money(sum(over))}</b></div></div>
+<div class="two" style="margin-top:10px"><div><b>Quem mais pagou</b><table>${top.length?top.map(([n,v])=>row(esc(n),money(v))).join(''):'<tr><td class="e">Nenhum recebimento no mês</td></tr>'}</table></div><div><b>Despesas por categoria</b><table>${Object.keys(byCat).length?Object.entries(byCat).sort((a,b)=>b[1]-a[1]).map(([n,v])=>row(esc(n),money(v))).join(''):'<tr><td class="e">Nenhuma despesa paga</td></tr>'}</table>${toPay.length?`<p class="m">Ainda a pagar neste mês: ${money(sum(toPay))}</p>`:''}</div></div>
+<h2>Parceria</h2><table>${Object.keys(coll).length?Object.entries(coll).map(([n,v])=>row('Parte de '+esc(n)+' (recebido no mês)',money(v))).join(''):'<tr><td class="e">Nenhum recebimento com parceira no mês</td></tr>'}${reps.map(r=>row('Repasse em '+br(r.date)+' — '+esc(String(r.desc||'').replace(/^Repasse — /,'')),money(r.value))).join('')}</table>
+<div class="two"><div><h2>Clientes novos (${newCli.length})</h2><table>${newCli.length?newCli.slice(0,30).map(c=>`<tr><td>${esc(c.name)}</td><td class="m">${esc(c.area||'')}</td></tr>`).join(''):'<tr><td class="e">Nenhum</td></tr>'}</table></div>
+<div><h2>Processos</h2><table>${row('Novos no mês',newP.length)}${row('Encerrados no mês',closed.length)}${row('Ativos hoje',P.filter(p=>lower(p.status)!=='encerrado').length)}</table></div></div>
+<h2>Prazos de ${MF[(M===12?1:M+1)-1]} (${dls.length})</h2><table>${dls.length?'<tr><th>Data</th><th>Prazo</th><th>Processo</th><th>Cliente</th></tr>'+dls.map(x=>`<tr><td>${br(x.d)}</td><td>${esc(x.t)}</td><td>${esc(x.p.number||'')}</td><td>${esc(cn(x.p.clientId))}</td></tr>`).join(''):'<tr><td class="e">Nenhum prazo cadastrado para o mês que vem</td></tr>'}</table>
+<div class="two"><div><h2>Consultas e compromissos</h2><table>${row('Compromissos no mês',ag.length)}${row('Agendados pelo site',site.length)}</table></div><div><h2>Tarefas</h2><table>${row('Concluídas no mês',tDone.length)}${row('Pendentes hoje',tOpen.length)}</table></div></div>
+<p style="text-align:center;margin-top:26px"><button onclick="print()" style="padding:10px 18px;font-size:14px">Imprimir / salvar em PDF</button></p></body></html>`);w.document.close();
+  }
+  window.kalinyMonthReport=report;
+  function button(){const box=document.querySelector('#page-overview .overview-welcome > div');if(!box||document.getElementById('rmOpen'))return;
+    box.insertAdjacentHTML('beforeend',`<div style="margin-top:10px;display:flex;gap:6px;align-items:center;flex-wrap:wrap"><button class="d-btn light" type="button" id="rmOpen">📄 Resumo do mês</button><select id="rmMonth" style="border:1px solid #eaded2;border-radius:999px;padding:7px 10px;background:#fff;font-size:13px">${Array.from({length:12},(_,i)=>{const d=new Date();d.setDate(1);d.setMonth(d.getMonth()-i);const k=d.getFullYear()+'-'+pad(d.getMonth()+1);return `<option value="${k}">${MF[d.getMonth()]} de ${d.getFullYear()}</option>`}).join('')}</select></div>`);
+    document.getElementById('rmOpen').onclick=()=>report(document.getElementById('rmMonth').value)}
+  const oR2=window.renderAll;window.renderAll=function(){const r=oR2.apply(this,arguments);try{button()}catch(e){}return r};setTimeout(button,1300);
 })();
 </script>
 </body></html>
