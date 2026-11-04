@@ -774,6 +774,9 @@ async function saveClientFromForm(){
     const name=String(f.get('name')||'').trim();
     if(!name){toast('Informe o nome do cliente');return}
     if(!Array.isArray(data.clients))data.clients=[];
+    {const dg=s=>String(s||'').replace(/\D/g,''),nn=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim(),cpf=dg(f.get('cpf'));
+     const same=data.clients.find(c=>(cpf.length===11&&dg(c.cpf)===cpf)||nn(c.name)===nn(name));
+     if(same&&!confirm('Já existe um cliente '+(cpf.length===11&&dg(same.cpf)===cpf?'com este CPF':'com este nome')+': "'+same.name+'".\n\nCadastrar mesmo assim?'))return}
 
     const client={
       id:'cli_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),
@@ -1481,7 +1484,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
    Regras: vence a alteração mais recente (updatedAt); exclusões viram marcação (deletedAt);
    resposta vazia ou com erro do servidor nunca apaga dados deste navegador. */
 (function(){
-  const VERSION='V145.52';
+  const VERSION='V145.53';
   const META_KEY='kaliny_sync_meta_v1';
   const COLLECTIONS=['processes','finance','notes','calcHistory','previdenciario','documents','tasks','agenda'];
   const IS_COLLAB=(typeof session!=='undefined'&&session&&session.role==='colaboradora'),COLLAB_PUSH=new Set(['finance','tasks']);let warnedForbidden=false;
@@ -2686,7 +2689,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
   function row(f){
     const c=f.clientId?clientById(f.clientId):null,neg=!isIn(f),d=refDate(f);
     const wa=isIn(f)&&!isPaid(f)&&c&&waNumber(c.phone)?`<button class="fa-ic" type="button" data-fin-wa="${esc(String(f.id))}" title="${state(f)==='overdue'?'Cobrar':'Lembrar'} no WhatsApp">💬</button>`:'';
-    return `<div class="fa-row">${pill(f)}<span class="fa-date">${br(d)}</span><div class="fa-desc"><b title="${esc(f.desc||'')}">${esc(f.desc||'Lançamento')}</b><span>${[c?esc(c.name):'',esc(category(f)),f.paymentMethod||f.formaPagamento?esc(f.paymentMethod||f.formaPagamento):'',f.collab&&f.collab.pct?'👤 '+esc(String(f.collab.name||f.collab.email).split(' ')[0])+' '+esc(String(f.collab.pct))+'%':'',f.createdBy&&f.type==='despesa'?'lançada por '+esc(String(f.createdBy).split('@')[0]):''].filter(Boolean).join(' · ')}</span></div><span class="fa-val" style="color:${neg?C.expense:C.received}">${neg?'−':'+'} ${money(f.value)}</span><div class="fa-act">${wa}${isIn(f)&&isPaid(f)&&c?`<button class="fa-ic" type="button" data-x-recibo="${esc(String(f.id))}" title="Gerar recibo">🧾</button>`:''}<button class="fa-ic" type="button" data-fa-edit="${esc(String(f.id))}" title="Editar">✎</button><button class="fa-ic" type="button" data-fa-dup="${esc(String(f.id))}" title="Duplicar">⧉</button><button class="fa-ic" type="button" data-fa-del="${esc(String(f.id))}" title="Excluir">🗑</button></div></div>`;
+    return `<div class="fa-row">${pill(f)}<span class="fa-date">${br(d)}</span><div class="fa-desc"><b title="${esc(f.desc||'')}">${esc(f.desc||'Lançamento')}</b><span>${[c?esc(c.name):'',esc(category(f)),f.paymentMethod||f.formaPagamento?esc(f.paymentMethod||f.formaPagamento):'',f.collab&&f.collab.pct?'👤 '+esc(String(f.collab.name||f.collab.email).split(' ')[0])+' '+esc(String(f.collab.pct))+'%':'',f.createdBy&&f.type==='despesa'?'lançada por '+esc(String(f.createdBy).split('@')[0]):'',f.notes?'<span title="'+esc(f.notes)+'">📝 '+esc(String(f.notes).slice(0,60))+(String(f.notes).length>60?'…':'')+'</span>':''].filter(Boolean).join(' · ')}</span></div><span class="fa-val" style="color:${neg?C.expense:C.received}">${neg?'−':'+'} ${money(f.value)}</span><div class="fa-act">${wa}${isIn(f)&&isPaid(f)&&c?`<button class="fa-ic" type="button" data-x-recibo="${esc(String(f.id))}" title="Gerar recibo">🧾</button>`:''}<button class="fa-ic" type="button" data-fa-edit="${esc(String(f.id))}" title="Editar">✎</button><button class="fa-ic" type="button" data-fa-dup="${esc(String(f.id))}" title="Duplicar">⧉</button><button class="fa-ic" type="button" data-fa-del="${esc(String(f.id))}" title="Excluir">🗑</button></div></div>`;
   }
   function listView(list,{groupBy='month'}={}){
     if(!list.length)return '<div class="fa-empty">Nenhum lançamento aqui. Use <b>+ Novo lançamento</b> para começar.</div>';
@@ -2850,6 +2853,9 @@ ${s.k==='fixedId'?'<div class="mini-help" style="margin-top:10px">É uma despesa
 <div class="field" style="grid-column:1/-1"><label>Categoria</label><div class="fq-chips" id="fqCats"></div></div>
 <div class="field"><label>Situação</label><div class="fq-chips" id="fqStatus"></div></div>
 <div class="field"><label>Forma de pagamento</label><select name="paymentMethod">${METHODS.map(m=>`<option ${(f.paymentMethod||f.formaPagamento)===m?'selected':''}>${m}</option>`).join('')}</select></div>
+<div class="field full"><label>Observação</label><textarea name="obs" rows="2" placeholder="Opcional — ex.: pago pela mãe do cliente, combinado desconto…">${esc(f.notes||'')}</textarea></div>
+${(()=>{let t=[];try{t=JSON.parse(localStorage.getItem('kaliny_team_v1')||'[]')||[]}catch(e){}const cur=f.collab||{};
+  return `<div class="field fq-collab"><label>Advogada parceira (receitas)</label><select name="collabEmail"><option value="">Nenhuma</option>${t.filter(u=>u&&u.email).map(u=>`<option value="${esc(u.email)}" ${String(u.email).toLowerCase()===String(cur.email||'').toLowerCase()?'selected':''}>${esc(u.name||u.email)}</option>`).join('')}</select>${t.length?'':'<div class="mini-help">Convide a parceira em Configurações → Equipe para ela aparecer aqui.</div>'}</div><div class="field fq-collab"><label>% da parceira</label><input name="collabPct" type="number" min="0" max="100" step="0.5" value="${cur.pct!=null?esc(String(cur.pct)):''}" placeholder="ex.: 30"></div>`})()}
 </div>
 ${edit?(f.installmentLabel?`<p class="muted" style="font-size:13px">Parte de um parcelamento: <b>${esc(f.installmentLabel)}</b>. A alteração vale só para esta parcela.</p>`:''):`
 <div class="fq-box"><label class="tgl"><input type="checkbox" id="fqSplit"> Dividir em parcelas</label><div id="fqSplitBox" hidden><div class="form-grid" style="margin-top:10px">
@@ -2908,9 +2914,15 @@ ${edit?(f.installmentLabel?`<p class="muted" style="font-size:13px">Parte de um 
     async function submit(again){
       const v=parseBRMoney(form.value.value);if(!v){toast('Informe o valor');form.value.focus();return}
       const desc=String(form.desc.value||'').trim();if(!desc){toast('Informe a descrição');form.desc.focus();return}
-      const common={clientId:String(form.clientId.value||''),type:curType(),category:cat,paymentMethod:form.paymentMethod.value};
+      const common={clientId:String(form.clientId.value||''),type:curType(),category:cat,paymentMethod:form.paymentMethod.value,notes:String(form.obs&&form.obs.value||'').trim().slice(0,1000)};
+      // V145.53: parceira e % direto no lançamento (receitas)
+      const cE=form.collabEmail?String(form.collabEmail.value||''):'',cP=Math.max(0,Math.min(100,Number(String(form.collabPct&&form.collabPct.value||'').replace(',','.'))||0));
+      let team=[];try{team=JSON.parse(localStorage.getItem('kaliny_team_v1')||'[]')||[]}catch(e){}
+      const collab=common.type==='receita'&&cE&&cP>0?{email:cE,name:(team.find(u=>String(u.email).toLowerCase()===cE.toLowerCase())||{}).name||cE,pct:cP}:null;
+      if(collab)common.collab=collab;
+      if(collab&&common.clientId){const cc=clientById(common.clientId);if(cc){cc.team=Array.isArray(cc.team)?cc.team:[];if(!cc.team.map(x=>String(x).toLowerCase()).includes(cE.toLowerCase())){cc.team.push(cE);try{saveClientRemote(cc,true)}catch(e){}}}}
       if(edit){
-        Object.assign(f,common,{desc,value:v,dueDate:form.dueDate.value,date:f.date||form.dueDate.value,status});
+        Object.assign(f,common,{desc,value:v,dueDate:form.dueDate.value,date:f.date||form.dueDate.value,status});if(!collab)delete f.collab;if(!common.notes)delete f.notes;
         if(status==='pago'&&!f.paidAt)f.paidAt=iso(new Date());if(status!=='pago')delete f.paidAt;
         save();closeModal();snack('Lançamento atualizado');return;
       }
@@ -3051,9 +3063,10 @@ ${edit?(f.installmentLabel?`<p class="muted" style="font-size:13px">Parte de um 
     const rows=list.map(c=>{const i=infos.get(String(c.id)),id=esc(String(c.id)),wa=waNumber(c.phone);
       const tags=[c.area?tag(esc(c.area)):'',(c.status||'Ativo')==='Inativo'?tag('Inativo'):'',i.act.length?tag(`⚖ ${i.act.length} processo${i.act.length>1?'s':''}`):'',
         i.dl?tag(`⏳ prazo ${countdown(i.dl.date)}`,days(i.dl.date)<=3?C.bad:C.warn):'',i.overdue?tag('⚠ '+money(i.overdue)+' vencido',C.bad):i.open?tag(money(i.open)+' a receber',C.warn):'',
+        (window.kalinyDupIds&&window.kalinyDupIds().has(String(c.id)))?`<span class="k-tag" data-k-dup="1" title="Há outro cadastro com o mesmo CPF ou nome" style="background:#fbf0dc;color:#a8741a;cursor:pointer">⚠ cadastro repetido — juntar</span>`:'',
         i.missing.length?`<span class="k-tag" title="Para gerar procuração e declarações, complete o cadastro" style="background:#eef2f7;color:#41658a">📝 falta ${esc(i.missing.join(', '))}</span>`:''].join('');
       return `<div class="k-row"><div class="k-av">${esc(initials(c.name))}</div><div class="k-main"><b data-k-open-client="${id}">${esc(c.name||'Sem nome')}</b><div class="k-meta">${[c.phone?esc(typeof formatBrazilPhone==='function'?formatBrazilPhone(c.phone):c.phone):'sem telefone',c.cpf?'CPF '+esc(c.cpf):'',c.city?esc(c.city):''].filter(Boolean).join(' · ')}</div><div class="k-tags">${tags}</div></div>
-<div class="k-act"><button class="k-ic" type="button" data-k-open-client="${id}">Ficha</button>${wa?`<a class="k-ic" href="https://wa.me/${wa}" target="_blank" rel="noopener" title="Abrir conversa no WhatsApp">💬</a>`:''}<button class="k-ic" type="button" data-k-edit-client="${id}" title="Editar cadastro">✎</button><button class="k-ic" type="button" data-k-new-proc="${id}" title="Novo processo">+ Processo</button><button class="k-ic" type="button" data-k-new-fin="${id}" title="Novo lançamento financeiro">+ R$</button><button class="k-ic" type="button" data-k-proc-doc="${id}" title="Gerar procuração">📄</button></div></div>`}).join('');
+<div class="k-act"><button class="k-ic" type="button" data-k-open-client="${id}">Ficha</button>${wa?`<a class="k-ic" href="https://wa.me/${wa}" target="_blank" rel="noopener" title="Abrir conversa no WhatsApp">💬</a>`:''}<button class="k-ic" type="button" data-k-edit-client="${id}" title="Editar cadastro">✎</button><button class="k-ic" type="button" data-k-new-proc="${id}" title="Novo processo">+ Processo</button><button class="k-ic" type="button" data-k-new-fin="${id}" title="Novo lançamento financeiro">+ R$</button><button class="k-ic" type="button" data-k-proc-doc="${id}" title="Gerar procuração">📄</button><button class="k-ic" type="button" data-k-del-client="${id}" title="Excluir cadastro">🗑</button></div></div>`}).join('');
     const incompleteTip=u.kpi==='incompleto'?`<div class="k-tip">📝 <b>Por que completar?</b> Com CPF, RG e endereço preenchidos, a procuração e as declarações saem prontas, sem precisar digitar nada. Clique em ✎ para completar.</div>`:'';
     app.innerHTML=`<style>${css}</style>
 <div class="k-kpis">${kpi('c','','Clientes ativos',active.length,all.length-active.length?(all.length-active.length)+' inativo(s)':'')}${kpi('c','novos','Novos no mês',cnt(month),MONTHS_FULL[t.getMonth()])}${kpi('c','processo','Com processo ativo',cnt(K.processo),'')}${kpi('c','vencido','Com valor vencido',cnt(K.vencido),cnt(K.vencido)?'cobrar':'nenhum')}${kpi('c','incompleto','Cadastro incompleto',cnt(K.incompleto),'faltam dados para documentos')}</div>
@@ -5030,6 +5043,16 @@ ${st.fixed.length&&missing?`<div class="form-actions"><button class="d-btn light
   });
   const oR=window.renderAll;window.renderAll=function(){const r=oR.apply(this,arguments);try{button()}catch(e){}return r};setTimeout(button,1500);
   window.kalinyConferir={dups,conferir,orphans,open};
+})();
+</script>
+<script>
+/* V145.53: lista de clientes — 🗑 excluir e "cadastro repetido" (abre Conferir cadastros). */
+(function(){
+  let cache={at:0,set:new Set()};
+  window.kalinyDupIds=()=>{if(Date.now()-cache.at<1500)return cache.set;const s=new Set();try{(window.kalinyConferir?window.kalinyConferir.dups():[]).forEach(p=>{s.add(String(p.keep.id));s.add(String(p.drop.id))})}catch(e){}cache={at:Date.now(),set:s};return s};
+  document.addEventListener('click',e=>{const g=k=>e.target.closest&&e.target.closest('['+k+']');let b;
+    if((b=g('data-k-del-client'))){e.preventDefault();e.stopPropagation();cache.at=0;deleteClient(b.dataset.kDelClient);return}
+    if(g('data-k-dup')){e.preventDefault();e.stopPropagation();if(window.kalinyConferir)window.kalinyConferir.open()}},true);
 })();
 </script>
 </body></html>
