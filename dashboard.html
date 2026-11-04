@@ -1485,7 +1485,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
    Regras: vence a alteração mais recente (updatedAt); exclusões viram marcação (deletedAt);
    resposta vazia ou com erro do servidor nunca apaga dados deste navegador. */
 (function(){
-  const VERSION='V145.60';
+  const VERSION='V145.61';
   const META_KEY='kaliny_sync_meta_v1';
   const COLLECTIONS=['processes','finance','notes','calcHistory','previdenciario','documents','tasks','agenda'];
   const IS_COLLAB=(typeof session!=='undefined'&&session&&session.role==='colaboradora'),COLLAB_PUSH=new Set(['finance','tasks']);let warnedForbidden=false;
@@ -1592,7 +1592,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
         markSynced(col,l);
       }
       if(IS_COLLAB){ // colaboradora: o servidor manda só o que ela pode ver — o resto sai deste aparelho
-        const before=list(col).length;data[col]=list(col).filter(x=>{const id=String(x&&x.id||'');return remoteIds.has(id)||(COLLAB_PUSH.has(col)&&isPending(col,id))});if(data[col].length!==before)changed=true;
+        const before=list(col).length;data[col]=list(col).filter(x=>{const id=String(x&&x.id||'');return remoteIds.has(id)||(COLLAB_PUSH.has(col)&&isPending(col,id))||(col==='agenda'&&(x.onlineId||id.indexOf('evt_online_')===0))});if(data[col].length!==before)changed=true;
       }else
       // Itens daqui que a planilha não tem: reenviar (nunca apagar).
       list(col).forEach(x=>{const id=String(x&&x.id||'');if(id&&!remoteIds.has(id)&&meta[col][id])meta[col][id].s=''});
@@ -4395,18 +4395,25 @@ body.kg-collab [onclick^="openDocumentUpload"],body.kg-collab [onclick^="openPro
   });
 
   /* ---------- financeiro da colaboradora ---------- */
-  function myClients(){return (data.clients||[]).slice().sort((a,b)=>String(a.name).localeCompare(String(b.name)))}
+  function myClients(){const all=(data.clients||[]),flag=all.some(c=>c&&c.myCase);return all.filter(c=>c&&(!flag||c.myCase)).slice().sort((a,b)=>String(a.name).localeCompare(String(b.name)))}
   function renderCollabFinance(){
     const el=document.getElementById('finApp')||document.querySelector('#page-finance .d-panel');if(!el)return;style();
-    const all=(data.finance||[]).filter(f=>f&&!f.deletedAt),rec=all.filter(f=>f.type!=='despesa'),desp=all.filter(f=>f.type==='despesa');
+    // V145.61: comissão dela, taxa fixa dela, despesas dos casos dela (editáveis) e despesas do escritório (só leitura)
+    const all=(data.finance||[]).filter(f=>f&&!f.deletedAt),fee=all.filter(f=>f.partnerFee),rec=all.filter(f=>f.type!=='despesa'&&!f.partnerFee);
+    const despAll=all.filter(f=>f.type==='despesa'&&!Array.isArray(f.repasseOf)),mine=new Set(myClients().map(c=>String(c.id)));
+    const desp=despAll.filter(f=>f.clientId&&mine.has(String(f.clientId))),office=despAll.filter(f=>!(f.clientId&&mine.has(String(f.clientId))));
     const sum=a=>a.reduce((s,f)=>s+Number(f.value||0),0),open=rec.filter(f=>!isPaid(f)),paid=rec.filter(isPaid);
-    const d=f=>f.dueDate||f.date||'',cn=f=>{const c=f.clientId?clientById(f.clientId):null;return c?c.name:''};
-    const L=(a,expense)=>a.length?a.slice().sort((x,y)=>String(d(y)).localeCompare(String(d(x)))).map(f=>`<div class="tm-l"><div><b>${esc(f.desc||'Lançamento')}</b><div class="tm-meta">${[cn(f),br(d(f)),isPaid(f)?(expense?'paga':'recebida'):(d(f)&&d(f)<todayIso()?'vencida':'a vencer'),f.share?('sua comissão: '+f.share.pct+'%'):''].filter(Boolean).map(esc).join(' · ')}</div></div><div style="display:flex;gap:6px;align-items:center"><span class="tm-v" style="color:${expense?'#3f7fbf':C.acc}">${expense?'−':'+'} ${money(f.value)}</span>${expense?`<button class="d-btn light" type="button" data-tm-exp="${esc(f.id)}">✎</button>`:''}</div></div>`).join(''):'<div class="muted" style="padding:8px 2px">Nada por aqui.</div>';
+    const d=f=>f.dueDate||f.date||'',cn=f=>{const c=f.clientId?clientById(f.clientId):null;return c?c.name:''},M=todayIso().slice(0,7),inM=f=>String(d(f)).slice(0,7)===M;
+    const MF=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'],mLabel=MF[Number(M.slice(5))-1]+' de '+M.slice(0,4);
+    const L=(a,kind)=>a.length?a.slice().sort((x,y)=>String(d(y)).localeCompare(String(d(x)))).map(f=>{const expense=kind!=='in',edit=kind==='case';return `<div class="tm-l"><div><b>${esc(f.desc||'Lançamento')}</b><div class="tm-meta">${[cn(f),kind==='office'?(f.category||''):'',br(d(f)),isPaid(f)?(expense?'paga':'recebida'):(d(f)&&d(f)<todayIso()?'vencida':'a vencer'),f.share?('sua comissão: '+f.share.pct+'%'):''].filter(Boolean).map(esc).join(' · ')}</div></div><div style="display:flex;gap:6px;align-items:center"><span class="tm-v" style="color:${expense?'#3f7fbf':C.acc}">${expense?'−':'+'} ${money(f.value)}</span>${edit?`<button class="d-btn light" type="button" data-tm-exp="${esc(f.id)}">✎</button>`:''}</div></div>`}).join(''):'<div class="muted" style="padding:8px 2px">Nada por aqui.</div>';
+    const feeM=fee.filter(inM),officeM=office.filter(inM);
     el.innerHTML=`<div class="tm-myfin"><div class="d-panel-head"><h2>Meu financeiro</h2><button class="d-btn" type="button" data-tm-exp="">+ Nova despesa</button></div>
-<div class="tm-notice">Aqui aparece só a <b>sua comissão</b> nos contratos em que você trabalha e as despesas dos seus casos.</div>
-<div class="tm-kpis"><div class="tm-kpi"><small>Minha parte a receber</small><strong>${money(sum(open))}</strong></div><div class="tm-kpi"><small>Minha parte já recebida</small><strong>${money(sum(paid))}</strong></div><div class="tm-kpi"><small>Despesas dos meus casos</small><strong>${money(sum(desp))}</strong></div></div>
-<h3 style="font:500 19px Georgia,serif;margin:6px 0 8px">Honorários (minha parte)</h3><div class="tm-list">${L(rec,false)}</div>
-<h3 style="font:500 19px Georgia,serif;margin:16px 0 8px">Despesas dos meus casos</h3><div class="tm-list">${L(desp,true)}</div></div>`;
+<div class="tm-notice">Aqui aparecem a <b>sua comissão</b>, a <b>taxa fixa</b> da parceria, as despesas dos seus casos e as <b>despesas do escritório</b>. As receitas do escritório não aparecem.</div>
+<div class="tm-kpis"><div class="tm-kpi"><small>Minha comissão a receber</small><strong>${money(sum(open))}</strong></div><div class="tm-kpi"><small>Minha comissão já recebida</small><strong>${money(sum(paid))}</strong></div><div class="tm-kpi"><small>Taxa fixa de ${esc(MF[Number(M.slice(5))-1])}</small><strong>${feeM.length?money(sum(feeM)):'—'}</strong></div><div class="tm-kpi"><small>Despesas do escritório no mês</small><strong>${money(sum(officeM))}</strong></div></div>
+<h3 style="font:500 19px Georgia,serif;margin:6px 0 8px">Honorários (minha comissão)</h3><div class="tm-list">${L(rec,'in')}</div>
+${fee.length?`<h3 style="font:500 19px Georgia,serif;margin:16px 0 8px">Taxa fixa da parceria</h3><div class="mini-help" style="margin:-4px 0 8px">Descontada no repasse do mês.</div><div class="tm-list">${L(fee.filter(f=>String(d(f)).slice(0,7)<=M).slice(-6).concat(fee.filter(f=>String(d(f)).slice(0,7)>M).slice(0,1)),'fee')}</div>`:''}
+<h3 style="font:500 19px Georgia,serif;margin:16px 0 8px">Despesas dos meus casos</h3><div class="tm-list">${L(desp,'case')}</div>
+<h3 style="font:500 19px Georgia,serif;margin:16px 0 8px">Despesas do escritório — ${esc(mLabel)}</h3><div class="mini-help" style="margin:-4px 0 8px">Aluguel, internet, sistemas e outras contas do escritório. Só para consulta.</div><div class="tm-list">${L(officeM,'office')}</div></div>`;
   }
   function expenseForm(f){
     f=f||{};const cl=myClients();
