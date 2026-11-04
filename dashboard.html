@@ -336,7 +336,7 @@ const ROLE_PAGES={
 function can(page){return (ROLE_PAGES[session?.role]||ROLE_PAGES['Administradora']).includes(page)}
 function touchSession(){const raw=sessionStorage.getItem(AUTH_KEY);if(!raw)return false;try{const s=JSON.parse(raw);const age=Date.now()-new Date(s.loginAt).getTime();if(age>=SESSION_MS){sessionStorage.removeItem(AUTH_KEY);location.href='gestao/';return false}s.loginAt=new Date().toISOString();sessionStorage.setItem(AUTH_KEY,JSON.stringify(s));return true}catch(e){return false}}
 const session=JSON.parse(sessionStorage.getItem(AUTH_KEY)||'null');
-if(!session){location.href='gestao/';throw new Error('Sessão não encontrada');}
+if(!session){try{if(/pacote=/.test(location.hash))localStorage.setItem('kaliny_pending_pack',JSON.stringify({h:location.hash,t:Date.now()}))}catch(e){}location.href='gestao/';throw new Error('Sessão não encontrada');}
 const KEY='kaliny_v6_data';const RECENT_KEY='kaliny_recent_clients';const base={clients:[],agenda:[],finance:[],calcHistory:[],documents:[],processes:[],notes:[],previdenciario:[],tasks:[]};let storedData=null;try{storedData=JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){storedData=null}let data={...base,...(storedData&&typeof storedData==='object'?storedData:{})};Object.keys(base).forEach(k=>{if(!Array.isArray(data[k]))data[k]=[]});function ensureRecordIds(){let changed=false;const ensure=(arr,prefix)=>{const used=new Set();arr.forEach((item,i)=>{let id=String(item?.id||'').trim();if(!id||used.has(id)){id=prefix+Date.now()+'_'+i+'_'+Math.random().toString(36).slice(2,7);item.id=id;changed=true}used.add(id)})};ensure(data.agenda,'evt_');ensure(data.finance,'fin_');ensure(data.processes,'proc_');ensure(data.documents,'doc_');ensure(data.notes,'note_');ensure(data.calcHistory,'calc_');return changed}const idsChanged=ensureRecordIds();if(idsChanged){try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){console.error('Não foi possível normalizar IDs:',e)}}let syncTimer=null;function save(){try{Object.keys(base).forEach(k=>{if(!Array.isArray(data[k]))data[k]=[]});localStorage.setItem(KEY,JSON.stringify(data));}catch(err){console.error('Falha ao salvar:',err);toast('Não foi possível salvar os dados neste navegador. Verifique se o armazenamento local está disponível.');return false}try{renderAll();}catch(err){console.error('Falha ao atualizar a tela:',err)}if(serverMode){clearTimeout(syncTimer);syncTimer=setTimeout(syncToServer,250)}return true}
 async function api(path,options={}){const headers={...(options.headers||{}),'Content-Type':'application/json','Authorization':'Bearer '+session.token};const r=await fetch(API_BASE+path,{...options,headers});if(r.status===401){sessionStorage.removeItem(AUTH_KEY);location.href='gestao/';throw new Error('Não autenticado')}if(!r.ok)throw new Error('API '+r.status);return r.json()}
 
@@ -1485,7 +1485,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
    Regras: vence a alteração mais recente (updatedAt); exclusões viram marcação (deletedAt);
    resposta vazia ou com erro do servidor nunca apaga dados deste navegador. */
 (function(){
-  const VERSION='V145.57';
+  const VERSION='V145.58';
   const META_KEY='kaliny_sync_meta_v1';
   const COLLECTIONS=['processes','finance','notes','calcHistory','previdenciario','documents','tasks','agenda'];
   const IS_COLLAB=(typeof session!=='undefined'&&session&&session.role==='colaboradora'),COLLAB_PUSH=new Set(['finance','tasks']);let warnedForbidden=false;
@@ -5249,9 +5249,9 @@ ${cr.waiting.length&&cr.part?`<div class="form-actions" style="margin-top:10px;f
   }
   window.kalinyPartnerFee={open:openFee,set:setFee,of:feesOf};
   /* ---------- pacote por link ---------- */
-  function readPack(){const m=/[#&]pacote=([A-Za-z0-9_-]+)/.exec(location.hash||'');if(!m)return null;
+  function readPack(){let h=location.hash||'';if(!/pacote=/.test(h)){try{const sv=JSON.parse(localStorage.getItem('kaliny_pending_pack')||'null');if(sv&&sv.h&&Date.now()-Number(sv.t||0)<60*60*1000)h=sv.h;else localStorage.removeItem('kaliny_pending_pack')}catch(e){}}const m=/[#&]pacote=([A-Za-z0-9_-]+)/.exec(h);if(!m)return null;
     try{const b=m[1].replace(/-/g,'+').replace(/_/g,'/');const txt=decodeURIComponent(Array.prototype.map.call(atob(b),c=>'%'+('00'+c.charCodeAt(0).toString(16)).slice(-2)).join(''));const j=JSON.parse(txt);return j&&typeof j==='object'?j:null}catch(e){return null}}
-  const clearHash=()=>{try{history.replaceState(null,'',location.pathname+location.search)}catch(e){location.hash=''}};
+  const clearHash=()=>{try{localStorage.removeItem('kaliny_pending_pack')}catch(e){}if(!/pacote=/.test(location.hash||''))return;try{history.replaceState(null,'',location.pathname+location.search)}catch(e){location.hash=''}};
   function seriesItems(x){const out=[];const n=Math.max(1,Math.min(60,parseInt(x.n,10)||1)),start=Math.max(1,parseInt(x.start,10)||1),tot=Math.max(n,parseInt(x.total,10)||n);
     for(let k=0;k<n;k++){const m=addM(x.from,k),due=dueOf(m,x.day),lab='Parcela '+(start+k)+'/'+tot;out.push({id:'pk_'+slug(x.desc)+'_'+m.replace('-',''),due,lab})}return out}
   async function applyPack(pk){
