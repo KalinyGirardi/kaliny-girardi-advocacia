@@ -1485,7 +1485,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
    Regras: vence a alteração mais recente (updatedAt); exclusões viram marcação (deletedAt);
    resposta vazia ou com erro do servidor nunca apaga dados deste navegador. */
 (function(){
-  const VERSION='V145.64';
+  const VERSION='V145.65';
   const META_KEY='kaliny_sync_meta_v1';
   const COLLECTIONS=['processes','finance','notes','calcHistory','previdenciario','documents','tasks','agenda'];
   const IS_COLLAB=(typeof session!=='undefined'&&session&&session.role==='colaboradora'),COLLAB_PUSH=new Set(['finance','tasks']);let warnedForbidden=false;
@@ -2631,7 +2631,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
   function items(r){return (data.finance||[]).filter(f=>f&&inRange(f,r))}
   function filtered(list){
     const q=lower(ui.q);
-    return list.filter(f=>(!ui.client||String(f.clientId)===ui.client)&&(!ui.type||(ui.type==='in'?isIn(f):!isIn(f)))&&(!ui.status||state(f)===ui.status||(ui.status==='payable'&&state(f)==='late')||(ui.status==='open'&&!isPaid(f)))&&
+    return list.filter(f=>(!ui.client||(ui.client==='__none'?(!f.clientId&&!f.partnerFee):(ui.client.indexOf('pf:')===0?lower(f.partnerFee)===ui.client.slice(3):String(f.clientId)===ui.client)))&&(!ui.type||(ui.type==='in'?isIn(f):!isIn(f)))&&(!ui.status||state(f)===ui.status||(ui.status==='payable'&&state(f)==='late')||(ui.status==='open'&&!isPaid(f)))&&
       (!q||lower(f.desc).includes(q)||lower(clientName(f.clientId)).includes(q)||lower(category(f)).includes(q)||String(f.value).includes(q)));
   }
   function totals(list){const t={received:0,receivable:0,overdue:0,expense:0,payable:0,late:0};list.forEach(f=>{t[state(f)]+=Number(f.value||0)});return t}
@@ -2729,9 +2729,9 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
 <p class="muted" style="font-size:12px">* Previsto = recebido + a receber − pago − a pagar, no mês do vencimento.</p>`;
   }
   function clientsView(){
-    const by=new Map();filtered((data.finance||[]).filter(f=>f&&isIn(f))).forEach(f=>{const k=String(f.clientId||'');if(!by.has(k))by.set(k,[]);by.get(k).push(f)});
+    const by=new Map();filtered((data.finance||[]).filter(f=>f&&isIn(f))).forEach(f=>{const k=f.partnerFee?'pf:'+lower(f.partnerFee):(f.clientId?String(f.clientId):'__none');if(!by.has(k))by.set(k,[]);by.get(k).push(f)});
     if(!by.size)return '<div class="fa-empty">Nenhuma receita vinculada a clientes.</div>';
-    const rows=[...by.entries()].map(([id,arr])=>{const t=totals(arr),total=t.received+t.receivable+t.overdue;return {id,name:clientName(id)||'Sem cliente',t,total}}).sort((a,b)=>b.total-a.total);
+    const rows=[...by.entries()].map(([id,arr])=>{const t=totals(arr),total=t.received+t.receivable+t.overdue;const pfName=()=>{const d=String((arr[0]||{}).desc||'');const m=/—\s*(.+?)\s*\(/.exec(d);return 'Taxa fixa da parceria'+(m?' — '+m[1]:'')};return {id,name:id.startsWith('pf:')?pfName():(id==='__none'?'Sem cliente vinculado':(clientName(id)||'Sem cliente vinculado')),t,total}}).sort((a,b)=>b.total-a.total);
     return rows.map(r=>{const pct=r.total?Math.round(r.t.received/r.total*100):0;return `<div class="fa-client"><div><b>${esc(r.name)}</b><div class="muted" style="font-size:12px;margin:2px 0 6px">Contratado ${money(r.total)} · recebido ${money(r.t.received)} · a receber ${money(r.t.receivable)}${r.t.overdue?` · <span style="color:${C.bad}">⚠ vencido ${money(r.t.overdue)}</span>`:''}</div><div class="fa-track"><div class="fa-fill" style="width:${pct}%;background:${C.received}"></div></div></div><div style="text-align:right"><b>${pct}%</b><div><button class="fa-ic" type="button" data-fa-client="${esc(r.id)}" style="margin-top:6px">Ver lançamentos</button></div></div></div>`}).join('');
   }
   function catsView(list){
@@ -2761,7 +2761,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
 </div>
 <div class="fa-bar fa-filters">
   <input class="fa-search" id="faSearch" placeholder="Buscar por descrição, cliente, categoria ou valor" value="${esc(ui.q)}">
-  <select class="fa-sel" id="faClient"><option value="">Todos os clientes</option>${clients.map(c=>`<option value="${esc(String(c.id))}" ${ui.client===String(c.id)?'selected':''}>${esc(c.name)}</option>`).join('')}</select>
+  <select class="fa-sel" id="faClient"><option value="">Todos os clientes</option><option value="__none" ${ui.client==='__none'?'selected':''}>Sem cliente vinculado</option>${[...new Set((data.finance||[]).filter(f=>f&&f.partnerFee&&!f.deletedAt).map(f=>lower(f.partnerFee)))].map(e=>{const f=(data.finance||[]).find(x=>x&&lower(x.partnerFee)===e),m=/—\s*(.+?)\s*\(/.exec(String(f&&f.desc||''));return `<option value="pf:${esc(e)}" ${ui.client==='pf:'+e?'selected':''}>Taxa fixa — ${esc(m?m[1]:e)}</option>`}).join('')}${clients.map(c=>`<option value="${esc(String(c.id))}" ${ui.client===String(c.id)?'selected':''}>${esc(c.name)}</option>`).join('')}</select>
   <select class="fa-sel" id="faType"><option value="">Entradas e saídas</option><option value="in" ${ui.type==='in'?'selected':''}>Só entradas</option><option value="out" ${ui.type==='out'?'selected':''}>Só saídas</option></select>
   ${ui.q||ui.client||ui.type||ui.status?'<button class="fa-chip" type="button" data-fa-clear>✕ Limpar filtros</button>':''}
 </div>
@@ -4358,7 +4358,7 @@ body.kg-collab [onclick^="openDocumentUpload"],body.kg-collab [onclick^="openPro
   function taskRow(t){
     const done=t.status==='feita',late=!done&&t.dueDate&&t.dueDate<todayIso(),c=t.clientId?clientById(t.clientId):null;
     const coms=(t.comments||[]).slice(-3);
-    return `<div class="tm-card ${done?'tm-done':''}"><div class="tm-row"><button class="tm-chk ${done?'on':''}" type="button" data-tm-toggle="${esc(t.id)}" title="${done?'Reabrir':'Marcar como feita'}">${done?'✓':''}</button><div><b>${esc(t.title||'Tarefa')}</b><div class="tm-meta">${t.dueDate?`<span class="tm-tag ${late?'tm-late':''}">${late?'atrasada · ':''}${br(t.dueDate)}</span>`:''}<span class="tm-tag">👤 ${esc(nameOf(t.assignee))}</span>${c?`<span class="tm-tag">${esc(c.name)}</span>`:''}${t.status==='andamento'?'<span class="tm-tag">em andamento</span>':''}</div>${t.notes?`<div class="tm-meta" style="white-space:pre-wrap">${esc(t.notes)}</div>`:''}</div><div class="tm-act" style="display:flex;gap:6px;flex-wrap:wrap">${!done&&t.status!=='andamento'?`<button class="d-btn light" type="button" data-tm-start="${esc(t.id)}">Comecei</button>`:''}<button class="d-btn light" type="button" data-tm-comment="${esc(t.id)}">💬 Comentar</button>${COLLAB?'':`<button class="d-btn light" type="button" data-tm-edit="${esc(t.id)}">✎</button><button class="d-btn light" type="button" data-tm-del="${esc(t.id)}">🗑</button>`}</div></div>${coms.length?`<div class="tm-com">${coms.map(x=>`<div><small>${esc(x.by)} · ${esc(String(x.at||'').slice(0,10).split('-').reverse().join('/'))}</small><br>${esc(x.text)}</div>`).join('')}</div>`:''}</div>`;
+    return `<div class="tm-card ${done?'tm-done':''}"><div class="tm-row"><button class="tm-chk ${done?'on':''}" type="button" data-tm-toggle="${esc(t.id)}" title="${done?'Reabrir':'Marcar como feita'}">${done?'✓':''}</button><div><b>${esc(t.title||'Tarefa')}</b><div class="tm-meta">${t.dueDate?`<span class="tm-tag ${late?'tm-late':''}">${late?'atrasada · ':''}${br(t.dueDate)}</span>`:''}<span class="tm-tag">👤 ${esc(nameOf(t.assignee))}</span>${c?`<span class="tm-tag">${esc(c.name)}</span>`:''}${t.status==='andamento'?'<span class="tm-tag">em andamento</span>':''}</div>${t.notes?`<div class="tm-meta" style="white-space:pre-wrap">${esc(t.notes)}</div>`:''}</div><div class="tm-act" style="display:flex;gap:6px;flex-wrap:wrap">${!done&&t.status!=='andamento'?`<button class="d-btn light" type="button" data-tm-start="${esc(t.id)}">Comecei</button>`:''}<button class="d-btn light" type="button" data-tm-comment="${esc(t.id)}">💬 Comentar</button>${COLLAB?'':`<button class="d-btn light" type="button" data-tm-edit="${esc(t.id)}">✎</button><button class="d-btn light" type="button" data-tm-del="${esc(t.id)}">🗑</button>`}</div></div>${coms.length?`<div class="tm-com">${coms.map((x,i)=>{const idx=(t.comments||[]).length-coms.length+i,can=!COLLAB||String(x.by||'')===String(MY_NAME||'');return `<div style="position:relative;padding-right:26px"><small>${esc(x.by)} · ${esc(String(x.at||'').slice(0,10).split('-').reverse().join('/'))}</small><br>${esc(x.text)}${can?`<button type="button" class="tm-comdel" data-tm-comdel="${esc(t.id)}|${idx}" title="Excluir comentário" aria-label="Excluir comentário" style="position:absolute;top:2px;right:2px;border:0;background:none;cursor:pointer;color:#9a5a55;font-size:14px;padding:2px 4px">🗑</button>`:''}</div>`}).join('')}</div>`:''}</div>`;
   }
   function renderTasks(){
     const el=document.getElementById('tasksApp');if(!el)return;style();
@@ -4392,6 +4392,7 @@ body.kg-collab [onclick^="openDocumentUpload"],body.kg-collab [onclick^="openPro
     if((b=g('data-tm-del'))){if(!confirm('Excluir esta tarefa?'))return;data.tasks=T().filter(x=>x.id!==b.dataset.tmDel);save();return renderTasks()}
     if((b=g('data-tm-toggle'))){const t=T().find(x=>x.id===b.dataset.tmToggle);if(!t)return;t.status=t.status==='feita'?'pendente':'feita';t.doneAt=t.status==='feita'?todayIso():'';toast(t.status==='feita'?'Tarefa concluída ✓':'Tarefa reaberta');return touch(t)}
     if((b=g('data-tm-start'))){const t=T().find(x=>x.id===b.dataset.tmStart);if(t){t.status='andamento';touch(t)}return}
+    if((b=g('data-tm-comdel'))){const [tid,ix]=b.dataset.tmComdel.split('|');const t=T().find(x=>x.id===tid);if(!t||!Array.isArray(t.comments))return;const i=Number(ix),cm=t.comments[i];if(!cm)return;if(!confirm('Excluir este comentário?\n\n“'+String(cm.text||'').slice(0,120)+'”'))return;t.comments.splice(i,1);return touch(t)}
     if((b=g('data-tm-comment'))){const t=T().find(x=>x.id===b.dataset.tmComment);if(!t)return;const txt=prompt('Comentário sobre "'+(t.title||'tarefa')+'":');if(!txt||!txt.trim())return;t.comments=Array.isArray(t.comments)?t.comments:[];t.comments.push({by:MY_NAME||'Kaliny',at:new Date().toISOString(),text:txt.trim().slice(0,1000)});return touch(t)}
   });
 
@@ -5338,6 +5339,13 @@ ${cr.waiting.length&&cr.part?`<div class="form-actions" style="margin-top:10px;f
   // Parceria ao vivo
   const live=()=>{const pg=document.getElementById('page-partners');if(pg&&pg.classList.contains('active')&&window.kalinyPartners&&!document.querySelector('#modal.show'))try{window.kalinyPartners.render()}catch(e){}};
   setInterval(live,60000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)live()});
+})();
+</script>
+<script>
+/* V145.65 — Com a página do cliente aberta, tocar no menu da esquerda fecha a página do cliente e abre a seção escolhida. */
+(function(){
+  document.addEventListener('click',e=>{const b=e.target&&e.target.closest&&e.target.closest('[data-page]');if(!b||!b.closest('.dash-nav,#mobileDrawer,aside,nav'))return;
+    const m=document.getElementById('modal');if(m&&m.classList.contains('show')&&m.classList.contains('kg-cpage')){try{closeModal()}catch(err){m.classList.remove('show')}}},true);
 })();
 </script>
 </body></html>
