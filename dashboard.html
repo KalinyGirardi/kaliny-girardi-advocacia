@@ -1485,7 +1485,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
    Regras: vence a alteração mais recente (updatedAt); exclusões viram marcação (deletedAt);
    resposta vazia ou com erro do servidor nunca apaga dados deste navegador. */
 (function(){
-  const VERSION='V145.66';
+  const VERSION='V145.67';
   const META_KEY='kaliny_sync_meta_v1';
   const COLLECTIONS=['processes','finance','notes','calcHistory','previdenciario','documents','tasks','agenda'];
   const IS_COLLAB=(typeof session!=='undefined'&&session&&session.role==='colaboradora'),COLLAB_PUSH=new Set(['finance','tasks']);let warnedForbidden=false;
@@ -2854,6 +2854,7 @@ ${s.k==='fixedId'?'<div class="mini-help" style="margin-top:10px">É uma despesa
 <div class="field" style="grid-column:1/-1"><label>Categoria</label><div class="fq-chips" id="fqCats"></div></div>
 <div class="field"><label>Situação</label><div class="fq-chips" id="fqStatus"></div></div>
 <div class="field"><label>Forma de pagamento</label><select name="paymentMethod">${METHODS.map(m=>`<option ${(f.paymentMethod||f.formaPagamento)===m?'selected':''}>${m}</option>`).join('')}</select></div>
+<div class="field" id="fqPaidBox" style="display:none"><label id="fqPaidLbl">Data do recebimento</label><input type="date" name="paidAt" value="${esc(String(f.paidAt||'').slice(0,10)||iso(new Date()))}"></div>
 <div class="field full"><label>Observação</label><textarea name="obs" rows="2" placeholder="Opcional — ex.: pago pela mãe do cliente, combinado desconto…">${esc(f.notes||'')}</textarea>${edit&&seriesOf(f)?`<label style="display:flex;gap:8px;align-items:center;margin-top:6px;font-size:13px;text-transform:none;letter-spacing:0;font-weight:400"><input type="checkbox" id="fqObsAll" style="width:auto"> Usar esta observação em todas as ${seriesOf(f).list.length} parcelas (${esc(seriesOf(f).label)})</label>`:''}</div>
 ${(()=>{let t=[];try{t=JSON.parse(localStorage.getItem('kaliny_team_v1')||'[]')||[]}catch(e){}const cur=f.collab||{};if(typeof session!=='undefined'&&session&&session.role==='colaboradora'&&!t.some(u=>u&&String(u.email).toLowerCase()===String(session.email||'').toLowerCase()))t=t.concat([{email:session.email,name:session.name||session.email}]);
   return `<div class="field fq-collab"><label>Advogada parceira (receitas)</label><select name="collabEmail"><option value="">Nenhuma</option>${t.filter(u=>u&&u.email).map(u=>`<option value="${esc(u.email)}" ${String(u.email).toLowerCase()===String(cur.email||'').toLowerCase()?'selected':''}>${esc(u.name||u.email)}</option>`).join('')}</select>${t.length?'':'<div class="mini-help">Convide a parceira em Configurações → Equipe para ela aparecer aqui.</div>'}</div><div class="field fq-collab"><label>Comissão da parceira (%)</label><input name="collabPct" type="number" min="0" max="100" step="any" value="${cur.pct!=null?esc(String(cur.pct)):''}" placeholder="ex.: 30"></div>`})()}
@@ -2879,6 +2880,7 @@ ${edit?(f.installmentLabel?`<p class="muted" style="font-size:13px">Parte de um 
       form.querySelector('#fqCats').innerHTML=CATS[tp].map(c=>`<label class="${c===cat?'on':''}"><input type="radio" name="cat" value="${esc(c)}" ${c===cat?'checked':''}>${esc(c)}</label>`).join('');
       form.querySelector('#fqStatus').innerHTML=[['pago',tp==='receita'?'✓ Recebido':'✓ Pago'],['pendente',tp==='receita'?'⏳ A receber':'⏳ A pagar']].map(([v,l])=>`<label class="${status===v?'on':''}"><input type="radio" name="st" value="${v}" ${status===v?'checked':''}>${l}</label>`).join('');
       form.querySelectorAll('.fq-seg label').forEach(l=>{const v=l.querySelector('input').value;l.className=v===tp?'on '+(v==='receita'?'in':'out'):''});
+      const pb=form.querySelector('#fqPaidBox');if(pb){pb.style.display=status==='pago'?'':'none';form.querySelector('#fqPaidLbl').textContent=tp==='receita'?'Data do recebimento':'Data do pagamento';pb.querySelector('input').required=status==='pago'}
       preview();
     }
     form.addEventListener('change',e=>{
@@ -2925,13 +2927,13 @@ ${edit?(f.installmentLabel?`<p class="muted" style="font-size:13px">Parte de um 
       if(edit){
         Object.assign(f,common,{desc,value:v,dueDate:form.dueDate.value,date:f.date||form.dueDate.value,status});if(!collab)delete f.collab;if(!common.notes)delete f.notes;
         const oa=form.querySelector('#fqObsAll');if(oa&&oa.checked){const sr=seriesOf(f),nowS=new Date().toISOString();if(sr)sr.list.forEach(x=>{if(x===f)return;if(common.notes)x.notes=common.notes;else delete x.notes;x.updatedAt=nowS})}
-        if(status==='pago'&&!f.paidAt)f.paidAt=iso(new Date());if(status!=='pago')delete f.paidAt;
+        if(status==='pago')f.paidAt=(form.paidAt&&form.paidAt.value)||f.paidAt||iso(new Date());if(status!=='pago')delete f.paidAt;
         save();closeModal();snack('Lançamento atualizado');return;
       }
       const p=plan(),groupId=(p.kind==='split'?'plan_':'rec_')+Date.now()+'_'+Math.random().toString(36).slice(2,6);
       const created=p.rows.map((r,i)=>({id:'fin_'+Date.now()+'_'+i+'_'+Math.random().toString(36).slice(2,6),...common,
         desc:p.kind==='single'?desc:`${desc} — ${p.kind==='split'?r.label:'Mês '+r.label}`,value:r.value,date:iso(r.date),dueDate:iso(r.date),
-        status:r.paid?'pago':(p.kind==='single'?status:'pendente'),...(r.paid?{paidAt:iso(new Date())}:{}),
+        status:r.paid?'pago':(p.kind==='single'?status:'pendente'),...(r.paid?{paidAt:(form.paidAt&&form.paidAt.value)||iso(new Date())}:{}),
         ...(p.kind==='split'?{planId:groupId,planType:'honorarios',installmentLabel:r.label}:{}),...(p.kind==='repeat'?{recurringId:groupId}:{})}));
       data.finance=Array.isArray(data.finance)?data.finance:[];data.finance.push(...created);save();
       snack(created.length>1?created.length+' lançamentos criados':'Lançamento salvo',()=>{const ids=new Set(created.map(x=>x.id));data.finance=data.finance.filter(x=>!ids.has(x.id));save()});
