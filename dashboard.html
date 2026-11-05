@@ -1485,7 +1485,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
    Regras: vence a alteração mais recente (updatedAt); exclusões viram marcação (deletedAt);
    resposta vazia ou com erro do servidor nunca apaga dados deste navegador. */
 (function(){
-  const VERSION='V145.65';
+  const VERSION='V145.66';
   const META_KEY='kaliny_sync_meta_v1';
   const COLLECTIONS=['processes','finance','notes','calcHistory','previdenciario','documents','tasks','agenda'];
   const IS_COLLAB=(typeof session!=='undefined'&&session&&session.role==='colaboradora'),COLLAB_PUSH=new Set(['finance','tasks']);let warnedForbidden=false;
@@ -4500,7 +4500,7 @@ ${shared.length?`<h3 style="font:500 19px Georgia,serif;margin:16px 0 8px">Lanç
     openModal('Repasse para '+p.name,`<form id="tm2RepForm"><p class="muted" style="margin-top:0">Parcelas já recebidas em que ${esc(String(p.name).split(' ')[0])} tem comissão. Marque as que entram neste repasse.</p>
 ${p.items.slice().sort((a,b)=>String(a.paidAt||a.dueDate||'').localeCompare(String(b.paidAt||b.dueDate||''))).map(f=>`<label class="tm2-pl"><input type="checkbox" name="f" value="${esc(String(f.id))}" checked data-v="${share(f)}"><span><b>${esc(f.desc||'Honorários')}</b><small>${esc([cn(f),'recebida '+br(f.paidAt||f.dueDate||f.date),money(f.value)+' × '+f.collab.pct+'%'].filter(Boolean).join(' · '))}</small></span><b>${money(share(f))}</b></label>`).join('')}
 <div class="form-grid" style="margin-top:12px"><div class="field"><label>Data do repasse</label><input name="date" type="date" required value="${todayIso()}"></div><div class="field"><label>Forma</label><select name="method"><option>Pix</option><option>Transferência</option><option>Dinheiro</option></select></div></div>
-<div class="form-grid" style="margin-top:4px"><div class="field"><label>% do escritório (sobre a comissão dela)</label><input name="fee" type="number" min="0" max="100" step="any" value="${window.kalinyLastFee?window.kalinyLastFee(p.email):0}"><div class="mini-help">Fica com o escritório. A % é guardada para os próximos repasses e pode mudar a cada mês.</div></div></div>
+<div class="form-grid" style="margin-top:4px"><div class="field"><label>% do escritório (sobre a comissão dela)</label><input name="fee" type="number" min="0" max="100" step="any" value="${window.kalinyMonthPct?window.kalinyMonthPct(p.email,todayIso().slice(0,7)):(window.kalinyLastFee?window.kalinyLastFee(p.email):0)}"><div class="mini-help">Fica com o escritório. A % é guardada para os próximos repasses e pode mudar a cada mês.</div></div></div>
 ${(()=>{const end=todayIso().slice(0,7),fx=(data.finance||[]).filter(f=>f&&!f.deletedAt&&f.partnerFee&&lower(f.partnerFee)===lower(p.email)&&!isPaid(f)&&String(f.dueDate||f.date||'').slice(0,7)<=end).sort((a,b)=>String(a.dueDate||'').localeCompare(String(b.dueDate||'')));return fx.length?`<div style="margin-top:6px"><b style="font-size:14px">Taxa fixa mensal da parceria</b>${fx.map(f=>`<label class="tm2-pl"><input type="checkbox" name="fx" value="${esc(String(f.id))}" checked data-v="${Number(f.value||0)}"><span><b>${esc(f.desc||'Taxa fixa')}</b><small>vence ${br(f.dueDate||f.date)} · descontar neste repasse</small></span><b>${money(f.value)}</b></label>`).join('')}</div>`:''})()}
 <div class="tm2-sum" style="margin-top:10px;font-size:14px;display:grid;gap:4px"><div style="display:flex;justify-content:space-between"><span>Comissão dela</span><b id="tm2Gross">${money(p.total)}</b></div><div style="display:flex;justify-content:space-between;color:#8d7767"><span>% do escritório (<span id="tm2FeeP">0</span>%)</span><b id="tm2Fee">− R$ 0,00</b></div><div id="tm2FxRow" style="display:none;justify-content:space-between;color:#8d7767"><span>Taxa fixa do mês</span><b id="tm2Fx">− R$ 0,00</b></div></div>
 <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap"><span>A repassar: <span class="tm2-tot" id="tm2Tot">${money(p.total)}</span></span><button class="d-btn" type="submit">Registrar repasse</button></div>
@@ -5092,6 +5092,18 @@ ${st.fixed.length&&missing?`<div class="form-actions"><button class="d-btn light
   const team=()=>{let t=[];try{t=JSON.parse(localStorage.getItem('kaliny_team_v1')||'[]')||[]}catch(e){}const fromFin={};(data.finance||[]).forEach(f=>{if(f&&f.collab&&f.collab.email)fromFin[lower(f.collab.email)]=f.collab.name||f.collab.email});
     const all=t.filter(u=>u&&u.email).map(u=>({email:u.email,name:u.name||u.email}));Object.entries(fromFin).forEach(([e,n])=>{if(!all.some(u=>lower(u.email)===e))all.push({email:e,name:n})});return all};
   let ui={m:ymOf(new Date()),who:'',mode:'prev'};
+  // V145.66: % do escritório por mês, guardada na cobrança da taxa fixa do mês (sincroniza); sem ela, vale a última usada
+  const PKEY='kaliny_partner_pct_v1',pLoc=()=>{try{return JSON.parse(localStorage.getItem(PKEY)||'{}')||{}}catch(e){return {}}};
+  function pctFor(email,m){const F=(data.finance||[]).filter(f=>f&&!f.deletedAt&&f.partnerFee&&lower(f.partnerFee)===lower(email)&&f.officePct!=null&&f.officePct!=='');
+    const own=F.find(f=>String(f.dueDate||f.date||'').slice(0,7)===m);if(own)return Number(own.officePct)||0;
+    const loc=pLoc()[lower(email)+'|'+m];if(loc!=null)return Number(loc)||0;
+    const prev=F.filter(f=>String(f.dueDate||f.date||'').slice(0,7)<m).sort((a,b)=>String(b.dueDate||'').localeCompare(String(a.dueDate||'')))[0];if(prev)return Number(prev.officePct)||0;
+    return window.kalinyLastFee?Number(window.kalinyLastFee(email))||0:0}
+  function setPct(email,m,v){v=Math.max(0,Math.min(100,Math.round(Number(String(v).replace(',','.'))*100)/100||0));const now=new Date().toISOString();
+    const f=(data.finance||[]).find(x=>x&&!x.deletedAt&&x.partnerFee&&lower(x.partnerFee)===lower(email)&&String(x.dueDate||x.date||'').slice(0,7)===m);
+    if(f){f.officePct=v;f.updatedAt=now;save();try{window.kalinySync&&window.kalinySync.syncNow()}catch(e){}}else{const o=pLoc();o[lower(email)+'|'+m]=v;try{localStorage.setItem(PKEY,JSON.stringify(o))}catch(e){}}
+    return v}
+  window.kalinyMonthPct=pctFor;window.kalinySetMonthPct=setPct;
   const isFixed=f=>f.category==='Despesas fixas'||f.category==='Aluguel e condomínio'||!!f.fixedId;
   function calc(m,email,mode){mode=mode||'rec';
     const F=(data.finance||[]).filter(f=>f&&!f.deletedAt&&lower(f.status)!=='cancelado');
@@ -5105,12 +5117,12 @@ ${st.fixed.length&&missing?`<div class="form-actions"><button class="d-btn light
     let fixed=F.filter(f=>!isIn(f)&&isFixed(f)&&when(f)===m).map(f=>({name:f.desc,value:Number(f.value||0)}));
     let fromCfg=false;if(!fixed.length&&window.kalinyFixed){fixed=(window.kalinyFixed.state().fixed||[]).map(x=>({name:x.name,value:Number(x.value||0)}));fromCfg=!!fixed.length}
     const fixedTotal=r2(fixed.reduce((s,x)=>s+x.value,0)),prop=r2(fixedTotal*frac);
-    const fee=window.kalinyLastFee?window.kalinyLastFee(email):0,rule=r2(part*fee/100+feeFixed);
+    const fee=pctFor(email,m),rule=r2(part*fee/100+feeFixed);
     const reps=F.filter(f=>Array.isArray(f.repasseOf)&&lower(f.repasseTo)===lower(email));
     const paidOut=r2(mine.filter(f=>f.repasseAt).reduce((s,f)=>s+(f.repasseNet!=null?Number(f.repasseNet):share(f)),0));
-    const waiting=mine.filter(f=>!f.repasseAt);
+    const waiting=F.filter(f=>isIn(f)&&isPaid(f)&&!f.partnerFee&&!Array.isArray(f.repasseOf)&&f.collab&&lower(f.collab.email)===lower(email)&&!f.repasseAt); // V145.66: todas as datas
     const open=F.filter(f=>isIn(f)&&!isPaid(f)&&f.collab&&lower(f.collab.email)===lower(email)&&when(f)===m);
-    return {total,part,frac,fixed,fixedTotal,fromCfg,prop,fee,rule,paidOut,waiting,waitingPart:r2(waiting.reduce((s,f)=>s+share(f),0)),openPart:r2(open.reduce((s,f)=>s+share(f),0)),mine:mine.length,reps,mode,paidTotal,feeFixed,feeFixedPaid,list:mode==='prev'?mineAll:mine,share};
+    return {total,part,frac,fixed,fixedTotal,fromCfg,prop,fee,rule,paidOut,waiting,waitingPart:r2(waiting.reduce((s,f)=>s+share(f),0)),openPart:r2(open.reduce((s,f)=>s+share(f),0)),mine:mine.length,reps,mode,paidTotal,feeFixed,feeFixedPaid,nowNet:(()=>{const wp=r2(waiting.reduce((s,f)=>s+share(f),0)),cm=ymOf(new Date()),fo=r2(F.filter(f=>f.partnerFee&&lower(f.partnerFee)===lower(email)&&!isPaid(f)&&String(f.dueDate||f.date||'').slice(0,7)<=cm).reduce((s,f)=>s+Number(f.value||0),0)),pc=pctFor(email,cm);return Math.max(0,r2(wp-r2(wp*pc/100)-(wp>0?fo:0)))})(),list:mode==='prev'?mineAll:mine,share};
   }
   const pct=v=>(Math.round(v*1000)/10).toString().replace('.',',')+'%';
   function render(){
@@ -5133,17 +5145,20 @@ ${st.fixed.length&&missing?`<div class="form-actions"><button class="d-btn light
 <div class="pr-note">Conta: a fração do faturamento do mês que é de ${esc(first)} (${money(c.part)} de ${money(c.total)} = ${pct(c.frac)}) aplicada a cada despesa fixa.${c.total?'':' Sem receitas recebidas neste mês ainda.'}</div>`:'<div class="muted">Cadastre as despesas fixas em <b>Configurações → Despesas fixas do escritório</b>.</div>'}</div>
 <div class="pr-box"><h3>Situação do mês <small class="pr-live" style="font:500 12px system-ui,sans-serif;color:#557a62;margin-left:6px">● ao vivo · ${new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</small></h3><div class="pr-cmp">
 <div><span>Comissão de ${esc(first)} no mês${PV?' (prevista)':''}</span><b>${money(c.part)}</b></div>
-<div><span>Fica com o escritório (${String(c.fee).replace('.',',')}%${c.feeFixed?' + taxa fixa':''})</span><b>− ${money(c.rule)}</b></div>${c.feeFixed?`<div style="color:#8d7767;font-size:13px"><span>· ${String(c.fee).replace('.',',')}% da comissão: ${money(r2(c.rule-c.feeFixed))} · taxa fixa do mês: ${money(c.feeFixed)}${c.feeFixedPaid?' (já descontada)':''}</span><span></span></div>`:''}
-<div style="color:#8d7767;font-size:13px"><span>Comparação: proporcional às despesas fixas</span><b>− ${money(c.prop)}</b></div>
-<div style="border-top:1px solid #eaded2;padding-top:8px"><span>A repassar para ${esc(first)}</span><span class="big">${money(r2(c.part-c.rule))}</span></div>
-<div style="color:#8d7767;font-size:13px"><span>A repassar pelo proporcional</span><b>${money(r2(c.part-c.prop))}</b></div>
-<div style="border-top:1px solid #eaded2;padding-top:8px"><span>Aguardando repasse (todas as datas)</span><b>${money(c.waitingPart)}</b></div>
-<div><span>A receber de ${esc(first)} neste mês (parcelas em aberto)</span><b>${money(c.openPart)}</b></div></div>
+<div><span>% do escritório neste mês <input type="number" id="prPct" min="0" max="100" step="any" value="${c.fee}" aria-label="% do escritório neste mês" style="width:74px;padding:4px 6px;border:1px solid #d9c9bb;border-radius:8px;font-size:14px;margin:0 2px"> %</span><b>− ${money(r2(c.part*c.fee/100))}</b></div>
+${c.feeFixed?`<div><span>Taxa fixa do mês${c.feeFixedPaid?' <small style="color:#557a62">(já descontada)</small>':''}</span><b>− ${money(c.feeFixed)}</b></div>`:''}
+<div style="border-top:1px solid #eaded2;padding-top:8px"><span>A repassar para ${esc(first)} no mês${PV?' (previsto)':''}${c.part-c.rule<0?' <small style="color:#9a5a55">— ela fica devendo ao escritório</small>':''}</span><span class="big">${money(r2(c.part-c.rule))}</span></div>
+<div style="border-top:1px solid #eaded2;padding-top:8px"><span>Comissão já recebida, aguardando repasse</span><b>${money(c.waitingPart)}</b></div>
+<div><span>Pode repassar agora <small style="color:#8d7767">(− ${String(c.fee).replace('.',',')}% e taxa fixa em aberto)</small></span><b style="color:#557a62">${money(c.nowNet)}</b></div>
+<div><span>Comissão em parcelas do mês ainda não recebidas</span><b>${money(c.openPart)}</b></div>
+<div style="color:#8d7767;font-size:13px;border-top:1px dashed #eaded2;padding-top:6px"><span>Comparação: proporcional às despesas fixas (${pct(c.frac)})</span><b>− ${money(c.prop)}</b></div>
+<div style="color:#8d7767;font-size:13px"><span>A repassar pelo proporcional</span><b>${money(r2(c.part-c.prop))}</b></div></div>
 ${cr.waiting.length&&cr.part?`<div class="form-actions" style="margin-top:10px;flex-wrap:wrap;gap:6px"><button class="d-btn light" type="button" data-pr-rep="rule">Registrar repasse (% + taxa fixa)</button><button class="d-btn" type="button" data-pr-rep="prop">Repassar pelo proporcional (${cr.part?String(Math.round(cr.prop/cr.part*1000)/10).replace('.',','):0}%)</button></div>`:(PV&&c.part?`<div class="pr-note">O repasse fica disponível quando as parcelas forem marcadas como pagas no Financeiro.</div>`:'')}
-<div class="pr-note">Os valores se atualizam a cada lançamento, a qualquer momento do mês. O escritório fica com a % da comissão mais a taxa fixa; o resto é repassado. A % é escolhida a cada repasse. O proporcional é só uma comparação com as despesas fixas do mês.</div></div></div>
+<div class="pr-note">Tudo se atualiza a cada lançamento, a qualquer momento do mês. O escritório fica com a % da comissão mais a taxa fixa; o resto é repassado. A % do mês fica guardada aqui e já vem preenchida no repasse. "Previsto" conta as parcelas do mês que ainda vão ser recebidas; "Pode repassar agora" conta só o que o escritório já recebeu.</div></div></div>
 <div class="pr-box" style="margin-top:14px"><h3>Lançamentos com ${esc(first)} em ${label(ui.m)}</h3>${c.list.length?`<div style="overflow-x:auto"><table class="pr-t pr-list"><thead><tr><th>Cliente</th><th>Lançamento</th><th>Vencimento</th><th>Situação</th><th class="n">Valor</th><th class="n">Comissão dela</th></tr></thead><tbody>${c.list.slice().sort((a,b)=>String(a.dueDate||a.date||'').localeCompare(String(b.dueDate||b.date||''))).map(f=>{const cl=f.clientId&&clientById(f.clientId),d=String(f.dueDate||f.date||'').slice(0,10).split('-').reverse().join('/');return `<tr><td>${esc(cl?cl.name:'—')}</td><td>${esc(f.desc||'Honorários')}</td><td>${d}</td><td>${isPaid(f)?(f.repasseAt?'<span style="color:#557a62">Repassado</span>':'<span style="color:#557a62">Recebido</span>'):'<span style="color:#b06a1e">A receber</span>'}</td><td class="n">${money(f.value)}</td><td class="n">${money(c.share(f))} <small style="color:#8d7767">(${String(f.collab.pct).replace('.',',')}%)</small></td></tr>`}).join('')}</tbody></table></div>`:`<div class="muted">Nenhum lançamento com ${esc(first)} neste mês. Para marcar, abra o lançamento no Financeiro e escolha a advogada parceira e a %.</div>`}</div>
 <div class="pr-box" style="margin-top:14px"><h3>Últimos 6 meses</h3><div style="overflow-x:auto"><table class="pr-t"><thead><tr><th>Mês</th><th class="n">${PV?'Previsto':'Recebido'} (escritório)</th><th class="n">Comissão dela</th><th class="n">Fixas proporcionais</th><th class="n">Fica com o escritório</th></tr></thead><tbody>${hist.map(h=>`<tr><td>${label(h.m)}</td><td class="n">${money(h.total)}</td><td class="n">${money(h.part)}</td><td class="n">${money(h.prop)}</td><td class="n">${money(h.rule)}</td></tr>`).join('')}</tbody></table></div></div>`;
     document.getElementById('prWho').onchange=e=>{ui.who=e.target.value;render()};
+    const pi=document.getElementById('prPct');if(pi)pi.onchange=()=>{const v=setPct(p.email,ui.m,pi.value);toast('% do escritório em '+label(ui.m)+': '+String(v).replace('.',',')+'%');render()};
   }
   document.addEventListener('click',e=>{const g=k=>e.target.closest&&e.target.closest('['+k+']');let b;
     if((b=g('data-pr-m'))){ui.m=shift(ui.m,+b.dataset.prM);return render()}
