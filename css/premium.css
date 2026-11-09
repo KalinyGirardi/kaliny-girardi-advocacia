@@ -297,3 +297,55 @@ footer .footer-bottom{display:flex;justify-content:space-between;gap:8px 24px;fl
 .about,.hero{overflow-x:clip}
 @media (min-width:1051px) and (max-width:1260px){.navlinks{gap:18px!important}.navlinks a{font-size:13px}.navlinks .nav-cta{padding:10px 14px!important}.brand-name strong{font-size:20px}}
 .navlinks a{white-space:nowrap}
+
+/* ---------- assistente "Qual é o seu caso?" ---------- */
+.guide{background:var(--espresso);color:var(--champagne);padding:var(--pad-section) 0;position:relative;overflow:hidden}
+.guide:before{content:'';position:absolute;inset:0;background:radial-gradient(45% 70% at 10% 20%,rgba(201,168,120,.16),transparent 65%),radial-gradient(40% 60% at 95% 100%,rgba(201,168,120,.1),transparent 60%);pointer-events:none}
+.guide-grid{position:relative;display:grid;grid-template-columns:.8fr 1.2fr;gap:clamp(40px,6vw,96px);align-items:start}
+.guide h2{color:var(--ivory)!important}.guide h2 em{color:var(--gold-2)}
+.guide-intro p{color:var(--muted-light);max-width:400px}
+.guide .eyebrow{color:var(--gold-2)}
+.guide-steps{list-style:none;margin:34px 0 0;padding:0;display:flex;flex-direction:column;gap:14px;counter-reset:g}
+.guide-steps li{counter-increment:g;display:flex;align-items:center;gap:14px;font-size:14px;letter-spacing:.06em;color:rgba(239,228,212,.45);transition:color .4s var(--ease)}
+.guide-steps li:before{content:counter(g);width:30px;height:30px;border-radius:50%;border:1px solid rgba(239,228,212,.25);display:grid;place-items:center;font:italic 500 16px 'Cormorant Garamond',serif;transition:all .4s var(--ease)}
+.guide-steps li.on{color:var(--ivory)}.guide-steps li.on:before{background:var(--gold-2);border-color:var(--gold-2);color:var(--espresso)}
+.guide-steps li.done{color:var(--gold-2)}.guide-steps li.done:before{content:'✓';border-color:var(--gold-2);color:var(--gold-2)}
+.guide-card{background:var(--ivory);color:var(--ink);padding:clamp(28px,4vw,48px);box-shadow:0 40px 80px -40px rgba(0,0,0,.6);min-height:440px;position:relative}
+.guide-card:before{content:'';position:absolute;inset:-12px 12px 12px -12px;border:1px solid rgba(201,168,120,.45);pointer-events:none}
+.guide-count{font-size:11.5px;letter-spacing:.28em;text-transform:uppercase;font-weight:600;color:var(--gold)}
+.guide-step h3{font-size:clamp(28px,2.6vw,38px)!important;line-height:1.1;margin:10px 0 24px!important}
+.guide-step{animation:gIn .5s var(--ease-out)}
+@keyframes gIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+.guide-options{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.guide-options button{text-align:left;font:inherit;cursor:pointer;background:#fff;border:1px solid var(--line);padding:16px 18px;display:flex;flex-direction:column;gap:4px;transition:border-color .3s var(--ease),transform .35s var(--ease-out),box-shadow .35s var(--ease),background .3s var(--ease)}
+.guide-options button b{font:500 21px/1.15 'Cormorant Garamond',serif;color:var(--brown-dark)}
+.guide-options button small{font-size:13px;line-height:1.5;color:var(--muted)}
+.guide-options button:hover,.guide-options button:focus-visible{border-color:var(--gold);transform:translateY(-2px);box-shadow:var(--shadow-1)}
+.guide-options button.on{background:var(--espresso);border-color:var(--espresso)}.guide-options button.on b{color:var(--ivory)}.guide-options button.on small{color:var(--muted-light)}
+.guide-back{margin-top:18px;background:none;border:0;padding:6px 0;font:600 13px Montserrat,sans-serif;letter-spacing:.06em;color:var(--brown-soft);cursor:pointer}
+.guide-back:hover{color:var(--brown-dark)}
+.guide-result p{font-size:16.5px;margin:0 0 18px}
+.guide-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}
+.guide-foot{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-top:22px;padding-top:18px;border-top:1px solid var(--line)}
+.guide-foot .guide-back{margin:0}
+/* horários (assistente e agendamento) */
+.guide-slots,.cta-slots-list{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 18px}
+.slot{font:inherit;cursor:pointer;display:inline-flex;flex-direction:column;align-items:flex-start;gap:2px;padding:10px 14px;border:1px solid var(--line);background:#fff;color:var(--brown-dark);transition:all .3s var(--ease)}
+.slot small{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.slot b{font:500 19px/1 'Cormorant Garamond',serif}
+.slot:hover,.slot:focus-visible{border-color:var(--gold);background:var(--espresso);color:var(--ivory);transform:translateY(-2px)}
+.slot:hover small,.slot:focus-visible small{color:var(--gold-2)}
+.slot-loading{font-size:14px;color:var(--muted)}
+.slot-label{width:100%;font-size:12px;letter-spacing:.2em;text-transform:uppercase;font-weight:600;color:var(--brown-soft);margin-bottom:2px}
+.cta-slots{margin-top:46px;padding-top:28px;border-top:1px solid rgba(239,228,212,.18)}
+.cta-slots-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.cta-slots-head small{color:var(--muted-light);font-size:13.5px}
+.cta-slots-list .slot{background:rgba(255,255,255,.04);border-color:rgba(239,228,212,.22);color:var(--ivory)}
+.cta-slots-list .slot small{color:var(--muted-light)}
+.cta-slots-list .slot:hover,.cta-slots-list .slot:focus-visible{background:var(--gold-2);border-color:var(--gold-2);color:var(--espresso)}
+.cta-slots-list .slot:hover small{color:var(--espresso)}
+.cta-slots-list .slot-loading{color:var(--muted-light)}
+.cta-slots-list .slot.more{justify-content:center;font-weight:600;font-size:13px;letter-spacing:.06em}
+@media (max-width:900px){.guide-grid{grid-template-columns:1fr}.guide-steps{flex-direction:row;gap:18px;flex-wrap:wrap}.guide-steps li span{display:none}.guide-card{min-height:0}.guide-card:before{inset:-8px 8px 8px -8px}}
+@media (max-width:560px){.guide-options{grid-template-columns:1fr}.guide-options button{padding:14px 16px}.guide-actions .btn{flex:1 1 100%}.slot{flex:1 1 calc(50% - 8px)}}
+@media (prefers-reduced-motion:reduce){.guide-step{animation:none}}

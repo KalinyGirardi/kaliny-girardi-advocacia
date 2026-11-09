@@ -42,3 +42,55 @@
   // 7) nada fica escondido: se a animação de entrada não rodar, mostra o conteúdo
   setTimeout(function(){document.querySelectorAll('.js-reveal:not(.revealed),.reveal-left:not(.revealed),.reveal-right:not(.revealed)').forEach(function(el){var r=el.getBoundingClientRect();if(r.top<innerHeight&&r.bottom>0)el.classList.add('revealed')})},1800);
 })();
+
+/* ---------- assistente "Qual é o seu caso?" e próximos horários livres ---------- */
+(function(){
+  'use strict';
+  var WD=['dom','seg','ter','qua','qui','sex','sáb'],pad=function(n){return String(n).padStart(2,'0')};
+  var parse=function(s){var m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(s||'');return m?new Date(+m[1],m[2]-1,+m[3],12):null};
+  var WA='5545998434981';
+  var AREAS={'Família e Sucessões':{slug:'familia-e-sucessoes',txt:'Divórcio, pensão, guarda, união estável, inventário e planejamento familiar, com escuta e cuidado.'},
+    'Previdenciário':{slug:'previdenciario',txt:'Aposentadoria, benefícios do INSS e salário-maternidade: entender os seus direitos e o melhor caminho.'},
+    'Imobiliário':{slug:'imobiliario',txt:'Compra e venda, contratos, aluguel e regularização de imóveis, com segurança em cada etapa.'},
+    'Consumidor':{slug:'consumidor',txt:'Problemas com compras, serviços, bancos e cobranças: orientação para resolver a situação.'},
+    'Cível':{slug:'civel',txt:'Contratos, dívidas, indenizações e conflitos do dia a dia, com estratégia e clareza.'},
+    'Consulta jurídica geral':{slug:'',txt:'Sem problema não saber a área: na consulta você conta o que aconteceu e a Kaliny indica o caminho.'}};
+  function nextSlots(cache,n){var out=[];Object.keys(cache||{}).sort().forEach(function(d){(cache[d]||[]).forEach(function(t){out.push({d:d,t:t})})});
+    var now=new Date(),today=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate()),hm=pad(now.getHours())+':'+pad(now.getMinutes());
+    return out.filter(function(x){return x.d>today||(x.d===today&&x.t>hm)}).slice(0,n)}
+  function slotBtn(x){var d=parse(x.d);return '<button type="button" class="slot" data-slot-d="'+x.d+'" data-slot-t="'+x.t+'"><small>'+WD[d.getDay()]+' · '+pad(d.getDate())+'/'+pad(d.getMonth()+1)+'</small><b>'+x.t+'</b></button>'}
+
+  // ---- assistente ----
+  var card=document.getElementById('guideCard');
+  if(card){
+    var st={area:'',mode:''},steps=[].slice.call(document.querySelectorAll('.guide-steps li'));
+    var show=function(n){card.querySelectorAll('.guide-step').forEach(function(s){s.hidden=s.getAttribute('data-step')!==String(n)});
+      steps.forEach(function(li,i){li.classList.toggle('on',i===n-1);li.classList.toggle('done',i<n-1)});
+      var f=card.querySelector('.guide-step:not([hidden]) button');if(f&&document.activeElement&&card.contains(document.activeElement))f.focus({preventScroll:true})};
+    var result=function(){var a=AREAS[st.area]||AREAS['Consulta jurídica geral'],geral=st.area==='Consulta jurídica geral';
+      document.getElementById('guideTitle').innerHTML=geral?'Uma <em>consulta jurídica geral</em> é o melhor começo.':'A área indicada é <em>'+st.area+'</em>.';
+      document.getElementById('guideText').textContent=a.txt+' Atendimento '+(st.mode==='Online'?'online, por videochamada.':'presencial, no escritório em Cascavel.');
+      var more=document.getElementById('guideMore');if(a.slug){more.hidden=false;more.href='areas/'+a.slug+'.html';more.textContent='Saiba mais sobre '+st.area+' →'}else more.hidden=true;
+      document.getElementById('guideWa').href='https://wa.me/'+WA+'?text='+encodeURIComponent('Olá! Vim pelo site da Kaliny Girardi Advocacia. Tenho uma dúvida sobre '+(geral?'um assunto jurídico':st.area)+' e gostaria de atendimento '+st.mode.toLowerCase()+'.');
+      var box=document.getElementById('guideSlots');
+      if(window.kgSlots){box.innerHTML='<span class="slot-loading">Buscando os próximos horários…</span>';window.kgSlots().then(function(c){var l=nextSlots(c,4);box.innerHTML=l.length?'<span class="slot-label">Próximos horários livres</span>'+l.map(slotBtn).join(''):''}).catch(function(){box.innerHTML=''})}else box.innerHTML='';
+      show(3)};
+    card.addEventListener('click',function(e){var b=e.target.closest('button,a');if(!b)return;
+      if(b.hasAttribute('data-g-area')){st.area=b.getAttribute('data-g-area');card.querySelectorAll('[data-g-area]').forEach(function(x){x.classList.toggle('on',x===b)});setTimeout(function(){show(2)},180)}
+      else if(b.hasAttribute('data-g-mode')){st.mode=b.getAttribute('data-g-mode');card.querySelectorAll('[data-g-mode]').forEach(function(x){x.classList.toggle('on',x===b)});setTimeout(result,180)}
+      else if(b.hasAttribute('data-g-back'))show(1);
+      else if(b.hasAttribute('data-g-restart')){st={area:'',mode:''};card.querySelectorAll('.on').forEach(function(x){x.classList.remove('on')});show(1)}
+      else if(b.hasAttribute('data-g-book')){if(window.kgBook)window.kgBook({area:st.area,mode:st.mode})}
+      else if(b.hasAttribute('data-slot-d')){if(window.kgBook)window.kgBook({area:st.area,mode:st.mode,date:b.getAttribute('data-slot-d'),time:b.getAttribute('data-slot-t')})}});
+  }
+
+  // ---- próximos horários na seção de agendamento ----
+  var wrap=document.getElementById('ctaSlots'),list=document.getElementById('ctaSlotsList');
+  if(wrap&&list&&window.kgSlots){
+    var fill=function(){window.kgSlots().then(function(c){var l=nextSlots(c,6);if(!l.length){wrap.hidden=true;return}
+      list.innerHTML=l.map(slotBtn).join('')+'<button type="button" class="slot more" data-slot-all>Ver todos →</button>';wrap.hidden=false}).catch(function(){wrap.hidden=true})};
+    if('IntersectionObserver' in window){var io=new IntersectionObserver(function(es){if(es.some(function(e){return e.isIntersecting})){io.disconnect();fill()}},{rootMargin:'400px 0px'});io.observe(wrap.closest('section')||wrap)}else fill();
+    list.addEventListener('click',function(e){var b=e.target.closest('button');if(!b||!window.kgBook)return;
+      if(b.hasAttribute('data-slot-all'))window.kgBook({});else window.kgBook({date:b.getAttribute('data-slot-d'),time:b.getAttribute('data-slot-t')})});
+  }
+})();
