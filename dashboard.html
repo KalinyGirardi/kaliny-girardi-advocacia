@@ -1485,7 +1485,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
    Regras: vence a alteração mais recente (updatedAt); exclusões viram marcação (deletedAt);
    resposta vazia ou com erro do servidor nunca apaga dados deste navegador. */
 (function(){
-  const VERSION='V145.73';
+  const VERSION='V145.74';
   const META_KEY='kaliny_sync_meta_v1';
   const COLLECTIONS=['processes','finance','notes','calcHistory','previdenciario','documents','tasks','agenda'];
   const IS_COLLAB=(typeof session!=='undefined'&&session&&session.role==='colaboradora'),COLLAB_PUSH=new Set(['finance','tasks']);let warnedForbidden=false;
@@ -4496,6 +4496,21 @@ ${shared.length?`<h3 style="font:500 19px Georgia,serif;margin:16px 0 8px">Lanç
     if(!box||box.parentNode!==app){if(box)box.remove();app.insertAdjacentHTML('afterbegin','<div id="tmRepasse"></div>');box=document.getElementById('tmRepasse')}
     box.innerHTML=pend.map(p=>`<div class="tm2-rep"><span>🤝 Repasse pendente para <b>${esc(p.name)}</b>: <b>${money(p.total)}</b> · ${p.items.length} parcela${p.items.length>1?'s':''} recebida${p.items.length>1?'s':''}</span><button class="d-btn" type="button" data-tm2-rep="${esc(p.email)}">Ver e registrar repasse</button></div>`).join('');
   }
+  // V145.74: pagamento avulso / adiantamento à parceira — vira crédito descontado no próximo repasse
+  const advCredit=email=>{const R=(data.finance||[]).filter(f=>f&&!f.deletedAt&&Array.isArray(f.repasseOf)&&lower(f.repasseTo)===lower(email));
+    return Math.max(0,round2(R.filter(f=>f.advance).reduce((s,f)=>s+Number(f.value||0),0)-R.reduce((s,f)=>s+Number(f.advanceUsed||0),0)))};
+  function advanceModal(email,name){const first=esc(String(name||'').split(' ')[0]),cr=advCredit(email);
+    openModal('Pagamento avulso para '+(String(name||'').split(' ')[0]||'a parceira'),`<form id="advForm"><p class="muted" style="margin-top:0">Use quando pagar ${first} antes do repasse ou só uma parte. O valor fica como <b>adiantamento</b> e é descontado sozinho no próximo “Registrar repasse”.</p>
+<div class="form-grid"><div class="field"><label>Valor pago</label><input name="value" type="number" min="0.01" step="0.01" required inputmode="decimal" placeholder="0,00"></div><div class="field"><label>Data</label><input name="date" type="date" required value="${todayIso()}"></div></div>
+<div class="form-grid" style="margin-top:4px"><div class="field"><label>Forma</label><select name="method"><option>Pix</option><option>Transferência</option><option>Dinheiro</option></select></div><div class="field"><label>Observação (opcional)</label><input name="notes" type="text" maxlength="200" placeholder="ex.: adiantamento da parcela da Cleusa"></div></div>
+${cr?`<div class="mini-help" style="margin-top:8px">${first} já tem ${money(cr)} adiantado ainda não descontado.</div>`:''}
+<div class="form-actions" style="margin-top:12px"><button class="d-btn" type="submit">Registrar pagamento</button></div></form>`);
+    const form=document.getElementById('advForm');setTimeout(()=>{try{form.value.focus()}catch(e){}},50);
+    form.onsubmit=e=>{e.preventDefault();const v=round2(Number(String(form.value.value||'').replace(',','.'))||0);if(!(v>0))return toast('Informe o valor pago');
+      const now=new Date().toISOString(),date=form.date.value||todayIso(),nm=String(name||email);
+      data.finance.push({id:'fin_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),type:'despesa',category:'Repasse a parceira',desc:'Adiantamento — '+nm,value:v,status:'pago',date,dueDate:date,paidAt:date,paymentMethod:form.method.value,notes:String(form.notes.value||'').trim(),repasseTo:email,repasseOf:[],advance:true,createdAt:now,updatedAt:now});
+      save();closeModal();toast('Pagamento de '+money(v)+' registrado — será descontado no próximo repasse');try{window.kalinySync&&window.kalinySync.syncNow()}catch(err){}};
+  }
   function repasseModal(email){
     const p=pendingByCollab().find(x=>lower(x.email)===lower(email));if(!p)return toast('Nenhum repasse pendente');
     const cn=f=>{const c=f.clientId?clientById(f.clientId):null;return c?c.name:''};
@@ -4505,19 +4520,21 @@ ${p.items.slice().sort((a,b)=>String(a.paidAt||a.dueDate||'').localeCompare(Stri
 <div class="form-grid" style="margin-top:4px"><div class="field"><label>% do escritório (sobre a comissão dela)</label><input name="fee" type="number" min="0" max="100" step="any" value="${window.kalinyMonthPct?window.kalinyMonthPct(p.email,todayIso().slice(0,7)):(window.kalinyLastFee?window.kalinyLastFee(p.email):0)}"><div class="mini-help">Fica com o escritório. A % é guardada para os próximos repasses e pode mudar a cada mês.</div></div></div>
 ${(()=>{const end=todayIso().slice(0,7),fx=(data.finance||[]).filter(f=>f&&!f.deletedAt&&f.partnerFee&&lower(f.partnerFee)===lower(p.email)&&!isPaid(f)&&String(f.dueDate||f.date||'').slice(0,7)<=end).sort((a,b)=>String(a.dueDate||'').localeCompare(String(b.dueDate||'')));return fx.length?`<div style="margin-top:6px"><b style="font-size:14px">Taxa fixa mensal da parceria</b>${fx.map(f=>`<label class="tm2-pl"><input type="checkbox" name="fx" value="${esc(String(f.id))}" checked data-v="${Number(f.value||0)}"><span><b>${esc(f.desc||'Taxa fixa')}</b><small>vence ${br(f.dueDate||f.date)} · descontar neste repasse</small></span><b>${money(f.value)}</b></label>`).join('')}</div>`:''})()}
 <div class="tm2-sum" style="margin-top:10px;font-size:14px;display:grid;gap:4px"><div style="display:flex;justify-content:space-between"><span>Comissão dela</span><b id="tm2Gross">${money(p.total)}</b></div><div style="display:flex;justify-content:space-between;color:#8d7767"><span>% do escritório (<span id="tm2FeeP">0</span>%)</span><b id="tm2Fee">− R$ 0,00</b></div><div id="tm2FxRow" style="display:none;justify-content:space-between;color:#8d7767"><span>Taxa fixa do mês</span><b id="tm2Fx">− R$ 0,00</b></div></div>
-<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap"><span>A repassar: <span class="tm2-tot" id="tm2Tot">${money(p.total)}</span></span><button class="d-btn" type="submit">Registrar repasse</button></div>
+${advCredit(p.email)?`<label class="tm2-pl" style="margin-top:6px"><input type="checkbox" name="adv" checked><span><b>Descontar o que já foi adiantado</b><small>${money(advCredit(p.email))} pago antes, em pagamento avulso</small></span><b id="tm2Adv">− R$ 0,00</b></label>`:''}
+<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap"><span><span id="tm2TotL">A repassar</span>: <span class="tm2-tot" id="tm2Tot">${money(p.total)}</span></span><button class="d-btn" type="submit">Registrar repasse</button></div>
 <div class="mini-help">Vira uma despesa “Repasse a parceira” no seu Financeiro. Ela vê no painel dela a comissão, o que ficou com o escritório e o extrato.</div></form>`);
     const form=document.getElementById('tm2RepForm');
     const tot=()=>round2([...form.querySelectorAll('input[name=f]:checked')].reduce((s,i)=>s+Number(i.dataset.v),0));
     const feeP=()=>Math.max(0,Math.min(100,Number(String(form.fee.value||0).replace(',','.'))||0)),fxS=()=>round2([...form.querySelectorAll('input[name=fx]:checked')].reduce((s,i)=>s+Number(i.dataset.v),0)),net=()=>round2(tot()-round2(tot()*feeP()/100)-fxS());
-    const upd=()=>{document.getElementById('tm2Gross').textContent=money(tot());document.getElementById('tm2FeeP').textContent=String(feeP()).replace('.',',');document.getElementById('tm2Fee').textContent='− '+money(round2(tot()*feeP()/100));document.getElementById('tm2Tot').textContent=money(net());const fr=document.getElementById('tm2FxRow');if(fr){fr.style.display=fxS()?'flex':'none';document.getElementById('tm2Fx').textContent='− '+money(fxS())}};
+    const advC=advCredit(p.email),advU=()=>form.adv&&form.adv.checked?Math.min(advC,Math.max(0,net())):0;
+    const upd=()=>{const ae=document.getElementById('tm2Adv');if(ae)ae.textContent='− '+money(advU());document.getElementById('tm2TotL').textContent=advU()?'A pagar agora':'A repassar';document.getElementById('tm2Gross').textContent=money(tot());document.getElementById('tm2FeeP').textContent=String(feeP()).replace('.',',');document.getElementById('tm2Fee').textContent='− '+money(round2(tot()*feeP()/100));document.getElementById('tm2Tot').textContent=money(round2(net()-advU()));const fr=document.getElementById('tm2FxRow');if(fr){fr.style.display=fxS()?'flex':'none';document.getElementById('tm2Fx').textContent='− '+money(fxS())}};
     form.onchange=upd;form.oninput=upd;upd();
     form.onsubmit=e=>{e.preventDefault();const ids=[...form.querySelectorAll('input[name=f]:checked')].map(i=>i.value),fxIds=[...form.querySelectorAll('input[name=fx]:checked')].map(i=>i.value),fxV=fxS(),gross=tot(),pct=feeP(),v=net();if(!ids.length||!gross)return toast('Marque ao menos uma parcela');if(v<0)return toast('A taxa fixa é maior que o valor a repassar. Desmarque a taxa e cobre à parte.');
       const now=new Date().toISOString(),date=form.date.value||todayIso(),rid='fin_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
-      data.finance.push({id:rid,type:'despesa',category:'Repasse a parceira',desc:'Repasse — '+p.name+' ('+ids.length+' parcela'+(ids.length>1?'s':'')+')',value:v,status:'pago',date,dueDate:date,paidAt:date,paymentMethod:form.method.value,repasseTo:p.email,repasseOf:ids,repasseFeePct:pct,repasseGross:gross,repasseFee:round2(gross-v),repasseFixed:fxV||undefined,repasseFixedIds:fxIds.length?fxIds:undefined,createdAt:now,updatedAt:now});
+      data.finance.push({id:rid,type:'despesa',category:'Repasse a parceira',desc:'Repasse — '+p.name+' ('+ids.length+' parcela'+(ids.length>1?'s':'')+')',value:round2(v-advU()),advanceUsed:advU()||undefined,status:'pago',date,dueDate:date,paidAt:date,paymentMethod:form.method.value,repasseTo:p.email,repasseOf:ids,repasseFeePct:pct,repasseGross:gross,repasseFee:round2(gross-v),repasseFixed:fxV||undefined,repasseFixedIds:fxIds.length?fxIds:undefined,createdAt:now,updatedAt:now});
       let fxLeft=fxV;const its=(data.finance||[]).filter(f=>f&&ids.includes(String(f.id)));its.forEach((f,i)=>{const part=i===its.length-1?fxLeft:round2(fxV*share(f)/gross);fxLeft=round2(fxLeft-part);f.repasseAt=date;f.repasseId=rid;f.repasseFeePct=pct;f.repasseNet=round2(share(f)-round2(share(f)*pct/100)-part);f.updatedAt=now});
       (data.finance||[]).forEach(f=>{if(f&&fxIds.includes(String(f.id))){f.status='pago';f.paidAt=date;f.paymentMethod='Descontado no repasse';f.repasseId=rid;f.updatedAt=now}});
-      save();closeModal();toast('Repasse de '+money(v)+' registrado'+(pct?' ('+String(pct).replace('.',',')+'% do escritório)':'')+(fxV?' com taxa fixa de '+money(fxV):''));try{window.kalinySync&&window.kalinySync.syncNow()}catch(err){}};
+      const au=advU();save();closeModal();toast('Repasse de '+money(v)+' registrado'+(au?' — '+money(au)+' já adiantado, pagar agora '+money(round2(v-au)):'')+(pct?' ('+String(pct).replace('.',',')+'% do escritório)':'')+(fxV?' com taxa fixa de '+money(fxV):''));try{window.kalinySync&&window.kalinySync.syncNow()}catch(err){}};
   }
   // excluir a despesa de repasse devolve as parcelas para "aguardando repasse"
   document.addEventListener('click',e=>{
@@ -4592,7 +4609,7 @@ ${(()=>{const end=todayIso().slice(0,7),fx=(data.finance||[]).filter(f=>f&&!f.de
   const oFin=window.renderFinance;
   if(typeof oFin==='function')window.renderFinance=function(){const r=oFin.apply(this,arguments);try{drawRepasse();decorateCollab()}catch(e){}return r};
   setTimeout(()=>{try{overviewTasks();drawRepasse();decorateCollab()}catch(e){}},1300);
-  window.kalinyRepasse={pendingByCollab,repasseModal,overviewTasks};
+  window.kalinyRepasse={pendingByCollab,repasseModal,overviewTasks,advanceModal,advCredit};
 })();
 </script>
 <script>
@@ -4706,24 +4723,25 @@ ${gs.length?gs.map(row).join(''):'<div class="muted" style="padding:20px;text-al
   window.kalinyLastFee=function(email){const r=(data.finance||[]).filter(f=>f&&Array.isArray(f.repasseOf)&&f.repasseFeePct!=null&&(!email||lower(f.repasseTo)===lower(email))).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')))[0];return r?Number(r.repasseFeePct):0};
   // extrato para imprimir/salvar em PDF
   window.kalinyExtrato=function(o){
-    const rows=o.items.map(f=>{const s=share(f),fee=r2(s*o.pct/100);return `<tr><td>${esc(cn(f)||'—')}</td><td>${esc(f.installmentLabel||f.desc||'Honorários')}</td><td>${br(f.paidAt||f.dueDate||f.date)}</td><td class="n">${f.share?money(f.share.total):money(f.value)}</td><td class="n">${f.share?f.share.pct:f.collab.pct}%</td><td class="n">${money(s)}</td></tr>`}).join('');
+    if(o.advance)o.items=[];
+    const rows=o.advance?`<tr><td colspan="5">Adiantamento de repasse${o.notes?' — '+esc(o.notes):''}</td><td class="n">${money(o.value)}</td></tr>`:o.items.map(f=>{const s=share(f),fee=r2(s*o.pct/100);return `<tr><td>${esc(cn(f)||'—')}</td><td>${esc(f.installmentLabel||f.desc||'Honorários')}</td><td>${br(f.paidAt||f.dueDate||f.date)}</td><td class="n">${f.share?money(f.share.total):money(f.value)}</td><td class="n">${f.share?f.share.pct:f.collab.pct}%</td><td class="n">${money(s)}</td></tr>`}).join('');
     const gross=r2(o.items.reduce((t,f)=>t+share(f),0)),fee=r2(gross*o.pct/100),netI=r2(o.items.reduce((t,f)=>t+(f.repasseNet!=null&&f.repasseNet!==''?Number(f.repasseNet):r2(share(f)-r2(share(f)*o.pct/100))),0)),fixedP=r2(gross-fee-netI)>0.009?r2(gross-fee-netI):0,net=r2(gross-fee-fixedP);
     const w=window.open('','_blank');if(!w){toast('Permita a abertura de janelas para ver o extrato');return}
     w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Extrato de repasse — ${esc(o.name)} — ${br(o.date)}</title><style>body{font-family:Georgia,serif;color:#382319;max-width:760px;margin:30px auto;padding:0 20px}h1{font-weight:500;font-size:26px;margin:4px 0}small,.m{color:#7a5d4a;font-family:Arial,sans-serif;font-size:13px}table{width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:13px;margin-top:16px}th,td{padding:8px 6px;border-bottom:1px solid #eaded2;text-align:left}th{color:#7a5d4a;font-weight:600}.n{text-align:right;white-space:nowrap}.t td{border:0;padding:5px 6px}.t .b td{font-weight:700;font-size:15px;border-top:2px solid #382319}.sig{display:flex;gap:40px;margin-top:70px;font-family:Arial,sans-serif;font-size:12px}.sig div{flex:1;border-top:1px solid #382319;padding-top:6px;text-align:center}@media print{button{display:none}}</style></head><body>
 <img src="${location.origin}${location.pathname.replace(/[^/]*$/,'')}assets/logo-240.webp" alt="" style="width:90px"><div class="m">KALINY GIRARDI ADVOCACIA · OAB/PR 118212</div>
-<h1>Extrato de repasse</h1><div class="m">Parceira: <b>${esc(o.name)}</b> · Data do repasse: <b>${br(o.date)}</b>${o.method?' · Forma: '+esc(o.method):''}</div>
+<h1>${o.advance?'Recibo de adiantamento':'Extrato de repasse'}</h1><div class="m">Parceira: <b>${esc(o.name)}</b> · Data do repasse: <b>${br(o.date)}</b>${o.method?' · Forma: '+esc(o.method):''}</div>
 <table><thead><tr><th>Cliente</th><th>Parcela</th><th>Recebida em</th><th class="n">Valor recebido</th><th class="n">%</th><th class="n">Comissão da parceira</th></tr></thead><tbody>${rows}</tbody></table>
-<table class="t"><tr><td>Comissão da parceira</td><td class="n">${money(gross)}</td></tr><tr><td>Fica com o escritório (${o.pct}% da comissão)</td><td class="n">− ${money(fee)}</td></tr>${fixedP?`<tr><td>Fica com o escritório (taxa fixa do mês)</td><td class="n">− ${money(fixedP)}</td></tr>`:''}<tr class="b"><td>Valor repassado</td><td class="n">${money(net)}</td></tr></table>
+${o.advance?`<table class="t"><tr class="b"><td>Valor pago</td><td class="n">${money(o.value)}</td></tr></table><p class="m">Será descontado do próximo repasse.</p>`:`<table class="t"><tr><td>Comissão da parceira</td><td class="n">${money(gross)}</td></tr><tr><td>Fica com o escritório (${o.pct}% da comissão)</td><td class="n">− ${money(fee)}</td></tr>${fixedP?`<tr><td>Fica com o escritório (taxa fixa do mês)</td><td class="n">− ${money(fixedP)}</td></tr>`:''}<tr class="b"><td>Valor repassado</td><td class="n">${money(net)}</td></tr>${o.advanceUsed?`<tr><td>Já pago antes, em adiantamento</td><td class="n">− ${money(o.advanceUsed)}</td></tr><tr class="b"><td>Pago neste repasse</td><td class="n">${money(r2(net-o.advanceUsed))}</td></tr>`:''}</table>`}
 <div class="sig"><div>Kaliny Girardi</div><div>${esc(o.name)}</div></div><p style="text-align:center;margin-top:30px"><button onclick="print()" style="padding:10px 18px;font-size:14px">Imprimir / salvar em PDF</button></p></body></html>`);w.document.close();
   };
   function itemsOf(rid){return (data.finance||[]).filter(f=>f&&!f.partnerFee&&f.collab&&String(f.repasseId||'')===String(rid))}
   // lista de extratos (Kaliny)
   window.kalinyExtratos=function(){
     const reps=(data.finance||[]).filter(f=>f&&Array.isArray(f.repasseOf)&&!f.deletedAt).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
-    openModal('Extratos de repasse',reps.length?reps.map(r=>`<div class="tm2-pl" style="grid-template-columns:minmax(0,1fr) auto auto"><span><b>${esc(String(r.desc||'Repasse').replace(/^Repasse — /,''))}</b><small>${br(r.date)} · ${esc(r.paymentMethod||'')}${r.repasseFeePct!=null?' · contribuição '+r.repasseFeePct+'%':''}</small></span><b>${money(r.value)}</b><button class="d-btn light" type="button" data-ex-open="${esc(String(r.id))}">📄 Extrato</button></div>`).join(''):'<div class="muted">Nenhum repasse registrado ainda.</div>');
+    openModal('Extratos de repasse',reps.length?reps.map(r=>`<div class="tm2-pl" style="grid-template-columns:minmax(0,1fr) auto auto"><span><b>${r.advance?'Adiantamento — ':''}${esc(String(r.desc||'Repasse').replace(/^(Repasse|Adiantamento) — /,''))}</b><small>${br(r.date)} · ${esc(r.paymentMethod||'')}${r.repasseFeePct!=null?' · contribuição '+r.repasseFeePct+'%':''}${r.advanceUsed?' · descontado adiantamento de '+money(r.advanceUsed):''}</small></span><b>${money(r.value)}</b><button class="d-btn light" type="button" data-ex-open="${esc(String(r.id))}">📄 Extrato</button></div>`).join(''):'<div class="muted">Nenhum repasse registrado ainda.</div>');
   };
   document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-ex-open]');if(!b)return;const r=(data.finance||[]).find(f=>String(f.id)===b.dataset.exOpen);if(!r)return;
-    window.kalinyExtrato({name:String(r.desc||'').replace(/^Repasse — /,'').replace(/ \(\d+ parcelas?\)$/,''),date:r.date,method:r.paymentMethod,pct:Number(r.repasseFeePct||0),items:itemsOf(r.id)})});
+    window.kalinyExtrato({name:String(r.desc||'').replace(/^(Repasse|Adiantamento) — /,'').replace(/ \(\d+ parcelas?\)$/,''),date:r.date,method:r.paymentMethod,pct:Number(r.repasseFeePct||0),items:itemsOf(r.id),advance:!!r.advance,value:Number(r.value||0),notes:r.notes,advanceUsed:Number(r.advanceUsed||0)})});
   // botão no Financeiro (Kaliny)
   function button(){if(COLLAB)return;const head=document.querySelector('#page-finance .d-panel > .d-panel-head');if(!head||document.getElementById('exBtn'))return;
     if(!(data.finance||[]).some(f=>f&&Array.isArray(f.repasseOf))&&!(data.finance||[]).some(f=>f&&f.collab))return;
@@ -5124,10 +5142,11 @@ ${st.fixed.length&&missing?`<div class="form-actions"><button class="d-btn light
     const fixedTotal=r2(fixed.reduce((s,x)=>s+x.value,0)),prop=r2(fixedTotal*frac);
     const fee=pctFor(email,m),rule=r2(part*fee/100+feeFixed);
     const reps=F.filter(f=>Array.isArray(f.repasseOf)&&lower(f.repasseTo)===lower(email));
-    const paidOut=r2(mine.filter(f=>f.repasseAt).reduce((s,f)=>s+(f.repasseNet!=null?Number(f.repasseNet):share(f)),0));
+    const paidOut=r2(F.filter(f=>Array.isArray(f.repasseOf)&&lower(f.repasseTo)===lower(email)&&String(f.date||'').slice(0,7)===m).reduce((s,f)=>s+Number(f.value||0),0)); // V145.74: dinheiro pago a ela no mês (repasses + adiantamentos)
+    const credit=window.kalinyRepasse&&window.kalinyRepasse.advCredit?window.kalinyRepasse.advCredit(email):0;
     const waiting=F.filter(f=>isIn(f)&&isPaid(f)&&!f.partnerFee&&!Array.isArray(f.repasseOf)&&f.collab&&lower(f.collab.email)===lower(email)&&!f.repasseAt); // V145.66: todas as datas
     const open=F.filter(f=>isIn(f)&&!isPaid(f)&&f.collab&&lower(f.collab.email)===lower(email)&&when(f)===m);
-    return {total,part,frac,fixed,fixedTotal,fromCfg,prop,fee,rule,paidOut,waiting,waitingPart:r2(waiting.reduce((s,f)=>s+share(f),0)),openPart:r2(open.reduce((s,f)=>s+share(f),0)),mine:mine.length,reps,mode,paidTotal,feeFixed,feeFixedPaid,nowNet:(()=>{const wp=r2(waiting.reduce((s,f)=>s+share(f),0)),cm=ymOf(new Date()),fo=r2(F.filter(f=>f.partnerFee&&lower(f.partnerFee)===lower(email)&&!isPaid(f)&&String(f.dueDate||f.date||'').slice(0,7)<=cm).reduce((s,f)=>s+Number(f.value||0),0)),pc=pctFor(email,cm);return Math.max(0,r2(wp-r2(wp*pc/100)-(wp>0?fo:0)))})(),list:mode==='prev'?mineAll:mine,share};
+    return {credit,total,part,frac,fixed,fixedTotal,fromCfg,prop,fee,rule,paidOut,waiting,waitingPart:r2(waiting.reduce((s,f)=>s+share(f),0)),openPart:r2(open.reduce((s,f)=>s+share(f),0)),mine:mine.length,reps,mode,paidTotal,feeFixed,feeFixedPaid,nowNet:(()=>{const wp=r2(waiting.reduce((s,f)=>s+share(f),0)),cm=ymOf(new Date()),fo=r2(F.filter(f=>f.partnerFee&&lower(f.partnerFee)===lower(email)&&!isPaid(f)&&String(f.dueDate||f.date||'').slice(0,7)<=cm).reduce((s,f)=>s+Number(f.value||0),0)),pc=pctFor(email,cm);return Math.max(0,r2(wp-r2(wp*pc/100)-(wp>0?fo:0)))})(),list:mode==='prev'?mineAll:mine,share};
   }
   const pct=v=>(Math.round(v*1000)/10).toString().replace('.',',')+'%';
   function render(){
@@ -5153,11 +5172,12 @@ ${st.fixed.length&&missing?`<div class="form-actions"><button class="d-btn light
 <div class="tot"><span>= Repasse para ${esc(first)}${c.part-c.rule<0?' <small style="color:#9a5a55">— ela fica devendo ao escritório</small>':''}</span><span class="big">${money(r2(c.part-c.rule))}</span></div></div>
 <div class="pr-note">A % vale só para ${label(ui.m)} e já vem preenchida no repasse.${c.feeFixed?'':' Sem taxa fixa cadastrada: use o botão “Taxa fixa”.'}</div></div>
 <div class="pr-box"><h3>Situação do repasse</h3><div class="pr-st">
-<div><span><i style="background:#557a62"></i>Pode repassar agora<small>já recebido dos clientes, com a % e a taxa descontadas</small></span><b style="color:#557a62">${money(c.nowNet)}</b></div>
+<div><span><i style="background:#557a62"></i>Pode repassar agora<small>já recebido dos clientes, com a % e a taxa descontadas${c.credit?' e o adiantamento':''}</small></span><b style="color:#557a62">${money(Math.max(0,r2(c.nowNet-c.credit)))}</b></div>
+${c.credit?`<div><span><i style="background:#6d5a8a"></i>Já adiantado, a descontar<small>pagamento avulso; sai do próximo repasse</small></span><b>${money(c.credit)}</b></div>`:''}
 <div><span><i style="background:#b08d5f"></i>Comissão já recebida, aguardando repasse<small>valor bruto, antes dos descontos</small></span><b>${money(c.waitingPart)}</b></div>
 <div><span><i style="background:#b06a1e"></i>Comissão em parcelas do mês ainda não recebidas<small>entra quando o cliente pagar</small></span><b>${money(c.openPart)}</b></div>
-<div><span><i style="background:#cdbfb2"></i>Já repassado<small>em ${label(ui.m)}</small></span><b>${money(c.paidOut)}</b></div></div>
-${cr.waiting.length&&cr.part?`<div class="form-actions" style="margin-top:12px"><button class="d-btn" type="button" data-pr-rep="rule">Registrar repasse</button></div>`:(PV&&c.part?`<div class="pr-note">O repasse fica disponível quando as parcelas forem marcadas como pagas no Financeiro.</div>`:'')}</div></div>
+<div><span><i style="background:#cdbfb2"></i>Já pago a ${esc(first)}<small>em ${label(ui.m)}, repasses e adiantamentos</small></span><b>${money(c.paidOut)}</b></div></div>
+${PV&&c.part&&!(cr.waiting.length&&cr.part)?`<div class="pr-note">O repasse fica disponível quando as parcelas forem marcadas como pagas no Financeiro. Se já pagou algo a ${esc(first)}, use “Pagamento avulso”.</div>`:''}<div class="form-actions" style="margin-top:12px;flex-wrap:wrap;gap:6px">${cr.waiting.length&&cr.part?`<button class="d-btn" type="button" data-pr-rep="rule">Registrar repasse</button>`:''}<button class="d-btn light" type="button" data-pr-adv>Pagamento avulso</button></div></div></div>
 <div class="pr-box" style="margin-top:14px"><h3>Lançamentos com ${esc(first)} em ${label(ui.m)}</h3>${c.list.length?`<div style="overflow-x:auto"><table class="pr-t pr-list"><thead><tr><th>Cliente</th><th>Lançamento</th><th>Vencimento</th><th>Situação</th><th class="n">Valor</th><th class="n">Comissão dela</th></tr></thead><tbody>${c.list.slice().sort((a,b)=>String(a.dueDate||a.date||'').localeCompare(String(b.dueDate||b.date||''))).map(f=>{const cl=f.clientId&&clientById(f.clientId),d=String(f.dueDate||f.date||'').slice(0,10).split('-').reverse().join('/');return `<tr><td>${esc(cl?cl.name:'—')}</td><td>${esc(f.desc||'Honorários')}</td><td>${d}</td><td>${isPaid(f)?(f.repasseAt?'<span style="color:#557a62">Repassado</span>':'<span style="color:#557a62">Recebido</span>'):'<span style="color:#b06a1e">A receber</span>'}</td><td class="n">${money(f.value)}</td><td class="n">${money(c.share(f))} <small style="color:#8d7767">(${String(f.collab.pct).replace('.',',')}%)</small></td></tr>`}).join('')}</tbody></table></div>`:`<div class="muted">Nenhum lançamento com ${esc(first)} neste mês. Para marcar, abra o lançamento no Financeiro e escolha a advogada parceira e a %.</div>`}</div>
 <div class="pr-box" style="margin-top:14px"><h3>Últimos 6 meses</h3><div style="overflow-x:auto"><table class="pr-t"><thead><tr><th>Mês</th><th class="n">${PV?'Previsto':'Recebido'} (escritório)</th><th class="n">Comissão dela</th><th class="n">Fica com o escritório</th><th class="n">Repasse</th></tr></thead><tbody>${hist.map(h=>`<tr><td>${label(h.m)}</td><td class="n">${money(h.total)}</td><td class="n">${money(h.part)}</td><td class="n">${money(h.rule)}</td><td class="n">${money(r2(h.part-h.rule))}</td></tr>`).join('')}</tbody></table></div></div>
 <details class="pr-box pr-alt" style="margin-top:14px" ${ui.alt?'open':''}><summary>Comparar com o rateio das despesas fixas <small>outra forma de calcular — não é o acordo atual</small></summary>
@@ -5172,6 +5192,7 @@ ${cr.waiting.length&&cr.part?`<div class="form-actions" style="margin-top:10px">
     if((b=g('data-pr-m'))){ui.m=shift(ui.m,+b.dataset.prM);return render()}
     if(g('data-pr-now')){ui.m=ymOf(new Date());return render()}
     if((b=g('data-pr-mode'))){ui.mode=b.dataset.prMode;return render()}
+    if(g('data-pr-adv')){const u=team().find(x=>lower(x.email)===lower(ui.who));if(u&&window.kalinyRepasse)window.kalinyRepasse.advanceModal(u.email,u.name);return}
     if(g('data-pr-ext')){if(window.kalinyExtratos)window.kalinyExtratos();return}
     if(g('data-pr-fee')){const u=team().find(x=>lower(x.email)===lower(ui.who));if(u&&window.kalinyPartnerFee)window.kalinyPartnerFee.open(u.email,u.name);return}
     if((b=g('data-pr-rep'))){const c=calc(ui.m,ui.who,'rec');if(!window.kalinyRepasse)return;window.kalinyRepasse.repasseModal(ui.who);
@@ -5371,5 +5392,5 @@ ${cr.waiting.length&&cr.part?`<div class="form-actions" style="margin-top:10px">
     const m=document.getElementById('modal');if(m&&m.classList.contains('show')&&m.classList.contains('kg-cpage')){try{closeModal()}catch(err){m.classList.remove('show')}}},true);
 })();
 </script>
-<script src="assets/panel-ui.js?v=145.73"></script>
+<script src="assets/panel-ui.js?v=145.74"></script>
 </body></html>
