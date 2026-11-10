@@ -43,6 +43,7 @@
     grid:R(3.5,3.5,7,7,1.5)+R(13.5,3.5,7,7,1.5)+R(3.5,13.5,7,7,1.5)+R(13.5,13.5,7,7,1.5),
     wallet:P('M3.5 7.5h15a2.5 2.5 0 0 1 2.5 2.5v8.5H3.5zM3.5 7.5l11-3.5v3.5M16.5 13h.01'),
     swap:P('M16.5 3.5l3.5 3.5-3.5 3.5M4 7h16M7.5 20.5 4 17l3.5-3.5M20 17H4'),
+    pie:P('M21 12a9 9 0 1 1-9-9v9z M14 2.3A9 9 0 0 1 21.7 10H14z'),
     checksq:R(3.5,3.5,17,17,2.5)+P('M8 12.2l2.8 2.8 5.2-5.6'),
     logout:P('M14.5 4h4.5v16h-4.5M10 8l-4 4 4 4M6 12h10'),
     pencil:P('M12 20h8M16.5 3.5a2.1 2.1 0 0 1 3 3L7.5 18.5l-4 1 1-4z'),
@@ -52,9 +53,9 @@
   var MAP={'⚠':'alert','⚖':'scale','📄':'file','⏳':'clock','💬':'message','📅':'calendar','🗓':'calendar','🗑':'trash','💰':'money','💲':'money','⏱':'timer','🎉':'sparkle','✨':'sparkle',
     '📝':'edit','✍':'pencil','🧮':'calc','🧾':'receipt','👤':'user','👥':'users','👨':'user','👩':'user','👧':'user','👵':'user','❓':'help','🔔':'bell','📱':'phone','☎':'phone','📊':'chart','🏠':'home',
     '📋':'clipboard','⭐':'star','🔎':'search','✅':'check','📂':'folder','📎':'clip','☁':'cloud','🤝':'hand','📍':'pin','💤':'moon','💡':'bulb','🪪':'idcard','🛡':'shield','⬆':'upload','⚙':'gear','👋':null,'🔒':'lock'};
-  var NAV={'◈':'grid','♙':'users','▣':'calendar','◫':'wallet','⇄':'swap','⚖':'scale','☑':'checksq','⌁':'calc','▤':'folder','⚙':'gear','❓':'help','↩':'logout'};
+  var NAV={'◈':'grid','♙':'users','▣':'calendar','◫':'wallet','⇄':'swap','◔':'pie','⚖':'scale','☑':'checksq','⌁':'calc','▤':'folder','⚙':'gear','❓':'help','↩':'logout'};
   var keys=Object.keys(MAP).sort(function(a,b){return b.length-a.length}).map(function(k){return k.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')});
-  var RE=new RegExp('('+keys.join('|')+')\\uFE0F?','g'),NAVRE=/^\s*([◈♙▣◫⇄⚖☑⌁▤⚙❓↩])️?\s*/;
+  var RE=new RegExp('('+keys.join('|')+')\\uFE0F?','g'),NAVRE=/^\s*([◈♙▣◫⇄◔⚖☑⌁▤⚙❓↩])️?\s*/;
   var svg=function(name){return '<svg class="ki" viewBox="0 0 24 24" aria-hidden="true" focusable="false">'+I[name]+'</svg>'};
   var SKIP={TEXTAREA:1,INPUT:1,SELECT:1,OPTION:1,SCRIPT:1,STYLE:1,NOSCRIPT:1,PRE:1,CODE:1,svg:1,SVG:1};
   var userContent='[contenteditable],.note-text,.history-item p,.tm-com,.cp-note,.doc-preview,.ki-skip';
