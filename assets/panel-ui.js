@@ -105,11 +105,13 @@
   var pend=null;
   var rowOf=function(el){return el&&el.closest&&el.closest('.fa-row,.tm-card,.tm-l,.history-item,.k-row,tr')};
   var flash=function(){if(!pend)return;var p=pend;var els=[].slice.call(document.querySelectorAll('['+p.a+'="'+(window.CSS&&CSS.escape?CSS.escape(p.v):p.v)+'"]')).filter(function(x){return x.offsetWidth||x.offsetHeight||x.getClientRects().length});var rows=els.map(rowOf).filter(Boolean);if(!rows.length)return;
-    pend=null;rows.forEach(function(row){row.classList.remove('kg-flash');void row.offsetWidth;row.classList.add('kg-flash');setTimeout(function(){row.classList.remove('kg-flash')},1100)})};
+    // se a lista for redesenhada durante o destaque, a linha nova também pisca (até o fim do mesmo 1,1 s)
+    var fresh=!p.until;if(fresh){p.until=Date.now()+1100;setTimeout(function(){if(pend===p)pend=null},1100)}
+    rows.forEach(function(row){if(!fresh&&row.classList.contains('kg-flash'))return;row.classList.remove('kg-flash');void row.offsetWidth;row.classList.add('kg-flash');setTimeout(function(){row.classList.remove('kg-flash')},Math.max(0,p.until-Date.now()))})};
   document.addEventListener('click',function(e){var t=e.target&&e.target.closest&&e.target.closest(ATTRS.map(function(a){return '['+a+']'}).join(','));if(!t)return;
     for(var i=0;i<ATTRS.length;i++){var v=t.getAttribute(ATTRS[i]);if(v){pend={a:ATTRS[i]==='data-fa-edit'?'data-fa-edit':ATTRS[i],v:v,edit:/edit|comment/.test(ATTRS[i]),at:Date.now()};break}}
     if(pend&&!pend.edit)setTimeout(flash,30)},true);
   // edição: destaca a linha quando a janela fecha salvando
   document.addEventListener('submit',function(e){if(pend&&pend.edit&&e.target&&e.target.closest&&e.target.closest('#modal'))setTimeout(flash,60)},true);
-  var mo=new MutationObserver(function(){if(pend&&Date.now()-pend.at<4000&&!pend.edit)flash()});mo.observe(document.body,{childList:true,subtree:true});
+  var mo=new MutationObserver(function(){if(!pend)return;if(pend.until?Date.now()<pend.until:(!pend.edit&&Date.now()-pend.at<4000))flash()});mo.observe(document.body,{childList:true,subtree:true});
 })();
