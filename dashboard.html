@@ -1485,7 +1485,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
    Regras: vence a alteração mais recente (updatedAt); exclusões viram marcação (deletedAt);
    resposta vazia ou com erro do servidor nunca apaga dados deste navegador. */
 (function(){
-  const VERSION='V145.71';
+  const VERSION='V145.72';
   const META_KEY='kaliny_sync_meta_v1';
   const COLLECTIONS=['processes','finance','notes','calcHistory','previdenciario','documents','tasks','agenda'];
   const IS_COLLAB=(typeof session!=='undefined'&&session&&session.role==='colaboradora'),COLLAB_PUSH=new Set(['finance','tasks']);let warnedForbidden=false;
@@ -5034,6 +5034,8 @@ ${st.fixed.length&&missing?`<div class="form-actions"><button class="d-btn light
   function count(){return dups().length+conferir().length+orphans().length}
   function render(){
     const el=document.getElementById('cfBody');if(!el)return;const D=dups(),C=conferir(),O=orphans();
+    // V145.72: guarda o cliente já escolhido em "Ligar a…" (por registro) para um redesenho não apagar a escolha
+    const picked={};(el._o||[]).forEach((o,i)=>{const s=el.querySelector(`[data-cf-to="${i}"]`);if(s&&s.value)picked[o.col+':'+o.item.id]=s.value});
     const opts=(data.clients||[]).slice().sort((a,b)=>String(a.name).localeCompare(String(b.name))).map(c=>`<option value="${esc(String(c.id))}">${esc(c.name)}</option>`).join('');
     const card=(t,b)=>`<div class="cf-card">${t}${b}</div>`;
     el.innerHTML=`<style>.cf-sec{margin:14px 0 6px;font:500 18px Georgia,serif}.cf-card{border:1px solid #eaded2;border-radius:12px;background:#fff;padding:10px 12px;margin-bottom:6px;display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}.cf-card small{display:block;color:#8d7767;font-size:12px}.cf-act{display:flex;gap:6px;flex-wrap:wrap}.cf-ok{color:#557a62;padding:6px 0}.cf-card select{border:1px solid #eaded2;border-radius:8px;padding:5px;max-width:220px}</style>
@@ -5041,6 +5043,7 @@ ${st.fixed.length&&missing?`<div class="form-actions"><button class="d-btn light
 <div class="cf-sec">Fichas para conferir (${C.length})</div>${C.length?C.map(c=>card(`<div><b>${esc(c.name)}</b><small>${/dígito verificador/.test(c.notes)?'CPF da planilha com dígito errado':'dados da pasta sem certeza de quem é o cliente'} — veja as observações da ficha</small></div>`,`<div class="cf-act"><button class="d-btn light" type="button" data-cf-view="${esc(String(c.id))}">Abrir</button><button class="d-btn" type="button" data-cf-done="${esc(String(c.id))}">Já conferi</button></div>`)).join(''):'<div class="cf-ok">✓ Nada para conferir.</div>'}
 <div class="cf-sec">Registros sem cliente (${O.length})</div>${O.length?O.map((o,i)=>card(`<div><b>${esc(o.label)}: ${esc(o.text)}</b><small>o cliente deste registro foi apagado</small></div>`,`<div class="cf-act"><select data-cf-to="${i}"><option value="">Ligar a…</option>${opts}</select><button class="d-btn light" type="button" data-cf-link="${i}">Ligar</button><button class="d-btn light" type="button" data-cf-del="${i}">Excluir</button></div>`)).join(''):'<div class="cf-ok">✓ Todos os registros têm cliente.</div>'}`;
     el._d=D;el._o=O;
+    O.forEach((o,i)=>{const v=picked[o.col+':'+o.item.id],s=el.querySelector(`[data-cf-to="${i}"]`);if(v&&s&&[...s.options].some(x=>x.value===v))s.value=v});
   }
   async function merge(p){
     if(!confirm('Juntar "'+p.drop.name+'" em "'+p.keep.name+'"?\n\nOs processos, documentos, lançamentos e compromissos passam para um cadastro só, os dados que faltam são completados e as observações dos dois ficam guardadas. O cadastro repetido é apagado.'))return;
@@ -5068,7 +5071,7 @@ ${st.fixed.length&&missing?`<div class="form-actions"><button class="d-btn light
     if((b=g('data-cf-del'))&&el){const o=el._o[+b.dataset.cfDel];if(!confirm('Excluir este '+o.label.toLowerCase()+' sem cliente?'))return;data[o.col]=data[o.col].filter(x=>x!==o.item);save();try{window.kalinySync&&window.kalinySync.syncNow()}catch(err){}toast(o.label+' excluído');return render()}
   });
   const oR=window.renderAll;window.renderAll=function(){const r=oR.apply(this,arguments);try{button()}catch(e){}return r};setTimeout(button,1500);
-  window.kalinyConferir={dups,conferir,orphans,open};
+  window.kalinyConferir={dups,conferir,orphans,open,render};
 })();
 </script>
 <script>
