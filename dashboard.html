@@ -1486,7 +1486,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
    Regras: vence a alteração mais recente (updatedAt); exclusões viram marcação (deletedAt);
    resposta vazia ou com erro do servidor nunca apaga dados deste navegador. */
 (function(){
-  const VERSION='V145.75';
+  const VERSION='V145.76';
   const META_KEY='kaliny_sync_meta_v1';
   const COLLECTIONS=['processes','finance','notes','calcHistory','previdenciario','documents','tasks','agenda'];
   const IS_COLLAB=(typeof session!=='undefined'&&session&&session.role==='colaboradora'),COLLAB_PUSH=new Set(['finance','tasks']);let warnedForbidden=false;
@@ -3285,7 +3285,12 @@ ${pendingCards()}
     else if(d.aShift)ui.anchor=iso(add(parseDay(ui.anchor)||today(),+d.aShift));
     else if('aToday' in d){ui.anchor=iso(today());ui.view='week'}
     else if(d.aKpi){if(d.aKpi==='month')ui.view='month';else if(d.aKpi==='pend'){document.querySelector('#agApp .a-pend')?.scrollIntoView({behavior:'smooth'});return}else if(d.aKpi==='dl'){showPage('processes');document.querySelector('[data-k-view="dl"]')?.click();return}else{ui.view=d.aKpi==='today'?'week':'next';ui.anchor=iso(today())}}
-    else if(d.aEv){const e=evById(d.aEv);if(e)return openEventForm(e.clientId||'',e.id);return}
+    else if(d.aEv){const e=evById(d.aEv);if(e)return openEventForm(e.clientId||'',e.id);
+      // V145.76: evento da Google Agenda (só leitura no painel) — mostra os detalhes e abre o dia na Google Agenda
+      const g=String(d.aEv).indexOf('g_')===0&&window.kalinyGEvents?window.kalinyGEvents().find(x=>String(x.id)===String(d.aEv)):null;
+      if(g){const dm=/^(\d{4})-(\d{2})-(\d{2})/.exec(g.date||'')||[],br=dm[1]?dm[3]+'/'+dm[2]+'/'+dm[1]:'';
+        openModal('Evento da Google Agenda',`<div class="gev"><p style="font:500 20px Georgia,serif;margin:0 0 8px">${esc(g.title||'(sem título)')}</p><p class="muted" style="margin:0 0 4px">📅 ${esc(br)}${g.allDay||!g.time?' · dia todo':' · '+esc(g.time)+(g.end?'–'+esc(g.end):'')}</p>${g.location?`<p class="muted" style="margin:0 0 4px">📍 ${esc(g.location)}</p>`:''}<p class="mini-help" style="margin-top:12px">Este evento foi marcado direto na Google Agenda. Para mudar ou apagar, abra na Google Agenda; o painel atualiza sozinho.</p><div class="form-actions" style="margin-top:12px"><a class="d-btn" href="https://calendar.google.com/calendar/r/day/${dm[1]?dm[1]+'/'+Number(dm[2])+'/'+Number(dm[3]):''}" target="_blank" rel="noopener">Abrir na Google Agenda ↗</a></div></div>`)}
+      return}
     else if(d.aProc)return openProcessDetail(d.aProc);
     else if(d.aNew){openEventForm('');const f=document.querySelector('#eventForm input[name="date"]');if(f)f.value=d.aNew;return}
     else if(d.aConfirm||d.aCancel){const e=evById(d.aConfirm||d.aCancel);if(!e)return;t.disabled=true;const wasOpen=document.getElementById('modal')?.classList.contains('show');const ok=await updateOnlineAppointmentStatus(e,d.aConfirm?'Confirmado':'Cancelado');if(!wasOpen&&/^Agenda/.test(document.getElementById('modalTitle')?.textContent||''))closeModal();if(ok!==false){renderAgendaApp();renderOverviewApp()}t.disabled=false;return}
@@ -5478,5 +5483,5 @@ ${cr.waiting.length&&cr.part?`<div class="form-actions" style="margin-top:10px">
     const m=document.getElementById('modal');if(m&&m.classList.contains('show')&&m.classList.contains('kg-cpage')){try{closeModal()}catch(err){m.classList.remove('show')}}},true);
 })();
 </script>
-<script src="assets/panel-ui.js?v=145.75"></script>
+<script src="assets/panel-ui.js?v=145.76"></script>
 </body></html>
