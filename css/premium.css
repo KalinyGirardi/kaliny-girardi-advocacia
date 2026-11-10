@@ -415,3 +415,16 @@ h2.split.words-in .w>span{transform:none}
   .marquee .marquee-track>span{font-size:clamp(22px,2.7vw,40px)!important;padding:0 .4em!important}
   .marquee .marquee-track>i:last-of-type{display:none}
 }
+
+/* ---------------- acessibilidade: contraste do dourado em textos sobre fundo claro ---------------- */
+:root{--gold-text:#94713f;--gold-text-sm:#8a6a3c}
+h1 em,h2 em,.hero-copy h1 em,.about-copy .quote em,.service-steps b{color:var(--gold-text)!important}
+.guide h2 em,.cta h2 em,.values h2 em{color:var(--gold-2)!important}
+.area .num,.guide-count,.slot-label,.eyebrow{color:var(--gold-text-sm)!important}
+.guide .eyebrow,.cta .eyebrow,.eyebrow.light,.guide-intro .eyebrow{color:var(--gold-2)!important}
+.area:hover .num,.area:focus-within .num{color:var(--gold-2)!important}
+footer .footer-bottom a{text-decoration:underline;text-underline-offset:3px}
+.eyebrow:not(.light){color:#7a5a45!important}
+.guide .eyebrow,.cta .eyebrow,.guide-intro .eyebrow{color:var(--gold-2)!important}
+.skip-link{position:fixed;left:16px;top:-60px;z-index:200;background:var(--espresso);color:var(--ivory);padding:12px 18px;font-size:14px;font-weight:600;transition:top .2s ease}
+.skip-link:focus{top:12px}
