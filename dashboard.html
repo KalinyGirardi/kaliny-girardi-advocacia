@@ -1485,7 +1485,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
    Regras: vence a alteração mais recente (updatedAt); exclusões viram marcação (deletedAt);
    resposta vazia ou com erro do servidor nunca apaga dados deste navegador. */
 (function(){
-  const VERSION='V145.69';
+  const VERSION='V145.70';
   const META_KEY='kaliny_sync_meta_v1';
   const COLLECTIONS=['processes','finance','notes','calcHistory','previdenciario','documents','tasks','agenda'];
   const IS_COLLAB=(typeof session!=='undefined'&&session&&session.role==='colaboradora'),COLLAB_PUSH=new Set(['finance','tasks']);let warnedForbidden=false;
@@ -5365,4 +5365,5 @@ ${cr.waiting.length&&cr.part?`<div class="form-actions" style="margin-top:10px;f
     const m=document.getElementById('modal');if(m&&m.classList.contains('show')&&m.classList.contains('kg-cpage')){try{closeModal()}catch(err){m.classList.remove('show')}}},true);
 })();
 </script>
+<script src="assets/panel-ui.js"></script>
 </body></html>

@@ -109,3 +109,28 @@
   .dash-user .muted{display:none}
   .dash-user img{width:40px!important;height:40px!important;margin-left:auto}
 }
+
+/* ---------------- ícones de traço fino (no lugar dos emojis) ---------------- */
+.ki-wrap{display:inline-flex;vertical-align:-.16em;margin-right:.32em}
+.ki{width:1.12em;height:1.12em;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+.dash-nav .ki-wrap{vertical-align:-.2em;margin-right:.55em;opacity:.85}
+.dash-nav button.active .ki-wrap{opacity:1;color:var(--gold-2)}
+.dash-nav .ki{width:17px;height:17px}
+.d-btn .ki-wrap{margin-right:.4em}
+h2 .ki-wrap,h3 .ki-wrap{color:var(--gold)}
+
+/* ---------------- telas vazias ---------------- */
+.empty,.fa-empty{position:relative;text-align:center!important;padding:34px 20px 28px!important;color:var(--muted)!important;font-size:14.5px!important;line-height:1.6;background:var(--ivory);border:1px dashed var(--line);border-radius:12px}
+.empty:before,.fa-empty:before{content:'';display:block;width:34px;height:34px;margin:0 auto 12px;background:var(--gold);opacity:.75;
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 13.5 6 5.5h12l2.5 8v5h-17z'/%3E%3Cpath d='M3.5 13.5h5l1.2 2h4.6l1.2-2h5'/%3E%3C/svg%3E") center/contain no-repeat;
+  mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 13.5 6 5.5h12l2.5 8v5h-17z'/%3E%3Cpath d='M3.5 13.5h5l1.2 2h4.6l1.2-2h5'/%3E%3C/svg%3E") center/contain no-repeat}
+.empty .empty-act,.fa-empty .empty-act{margin-top:14px}
+
+/* ---------------- primeiro carregamento: esqueleto em vez de "vazio" ---------------- */
+@keyframes kgShimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
+body.kg-loading .empty,body.kg-loading .fa-empty{color:transparent!important;border-style:solid;border-color:transparent;min-height:96px;
+  background:linear-gradient(90deg,#f1e9df 0,#f8f3ec 40%,#f1e9df 80%) 0 0/800px 100%;animation:kgShimmer 1.4s linear infinite}
+body.kg-loading .empty *,body.kg-loading .fa-empty *{visibility:hidden}
+body.kg-loading .empty:before,body.kg-loading .fa-empty:before{display:none}
+body.kg-loading .empty:after,body.kg-loading .fa-empty:after{content:'Carregando…';visibility:visible;position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);color:var(--brown-soft);font-size:13px;letter-spacing:.06em}
+@media (prefers-reduced-motion:reduce){body.kg-loading .empty,body.kg-loading .fa-empty{animation:none}}
