@@ -116,10 +116,13 @@
     setTimeout(function(){document.querySelectorAll('h2.split:not(.words-in)').forEach(function(h){var r=h.getBoundingClientRect();if(r.top<innerHeight&&r.bottom>0)h.classList.add('words-in')})},2000)}
   // 3) fotos em cortina
   if(!reduced&&'IntersectionObserver' in window){var imgs=[].slice.call(document.querySelectorAll('.about-photo img,.guide-card'));
-    var go=function(el){if(el.tagName==='IMG'&&!el.complete){el.addEventListener('load',function(){el.classList.add('wiped')},{once:true});el.addEventListener('error',function(){el.classList.add('wiped')},{once:true});setTimeout(function(){el.classList.add('wiped')},4000)}else el.classList.add('wiped')};
-    var wio=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){go(e.target);wio.unobserve(e.target)}})},{threshold:.15,rootMargin:'0px 0px 200px 0px'});
-    imgs.forEach(function(im){if(im.classList.contains('guide-card'))return;im.classList.add('img-wipe');wio.observe(im)});
-    setTimeout(function(){document.querySelectorAll('.img-wipe:not(.wiped)').forEach(function(el){var r=el.getBoundingClientRect();if(r.top<innerHeight&&r.bottom>0)el.classList.add('wiped')})},2000)}
+    var go=function(el){if(el.tagName==='IMG'&&el.loading==='lazy')el.loading='eager'; // recortada, o navegador nunca a baixaria sozinho
+      if(el.tagName==='IMG'&&!el.complete){el.addEventListener('load',function(){el.classList.add('wiped')},{once:true});el.addEventListener('error',function(){el.classList.add('wiped')},{once:true});setTimeout(function(){el.classList.add('wiped')},4000)}else el.classList.add('wiped')};
+    // observa a moldura (não a foto): a foto começa 100% recortada e o Chrome não a considera visível
+    var wio=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){var im=e.target._wipeImg;if(im)go(im);wio.unobserve(e.target)}})},{threshold:.15,rootMargin:'0px 0px 200px 0px'});
+    imgs.forEach(function(im){if(im.classList.contains('guide-card'))return;im.classList.add('img-wipe');var box=im.parentElement||im;box._wipeImg=im;wio.observe(box)});
+    var sweep=function(){var left=document.querySelectorAll('.img-wipe:not(.wiped)');if(!left.length){removeEventListener('scroll',sweep);return}left.forEach(function(el){var r=(el.parentElement||el).getBoundingClientRect();if(r.top<innerHeight&&r.bottom>0)go(el)})};
+    setTimeout(sweep,2000);addEventListener('scroll',sweep,{passive:true})}
   // 4) foto do topo inclina com o mouse
   var hv=document.querySelector('.hero-visual');
   if(hv&&fine&&!reduced){var card=hv.querySelector('.hero-card');

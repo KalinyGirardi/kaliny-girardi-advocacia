@@ -328,5 +328,5 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')set(false)})
 (function(){var L=window.KG_CONTEUDOS||[];document.querySelectorAll('.video-card').forEach(function(card){var m=/\/(?:p|reel)\/([^/?#]+)/.exec(card.dataset.video||'');if(!m)return;var it=L.find(function(x){return x.id===m[1]});var th=card.querySelector('.video-thumb');if(!it||!th||th.querySelector('.kc-cover'))return;th.insertAdjacentHTML('afterbegin',window.kgCoverHTML(it,''))});
 var more=document.querySelector('.kc-more a');if(more&&L.length)more.innerHTML='Ver toda a biblioteca ('+L.length+' vídeo'+(L.length>1?'s':'')+') <span>→</span>';})();
 </script><script>(function(){var g=window.KG_GOOGLE||{};document.querySelectorAll("[data-kg-review]").forEach(function(a){a.href=window.kgReviewLink?window.kgReviewLink():a.href});if(g.perfil)document.querySelectorAll("[data-kg-profile]").forEach(function(a){a.href=g.perfil})})();</script>
-<script src="assets/premium.js" defer></script>
+<script src="assets/premium.js?v=20261111" defer></script>
 </body></html>
