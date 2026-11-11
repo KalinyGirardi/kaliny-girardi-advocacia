@@ -1486,7 +1486,7 @@ window.openContractEditor=window.openContractEditor||openContractEditor;
    Regras: vence a alteração mais recente (updatedAt); exclusões viram marcação (deletedAt);
    resposta vazia ou com erro do servidor nunca apaga dados deste navegador. */
 (function(){
-  const VERSION='V145.76';
+  const VERSION='V145.77';
   const META_KEY='kaliny_sync_meta_v1';
   const COLLECTIONS=['processes','finance','notes','calcHistory','previdenciario','documents','tasks','agenda'];
   const IS_COLLAB=(typeof session!=='undefined'&&session&&session.role==='colaboradora'),COLLAB_PUSH=new Set(['finance','tasks']);let warnedForbidden=false;
@@ -4385,9 +4385,9 @@ body.kg-collab [onclick^="openDocumentUpload"],body.kg-collab [onclick^="openPro
     openModal(t.id?'Editar tarefa':'Nova tarefa',`<form id="tmForm" class="form-grid"><div class="field full"><label>O que precisa ser feito</label><input name="title" required value="${esc(t.title||'')}" placeholder="Ex.: Protocolar a réplica no processo da Ana"></div>
 <div class="field"><label>Responsável</label><select name="assignee">${opts}</select></div><div class="field"><label>Prazo</label><input name="dueDate" type="date" value="${esc(t.dueDate||'')}"></div>
 <div class="field full"><label>Cliente (opcional)</label><select name="clientId"><option value="">Sem cliente</option>${cl}</select><div class="mini-help">Se escolher um cliente para uma colaboradora, ela passa a ver esse cliente.</div></div>
-<div class="field full"><label>Detalhes</label><textarea name="notes" rows="3">${esc(t.notes||'')}</textarea></div><div class="form-actions"><button class="d-btn" type="submit">Salvar tarefa</button></div></form>`);
+${window.kalinyRepeat?window.kalinyRepeat.field(t.repeat):''}<div class="field full"><label>Detalhes</label><textarea name="notes" rows="3">${esc(t.notes||'')}</textarea></div><div class="form-actions"><button class="d-btn" type="submit">Salvar tarefa</button></div></form>`);
     document.getElementById('tmForm').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target),now=new Date().toISOString();
-      const v={title:String(f.get('title')).trim(),assignee:String(f.get('assignee')||''),dueDate:String(f.get('dueDate')||''),clientId:String(f.get('clientId')||''),notes:String(f.get('notes')||'').trim(),updatedAt:now};
+      const v={title:String(f.get('title')).trim(),assignee:String(f.get('assignee')||''),dueDate:String(f.get('dueDate')||''),clientId:String(f.get('clientId')||''),notes:String(f.get('notes')||'').trim(),repeat:String(f.get('repeat')||''),updatedAt:now};if(t.id&&String(t.repeat||'')!==v.repeat)v.nextId='';
       if(t.id)Object.assign(T().find(x=>x.id===t.id)||{},v);else T().push({id:'task_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),status:'pendente',createdAt:now,createdBy:ME,comments:[],...v});
       save();closeModal();renderTasks();toast(v.assignee?'Tarefa designada para '+nameOf(v.assignee):'Tarefa salva')};
   }
@@ -5184,6 +5184,72 @@ ${cr.draws.length?`<table class="pr-t rs-draws" style="margin-top:12px"><tbody>$
 })();
 </script>
 <script>
+/* V145.77 — (1) Busca única: 🔎 no topo ou Ctrl+K (ou "/") procura em clientes, processos, financeiro, documentos,
+   tarefas e agenda de uma vez, e abre o item. (2) Repetição: tarefas e compromissos com "Repetir" (todo dia, semana,
+   15 dias, mês, ano) — ao concluir a tarefa ou passar a data do compromisso, a próxima é criada sozinha
+   (id fixo por data, então vários aparelhos não duplicam). */
+(function(){
+  const S=(typeof session!=='undefined'&&session)||{},COLLAB=S.role==='colaboradora';
+  const fold=v=>String(v==null?'':v).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+  const digits=v=>String(v||'').replace(/\D/g,'');
+  const brd=v=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(v||'');return m?m[3]+'/'+m[2]+'/'+m[1]:''};
+  const cname=id=>{const c=id?clientById(id):null;return c?c.name:''};
+  const canPage=pg=>{try{return typeof can!=='function'||can(pg)}catch(e){return true}};
+  // ---------- (1) busca única ----------
+  function sources(){const L=k=>(data[k]||[]).filter(x=>x&&!x.deletedAt);const out=[];
+    if(canPage('clients'))L('clients').forEach(c=>out.push({g:'Clientes',ic:'👤',t:c.name||'(sem nome)',s:[c.phone,c.email,c.cpf].filter(Boolean).join(' · '),hay:[c.name,c.phone,c.email,c.cpf,c.notes&&String(c.notes).slice(0,200)],dg:[c.phone,c.cpf],go:()=>viewClient(c.id)}));
+    if(canPage('processes'))L('processes').forEach(x=>out.push({g:'Processos',ic:'⚖',t:x.number||x.subject||'Processo',s:[x.subject&&x.number?x.subject:'',cname(x.clientId),x.court].filter(Boolean).join(' · '),hay:[x.number,x.subject,x.court,cname(x.clientId)],dg:[x.number],go:()=>openProcessDetail(x.id)}));
+    if(canPage('finance'))L('finance').filter(f=>!f.ownerDraw||!COLLAB).forEach(f=>out.push({g:'Financeiro',ic:'💰',t:(f.desc||f.category||'Lançamento')+' — '+money(f.value),s:[cname(f.clientId),brd(f.dueDate||f.date),f.status].filter(Boolean).join(' · '),hay:[f.desc,f.category,cname(f.clientId),money(f.value),String(f.value||'')],go:()=>editFinance(f.id)}));
+    if(canPage('documents'))L('documents').forEach(d=>out.push({g:'Documentos',ic:'📄',t:d.name||d.title||'Documento',s:[cname(d.clientId),d.category].filter(Boolean).join(' · '),hay:[d.name,d.title,d.category,d.description,cname(d.clientId)],go:()=>{if(d.clientId&&clientById(d.clientId)){viewClient(d.clientId);setTimeout(()=>{try{openClientTab(d.clientId,'documents')}catch(e){}},60)}else showPage('documents')}}));
+    if(canPage('tasks'))L('tasks').forEach(t=>out.push({g:'Tarefas',ic:'☑',t:t.title||'Tarefa',s:[t.status==='feita'?'feita':'pendente',brd(t.dueDate),cname(t.clientId)].filter(Boolean).join(' · '),hay:[t.title,t.notes,cname(t.clientId)],go:()=>{showPage('tasks');setTimeout(()=>{const b=document.querySelector('#page-tasks [data-tm-edit="'+CSS.escape(String(t.id))+'"]')||document.querySelector('[data-tm-edit="'+CSS.escape(String(t.id))+'"]');if(b)b.click()},80)}}));
+    if(canPage('agenda'))L('agenda').forEach(e=>out.push({g:'Agenda',ic:'📅',t:(e.time?e.time+' ':'')+(e.title||'Compromisso'),s:[brd(e.date),cname(e.clientId)||e.client].filter(Boolean).join(' · '),hay:[e.title,e.client,cname(e.clientId),brd(e.date)],go:()=>openEventForm(e.clientId||'',e.id)}));
+    return out}
+  function search(q){const words=fold(q).split(/\s+/).filter(Boolean),qd=digits(q);if(!words.length)return [];
+    const res=[];sources().forEach(r=>{const h=fold(r.hay.filter(Boolean).join(' '));let ok=words.every(w=>h.includes(w));if(!ok&&qd.length>=4&&r.dg)ok=r.dg.some(v=>digits(v).includes(qd));if(!ok)return;
+      const tf=fold(r.t);r.score=(tf.startsWith(words[0])?3:0)+(tf.includes(words.join(' '))?2:0);res.push(r)});
+    const order=['Clientes','Processos','Agenda','Tarefas','Financeiro','Documentos'],by={};res.sort((a,b)=>b.score-a.score).forEach(r=>{(by[r.g]=by[r.g]||[]).length<6&&by[r.g].push(r)});
+    return order.filter(g=>by[g]).map(g=>({g,items:by[g],more:res.filter(r=>r.g===g).length-by[g].length}))}
+  let cur=[],sel=0;
+  function draw(){const box=document.getElementById('gsRes'),q=document.getElementById('gsQ');if(!box||!q)return;const G=search(q.value);cur=[];
+    box.innerHTML=!q.value.trim()?'<div class="gs-hint">Digite um nome, CPF, telefone, número de processo, valor ou palavra.<br><small>Dica: Ctrl+K abre esta busca de qualquer tela.</small></div>':G.length?G.map(gr=>`<div class="gs-g">${esc(gr.g)}${gr.more>0?` <small>+${gr.more}</small>`:''}</div>`+gr.items.map(r=>{cur.push(r);const i=cur.length-1;return `<button type="button" class="gs-it${i===sel?' on':''}" data-gs-i="${i}"><span class="gs-ic">${r.ic}</span><span><b>${esc(r.t)}</b><small>${esc(r.s||'')}</small></span></button>`}).join('')).join(''):'<div class="gs-hint">Nada encontrado para “'+esc(q.value)+'”.</div>'}
+  function pick(i){const r=cur[i];if(!r)return;closeModal();setTimeout(()=>{try{r.go()}catch(e){console.warn('Busca:',e)}},30)}
+  function openSearch(){sel=0;openModal('Buscar no painel','<style>.gs-in{width:100%;font-size:17px;padding:12px 14px;border:1px solid #d9c9bb;border-radius:12px;background:#fff}.gs-res{margin-top:10px;max-height:min(60vh,520px);overflow:auto}.gs-g{font:600 11px system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#8d7767;margin:12px 4px 4px}.gs-g small{letter-spacing:0;text-transform:none;font-weight:400}.gs-it{display:flex;gap:10px;align-items:center;width:100%;text-align:left;border:0;background:none;padding:9px 10px;border-radius:10px;cursor:pointer;font:inherit;color:inherit}.gs-it b{display:block;font-weight:600}.gs-it small{display:block;color:#8d7767;font-size:12px}.gs-it.on,.gs-it:hover{background:#f4ece3}.gs-ic{width:28px;text-align:center}.gs-hint{color:#8d7767;padding:14px 6px;line-height:1.6}</style><input id="gsQ" class="gs-in" type="search" autocomplete="off" placeholder="Buscar cliente, processo, lançamento, documento…" aria-label="Buscar no painel"><div id="gsRes" class="gs-res" role="listbox"></div>');
+    const q=document.getElementById('gsQ');q.oninput=()=>{sel=0;draw()};q.onkeydown=e=>{if(e.key==='ArrowDown'){e.preventDefault();sel=Math.min(cur.length-1,sel+1);draw();scroll()}else if(e.key==='ArrowUp'){e.preventDefault();sel=Math.max(0,sel-1);draw();scroll()}else if(e.key==='Enter'){e.preventDefault();pick(sel)}};draw();setTimeout(()=>q.focus(),30)}
+  function scroll(){const b=document.querySelector('#gsRes .gs-it.on');if(b)b.scrollIntoView({block:'nearest'})}
+  document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-gs-i],[data-gs-open]');if(!b)return;if(b.dataset.gsOpen!=null)return openSearch();pick(+b.dataset.gsI)});
+  document.addEventListener('keydown',e=>{const k=String(e.key||'').toLowerCase(),tag=(e.target&&e.target.tagName)||'',typing=/INPUT|TEXTAREA|SELECT/.test(tag)||(e.target&&e.target.isContentEditable);
+    if((e.ctrlKey||e.metaKey)&&k==='k'){e.preventDefault();return openSearch()}if(k==='/'&&!typing&&!document.querySelector('#modal.show')){e.preventDefault();openSearch()}});
+  function button(){const u=document.querySelector('.dash-user');if(!u||document.getElementById('gsBtn'))return;u.insertAdjacentHTML('afterbegin','<button class="gd-help-btn" type="button" id="gsBtn" data-gs-open title="Buscar em tudo (Ctrl+K)">🔎 Buscar</button>')}
+  // ---------- (2) repetição ----------
+  const REP={'':'Não repete',daily:'Todo dia',weekly:'Toda semana',biweekly:'A cada 15 dias',monthly:'Todo mês',yearly:'Todo ano'};
+  const pad=n=>String(n).padStart(2,'0'),isoD=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+  const todayIso=()=>isoD(new Date());
+  function step(iso,rep){const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(iso||'');if(!m)return '';const y=+m[1],mo=+m[2]-1,d=+m[3];let x;
+    if(rep==='daily')x=new Date(y,mo,d+1);else if(rep==='weekly')x=new Date(y,mo,d+7);else if(rep==='biweekly')x=new Date(y,mo,d+14);
+    else if(rep==='monthly'){x=new Date(y,mo+1,1);x.setDate(Math.min(d,new Date(y,mo+2,0).getDate()))}else if(rep==='yearly'){x=new Date(y+1,mo,1);x.setDate(Math.min(d,new Date(y+1,mo+1,0).getDate()))}else return '';return isoD(x)}
+  function nextFrom(iso,rep,minIso){let n=step(iso,rep),g=0;while(n&&n<minIso&&g++<800)n=step(n,rep);return n}
+  const baseId=id=>String(id||'').replace(/_r\d{8}$/,'');
+  function materialize(){if(COLLAB)return false;let ch=false;const now=new Date().toISOString(),t0=todayIso();
+    (data.tasks||[]).slice().forEach(t=>{if(!t||t.deletedAt||!REP[t.repeat]||!t.repeat||t.status!=='feita'||t.nextId)return;
+      const from=t.dueDate||String(t.doneAt||t.updatedAt||now).slice(0,10),nd=nextFrom(from,t.repeat,t0);if(!nd)return;const id=baseId(t.id)+'_r'+nd.replace(/-/g,'');
+      if(!(data.tasks||[]).some(x=>x&&String(x.id)===id))data.tasks.push({id,title:t.title,assignee:t.assignee,clientId:t.clientId||'',notes:t.notes||'',repeat:t.repeat,dueDate:nd,status:'pendente',createdAt:now,createdBy:t.createdBy,comments:[],updatedAt:now});
+      t.nextId=id;t.updatedAt=now;ch=true});
+    (data.agenda||[]).slice().forEach(e=>{if(!e||e.deletedAt||e.onlineId||e.google||!e.repeat||!REP[e.repeat]||e.nextId||!e.date||String(e.date).slice(0,10)>=t0||lower(e.status)==='cancelado')return;
+      const nd=nextFrom(String(e.date).slice(0,10),e.repeat,t0);if(!nd)return;const id=baseId(e.id)+'_r'+nd.replace(/-/g,'');
+      if(!(data.agenda||[]).some(x=>x&&String(x.id)===id)){const c={...e};delete c.nextId;delete c.googleId;delete c.gcalId;Object.assign(c,{id,date:nd,updatedAt:now});data.agenda.push(c)}
+      e.nextId=id;e.updatedAt=now;ch=true});
+    return ch}
+  const lower=v=>String(v||'').trim().toLowerCase();
+  let mt=0;function runMat(){clearTimeout(mt);mt=setTimeout(()=>{try{if(materialize()){save();try{window.kalinySync&&window.kalinySync.syncNow()}catch(e){}}}catch(e){console.warn('Repetição:',e)}},400)}
+  const field=v=>`<div class="field" data-rep-field><label>Repetir</label><select name="repeat">${Object.entries(REP).map(([k,l])=>`<option value="${k}" ${String(v||'')===k?'selected':''}>${l}</option>`).join('')}</select><div class="mini-help">A próxima é criada sozinha quando esta for concluída (tarefa) ou passar (compromisso).</div></div>`;
+  // compromisso: o formulário já salva todos os campos — só acrescenta o "Repetir"
+  const oE=window.openEventForm;if(typeof oE==='function')window.openEventForm=function(clientId,existingId){const r=oE.apply(this,arguments);try{const f=document.getElementById('eventForm');if(f&&!f.querySelector('[data-rep-field]')&&!COLLAB){const ex=(data.agenda||[]).find(x=>String(x.id)===String(existingId||''));const act=f.querySelector('.form-actions');(act||f.lastElementChild).insertAdjacentHTML('beforebegin',field(ex&&ex.repeat));
+      if(ex&&ex.repeat){f.addEventListener('submit',()=>{const v=f.repeat.value;if(v!==ex.repeat)delete ex.nextId},{capture:true})}}}catch(e){console.warn('Repetição:',e)}return r};
+  window.kalinyRepeat={materialize,step,nextFrom,REP,field};window.kalinySearch={open:openSearch,search};
+  const oR=window.renderAll;window.renderAll=function(){const r=oR.apply(this,arguments);try{button();runMat()}catch(e){console.warn('V145.77:',e)}return r};setTimeout(()=>{button();runMat()},1200);
+})();
+</script>
+<script>
 /* V145.53: lista de clientes — 🗑 excluir e "cadastro repetido" (abre Conferir cadastros). */
 (function(){
   let cache={at:0,set:new Set()};
@@ -5483,5 +5549,5 @@ ${cr.waiting.length&&cr.part?`<div class="form-actions" style="margin-top:10px">
     const m=document.getElementById('modal');if(m&&m.classList.contains('show')&&m.classList.contains('kg-cpage')){try{closeModal()}catch(err){m.classList.remove('show')}}},true);
 })();
 </script>
-<script src="assets/panel-ui.js?v=145.76"></script>
+<script src="assets/panel-ui.js?v=145.77"></script>
 </body></html>
